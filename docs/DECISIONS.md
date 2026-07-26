@@ -65,6 +65,21 @@ Antes de apagar o `scratch/`, os 19 arquivos puxados do n8n vivo foram movidos p
 **Por quê:** critério = apagar o que se regenera, preservar o que não se regenera.
 Resultado: 220 MB / 620 arquivos → 3,8 MB / ~100 arquivos.
 
+### D-6 — Formato do login: uma conta por clínica, criada à mão · 26/07/2026
+**Decisão:** (a) **um login compartilhado por clínica**, não por pessoa; (b) contas criadas
+pelo dono no painel do Supabase, sem autocadastro nem tela de admin; (c) sessão **não expira**.
+**Por quê:** o alvo agora é uma clínica só. Gestão de usuários e timeout de inatividade são
+complexidade que não se paga nesse tamanho, e sessão que expira no meio do expediente derruba
+o Realtime — a recepção lê isso como "o sistema travou".
+
+**Consequência assumida:** `mensagem_logs.sender_id` fica sempre NULL (com uma conta só, gravar
+o uid não informa quem escreveu). `conversations.assignee_id` continua em uso, mas seu
+significado degrada de *"quem assumiu"* para *"se alguém assumiu"* — ainda alimenta o rótulo
+`Humano` no cabeçalho e as abas de filtro do CRM.
+
+**Reabrir quando:** entrar a segunda clínica, ou quando a recepção tiver mais de uma pessoa e
+alguém perguntar "quem respondeu esse paciente?".
+
 ---
 
 ## 🚫 Rejeitadas (NÃO reintroduza)

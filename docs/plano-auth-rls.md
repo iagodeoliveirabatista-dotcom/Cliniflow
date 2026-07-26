@@ -302,30 +302,102 @@ por `POST /rest/v1/rpc/criar_pre_agendamento` com o corpo
 ## 6. Etapa 3 — Frontend
 
 Arquivos: `cliniflow-export/supabase-client.js` e `cliniflow-export/cliniflow-components.jsx`.
-É JS puro com React via CDN, **sem build step** — não introduza bundler.
+É JS puro com React via CDN, **sem build step** — não introduza bundler, não introduza
+router. O app inteiro é uma SPA que já existe; você só está colocando um portão na frente.
 
-1. **Tela de login** — email + senha, antes de qualquer coisa renderizar.
-   `supabase.auth.signInWithPassword({ email, password })`.
-2. **Guardar a sessão** — o supabase-js v2 persiste em localStorage e injeta o JWT
-   automaticamente em toda query. Não construa header manualmente.
-3. **Bloquear o app sem sessão** — `supabase.auth.getSession()` no boot;
-   `supabase.auth.onAuthStateChange()` para reagir a logout/expiração.
-4. **Botão de sair** — `supabase.auth.signOut()`.
-5. **Remover os hacks de uuid fantasma.** Existem hoje comparações contra
-   `'d3b07384-ad6b-4f5c-9ab4-66e2854d88ad'` em `updateConversa` e `enviarMensagemCRM`
-   que zeram `assignee_id`/`sender_id`. Com Auth real, use `auth.uid()` de verdade.
-6. **`config.js`** — a chave anon continua aí, e tudo bem: com o RLS fechado ela deixa
-   de dar acesso a dado nenhum sem login. É esse o ponto do trabalho.
+### 6.1. A tela
+
+Card centralizado na viewport, fundo `var(--supabase-bg-studio)`. Combine com o visual que já
+existe no CRM (tema escuro, `#161616` nos inputs, `1px solid var(--supabase-border)`,
+`borderRadius: 8`, o `accent` como cor do botão). **Não invente um sistema visual novo.**
+
+Conteúdo, e só isto:
+- Nome da clínica / "Cliniflow"
+- Campo e-mail (`type="email"`, `autoComplete="username"`)
+- Campo senha (`type="password"`, `autoComplete="current-password"`)
+- Botão **Entrar** (estado `disabled` enquanto envia, texto vira `"..."`)
+- Uma linha de erro, em vermelho, abaixo dos campos
+
+**Sem** link de criar conta. **Sem** "esqueci minha senha". Ver decisão 6.4.
+
+Mensagens de erro — traduza, não vaze o erro cru do Supabase:
+- `Invalid login credentials` → "E-mail ou senha incorretos."
+- falha de rede → "Sem conexão com o servidor. Verifique a internet."
+- qualquer outro → "Não foi possível entrar. Tente de novo."
+
+### 6.2. Sessão
+
+O supabase-js v2 já persiste em `localStorage` e renova o token sozinho — **os defaults
+estão certos, não os desabilite** e não construa header `Authorization` manualmente.
+
+```js
+// no boot, antes de renderizar o app
+const { data: { session } } = await supabase.auth.getSession();
+
+// e reagir a mudanças (logout, token revogado)
+supabase.auth.onAuthStateChange((_event, session) => { /* re-render */ });
+```
+
+Sem sessão → renderiza a tela de login. Com sessão → renderiza o CRM.
+Botão **Sair** no cabeçalho, chamando `supabase.auth.signOut()`.
+
+> ⚠️ **Cuidado com o Realtime.** As inscrições WebSocket precisam ser criadas **depois** de
+> haver sessão, e refeitas se a sessão mudar. Se você assinar antes do login, o canal sobe
+> sem JWT e, com o RLS fechado, não entrega evento nenhum — silenciosamente. Ver armadilha 3.4.
+
+### 6.3. `sender_id` e `assignee_id` com login compartilhado
+
+A decisão foi **um login por clínica** (ver 6.4). Isso muda o significado dessas colunas:
+
+- **`mensagem_logs.sender_id`** → deixe **NULL**. Com uma conta só, gravar o uid não diz quem
+  escreveu; é dado sem informação, e dado sem informação engana quem for ler depois.
+- **`conversations.assignee_id`** → **continue usando**, mas o significado degrada de
+  *"quem assumiu"* para *"se alguém assumiu"*. Isso ainda é útil: é o que faz a conversa
+  aparecer como `Humano` no cabeçalho e alimenta as abas *minhas / não atribuídas / resolvidas*.
+  Grave `session.user.id` quando a recepção assumir.
+
+**Remova o hack do uuid fantasma.** Hoje existem comparações contra
+`'d3b07384-ad6b-4f5c-9ab4-66e2854d88ad'` (que é o **id da clínica**, usado como se fosse um
+usuário) em `updateConversa` e `enviarMensagemCRM`, zerando os campos. Troque por
+`session.user.id` no `assignee_id` e `null` fixo no `sender_id`.
+
+### 6.4. Decisões já tomadas — não reabra
+
+| Decisão | Escolha | Consequência para você |
+|---|---|---|
+| Identidade | **Um login por clínica** | Não construa gestão de usuários. Uma conta só. |
+| Quem cria contas | **O dono, pelo painel do Supabase** | Não construa autocadastro nem convite por e-mail. |
+| Sessão | **Não expira** | Mantenha os defaults do supabase-js. Não implemente timeout de inatividade. |
+
+Recuperação de senha é feita pelo painel do Supabase (Authentication → o usuário →
+*Send password recovery*). Por isso não há link de "esqueci a senha" na tela.
+
+**Não substitua isso por "algo melhor".** São escolhas conscientes para uma clínica só;
+a ampliação vem depois, se vier.
+
+### 6.5. `config.js`
+
+A chave anon continua no arquivo, e **tudo bem**: com o RLS fechado ela deixa de dar acesso a
+dado nenhum sem login. Esse é justamente o objetivo do trabalho — não tente escondê-la.
 
 ---
 
-## 7. Etapa 4 — Criar o primeiro usuário e vincular
+## 7. Etapa 4 — Criar a conta da clínica e vincular
+
+No painel: **Authentication → Add user → Create new user**. Marque
+*Auto Confirm User* (não há fluxo de confirmação por e-mail neste projeto).
+Use um e-mail que a clínica controle, ex. `recepcao@<clinica>.com.br`.
 
 ```sql
--- depois de criar o usuário pelo painel (Authentication → Add user)
+-- vincula a conta à clínica (uma linha por clínica, decisão 6.4)
 INSERT INTO public.clinic_users (user_id, clinic_id, nome, papel)
 VALUES ('<uuid-do-usuario>', '<uuid-da-clinica>', 'Recepção', 'admin');
 ```
+
+Confira que o vínculo funciona **antes** de fechar qualquer tabela — logado como esse
+usuário, `SELECT public.auth_clinic_id();` tem que devolver o uuid da clínica, não NULL.
+Se devolver NULL, todas as políticas vão negar tudo e você vai debugar a tela achando que
+é o frontend.
 
 Conferir que todo dado existente tem dono antes de fechar:
 

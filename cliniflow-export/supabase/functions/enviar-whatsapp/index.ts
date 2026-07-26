@@ -10,6 +10,20 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// logs_erro é o destino único de erro dos três componentes (n8n, edge, frontend).
+// workflow_name/node_name são NOT NULL e mapeados ao nó do n8n; aqui viram slug da
+// função e ponto de falha. Nunca deixa a falha de log derrubar o envio.
+async function logErro(supabase: any, ponto: string, mensagem: string) {
+  try {
+    await supabase.from('logs_erro').insert({
+      origem: 'edge',
+      workflow_name: 'enviar-whatsapp',
+      node_name: ponto,
+      error_message: String(mensagem).slice(0, 2000),
+    });
+  } catch (_) { /* logar erro não pode gerar erro */ }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS });
@@ -46,14 +60,18 @@ serve(async (req) => {
       const expiraEm = new Date(Date.now() + 16 * 60 * 60 * 1000); // 16 horas
       const telefoneFormatado = cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone;
 
-      await supabase
+      const { error: sessaoErr } = await supabase
         .from('sessoes_ativas')
         .upsert({
           telefone: telefoneFormatado,
           nome_paciente: nome_paciente || null,
-          google_event_id: consulta_id,
+          consulta_id: consulta_id,
           expira_em: expiraEm.toISOString(),
         });
+
+      // Sem isto o erro é engolido: o lembrete sai, a sessão de 16h não abre, e o
+      // "CONFIRMAR" do paciente cai no fluxo do agente em vez do de confirmação.
+      if (sessaoErr) await logErro(supabase, 'abre_sessao_16h', sessaoErr.message);
     }
 
     // 1. Localiza ou cria o paciente no banco por telefone
@@ -162,6 +180,9 @@ serve(async (req) => {
 
     // Atualizar status do log
     const newStatus = n8nRes.ok ? 'sent' : 'failed';
+    if (!n8nRes.ok) {
+      await logErro(supabase, 'webhook_n8n', `HTTP ${n8nRes.status} ao enviar para ${n8nUrl}`);
+    }
     if (logRow?.id) {
       await supabase
         .from('mensagem_logs')
@@ -182,6 +203,12 @@ serve(async (req) => {
       { status: n8nRes.ok ? 200 : 502, headers: { ...CORS, 'Content-Type': 'application/json' } },
     );
   } catch (err) {
+    // Cliente próprio: o do bloco try está fora de escopo aqui.
+    await logErro(
+      createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!),
+      'excecao',
+      String(err),
+    );
     return new Response(
       JSON.stringify({ ok: false, error: String(err) }),
       { status: 500, headers: { ...CORS, 'Content-Type': 'application/json' } },
