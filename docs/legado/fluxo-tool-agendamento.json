@@ -1,0 +1,52 @@
+{
+  "name": "Cliniflow - Tool Agendamento",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "e5cc9f81-5c8e-4a69-8f83-e187b5a1936c",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [ 180, 240 ]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "consultas",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "patient_id", "fieldValue": "={{ $json.query.patient_id }}" },
+            { "fieldId": "clinic_id", "fieldValue": "={{ $json.query.clinic_id }}" },
+            { "fieldId": "status", "fieldValue": "solicitado" },
+            { "fieldId": "notas", "fieldValue": "=Solicitação IA: {{ $json.query.especialidade }}. Preferência: {{ $json.query.periodo_preferencia }}. Obs: {{ $json.query.observacoes }}" }
+          ]
+        }
+      },
+      "id": "7f872f25-83c9-4b8c-8f9f-092592d3b5ac",
+      "name": "Supabase Insert",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [ 400, 240 ],
+      "credentials": { "supabaseApi": { "id": "hJIcCVPmy1j9Vjq1", "name": "Supabase account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "return { json: { success: true, message: 'Agendamento solicitado com sucesso e enviado à recepção.' } };"
+      },
+      "id": "d9834241-e941-4cf4-92e9-4e50337b51e0",
+      "name": "Code",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [ 620, 240 ]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [ [ { "node": "Supabase Insert", "type": "main", "index": 0 } ] ]
+    },
+    "Supabase Insert": {
+      "main": [ [ { "node": "Code", "type": "main", "index": 0 } ] ]
+    }
+  },
+  "settings": {}
+}

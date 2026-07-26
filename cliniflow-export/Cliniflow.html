@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cliniflow — Agenda</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="supabase.js"></script>
+
+  <script src="config.js"></script>
+  <script src="supabase-client.js?v=9"></script>
+
+  <script type="text/babel" src="tweaks-panel.jsx?v=4"></script>
+  <script type="text/babel" src="cliniflow-components.jsx?v=7"></script>
+  <script type="text/babel" src="patients-components.jsx?v=7"></script>
+  <script type="text/babel" src="reports-components.jsx?v=4"></script>
+  <script type="text/babel" src="automation-components.jsx?v=4"></script>
+
+  <style>
+    :root {
+      /* Mapeamento de Cores Supabase */
+      --supabase-brand: #3ecf8e;
+      --supabase-brand-hover: #30b27b;
+      --supabase-bg-main: #171717;
+      --supabase-bg-studio: #0f0f0f;
+      --supabase-bg-card: #1e1e1e;
+      --supabase-border: #2e2e2e;
+      
+      /* Texto */
+      --supabase-text: #ffffff;
+      --supabase-text-light: #ededed;
+      --supabase-text-muted: #a0a0a0;
+      
+      /* Cantos e Transições */
+      --radius-studio: 6px;
+      --transition-studio: all 0.2s ease-in-out;
+    }
+    :root[data-theme="light"] {
+      --supabase-bg-main: #fbfcfd;
+      --supabase-bg-studio: #f4f5f7;
+      --supabase-bg-card: #ffffff;
+      --supabase-border: #e6e8eb;
+      --supabase-text: #1f2937;
+      --supabase-text-light: #4b5563;
+      --supabase-text-muted: #8c92a0;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; overflow: hidden; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--supabase-bg-main); color: var(--supabase-text-light); }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--supabase-border); border-radius: var(--radius-studio); }
+    ::-webkit-scrollbar-thumb:hover { background: var(--supabase-text-muted); }
+    button { font-family: inherit; }
+    input, textarea, select { font-family: inherit; }
+    @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: translateY(0) } }
+  </style>
+</head>
+<body style="font-family: Inter; font-size: 15px">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useCallback } = React;
+    const {
+      TweaksPanel, TweakSection, TweakRadio, TweakToggle, useTweaks,
+    } = window;
+    const {
+      APPOINTMENTS, STATUS_CFG,
+      Sidebar, ListView, CalendarView, KanbanView, DetailPanel,
+      PATIENTS, PatientsView,
+      AddPatientModal, EditPatientModal, NewAppointmentModal,
+      ReportsView,
+      AutomationView,
+      AtendimentosView,
+    } = window;
+    const SB = window.SupabaseService;
+
+    // ── Constants ──────────────────────────────────────────────────────────
+
+    const ACCENT_MAP = {
+      verde:   '#3ecf8e',
+      azul:    '#5b8cff',
+      violeta: '#a78bfa',
+      cyan:    '#22d3ee',
+    };
+
+    const FILTER_TABS = [
+      { id:'todas',       label:'Todas'       },
+      { id:'confirmed',   label:'Confirmadas' },
+      { id:'pending',     label:'Pendentes'   },
+      { id:'solicitado',  label:'Solicitadas' },
+      { id:'rescheduled', label:'Solicitado reagendamento' },
+      { id:'canceled',    label:'Canceladas'  },
+    ];
+
+    const LAYOUT_ICONS = {
+      lista:      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>,
+      calendário: <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z"/></svg>,
+      kanban:     <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6h4v13H4zm6-3h4v8h-4zm6 5h4v11h-4z"/></svg>,
+    };
+
+    // ── App ────────────────────────────────────────────────────────────────
+
+    const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+      "layout": "lista",
+      "accent": "verde",
+      "compacto": false,
+      "theme": "dark"
+    }/*EDITMODE-END*/;
+
+    function App() {
+      const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+      const [appts, setAppts] = useState([...APPOINTMENTS]);
+      const [patients, setPatients] = useState([...PATIENTS]);
+      const [selectedId, setSelectedId] = useState(null);
+      const [filter, setFilter] = useState('todas');
+      const [page, setPage] = useState('agenda');
+      const [newApptOpen, setNewApptOpen] = useState(false);
+      const [newPatientOpen, setNewPatientOpen] = useState(false);
+      const [editingPatient, setEditingPatient] = useState(null);
+      const [dbConnected, setDbConnected] = useState(false);
+      const [currentMonday, setCurrentMonday] = useState(() => {
+        const now = new Date();
+        const monday = new Date(now);
+        monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+        monday.setHours(0, 0, 0, 0);
+        return monday;
+      });
+
+      const accent = ACCENT_MAP[t.accent] || '#3ecf8e';
+      const selected = appts.find(a => a.id === selectedId) || null;
+
+      useEffect(() => {
+        document.documentElement.setAttribute('data-theme', t.theme);
+      }, [t.theme]);
+
+      // ── Load real data from Supabase on mount ─────────────────────────
+      useEffect(() => {
+        if (!SB || !SB.isConnected()) return;
+        setDbConnected(true);
+
+        // Load patients
+        SB.fetchPacientes().then(res => {
+          if (res.data) {
+            setPatients(res.data.map(SB.pacienteToPatient));
+          }
+        });
+
+        // Sincronização em tempo real (Supabase Realtime) para pacientes
+        const subPacientes = SB.subscribeToPacientes((payload) => {
+          SB.fetchPacientes().then(res => {
+            if (res.data) {
+              setPatients(res.data.map(SB.pacienteToPatient));
+            }
+          });
+        });
+
+        return () => {
+          if (subPacientes) subPacientes.unsubscribe();
+        };
+      }, []);
+
+      useEffect(() => {
+        if (!SB || !SB.isConnected()) return;
+
+        const sunday = new Date(currentMonday);
+        sunday.setDate(currentMonday.getDate() + 6);
+        sunday.setHours(23, 59, 59, 999);
+
+        SB.fetchConsultas({
+          dataInicio: currentMonday.toISOString(),
+          dataFim: sunday.toISOString(),
+        }).then(res => {
+          if (res.data) {
+            setAppts(res.data.map(c => SB.consultaToAppointment(c, currentMonday)));
+          }
+        });
+
+        // Subscribe to realtime changes
+        const subConsultas = SB.subscribeToConsultas((payload) => {
+          SB.fetchConsultas({
+            dataInicio: currentMonday.toISOString(),
+            dataFim: sunday.toISOString(),
+          }).then(res => {
+            if (res.data) setAppts(res.data.map(c => SB.consultaToAppointment(c, currentMonday)));
+          });
+        });
+
+        return () => {
+          if (subConsultas) subConsultas.unsubscribe();
+        };
+      }, [currentMonday]);
+
+      // ── CRUD Operations ───────────────────────────────────────────────
+      const updateConsulta = useCallback(async (id, updates) => {
+        // Update locally first (optimistic)
+        setAppts(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
+
+        // Update in Supabase if connected
+        if (dbConnected) {
+          const payload = { ...updates };
+          if (payload.status) {
+            const statusMap = { confirmed: 'confirmado', pending: 'pendente', rescheduled: 'remarcado', canceled: 'cancelado', solicitado: 'solicitado' };
+            payload.status = statusMap[payload.status] || payload.status;
+          }
+          await SB.updateConsulta(id, payload);
+        }
+      }, [dbConnected]);
+
+      const deleteAppt = useCallback(async (id) => {
+        // Update locally first (optimistic)
+        setAppts(prev => prev.filter(a => a.id !== id));
+        setSelectedId(null);
+
+        // Delete in Supabase if connected
+        if (dbConnected) {
+          await SB.deleteConsulta(id);
+        }
+      }, [dbConnected]);
+
+      const moveAppt = useCallback(async (id, newDay, newTime) => {
+        setAppts(prev => prev.map(a => a.id === id ? { ...a, day: newDay, time: newTime } : a));
+
+        if (dbConnected) {
+          // Calculate new date from currentMonday
+          const targetDate = new Date(currentMonday);
+          targetDate.setDate(currentMonday.getDate() + newDay);
+          const [h, m] = newTime.split(':').map(Number);
+          targetDate.setHours(h, m, 0, 0);
+          await SB.updateConsulta(id, { data_hora: targetDate.toISOString() });
+        }
+      }, [dbConnected, currentMonday]);
+
+      const addAppt = useCallback(async (a) => {
+        if (dbConnected) {
+          // Calculate real datetime from currentMonday
+          const targetDate = new Date(currentMonday);
+          targetDate.setDate(currentMonday.getDate() + parseInt(a.day));
+          const [h, m] = a.time.split(':').map(Number);
+          targetDate.setHours(h, m, 0, 0);
+
+          // Find patient by name to get ID
+          const pat = patients.find(p => p.name === a.patient || p.id === a.patientId);
+
+          const statusMap = { confirmed: 'confirmado', pending: 'pendente', rescheduled: 'remarcado', canceled: 'cancelado', solicitado: 'solicitado' };
+          const res = await SB.createConsulta({
+            patient_id: pat?.id || null,
+            data_hora: targetDate.toISOString(),
+            duracao_min: a.dur,
+            tipo: a.type,
+            medico: a.doctor,
+            status: statusMap[a.status] || 'pendente',
+            whatsapp_ativo: a.wa,
+            preco: a.preco,
+          });
+          if (res.data) {
+            setAppts(prev => [...prev, SB.consultaToAppointment(res.data, currentMonday)]);
+            return;
+          }
+        }
+        // Fallback: add locally
+        setAppts(prev => [...prev, a]);
+      }, [dbConnected, patients, currentMonday]);
+
+      const addPatient = useCallback(async (p) => {
+        if (dbConnected) {
+          const res = await SB.createPaciente({
+            nome: p.name,
+            telefone: p.phone,
+            email: p.email,
+            convenio: p.convenio,
+            data_nasc: p.data_nasc,
+          });
+          if (res.data) {
+            setPatients(prev => [SB.pacienteToPatient(res.data), ...prev]);
+            return;
+          }
+        }
+        // Fallback: add locally
+        setPatients(prev => [p, ...prev]);
+      }, [dbConnected]);
+
+      const updatePatient = useCallback(async (id, updates) => {
+        // Update locally first (optimistic)
+        setPatients(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+
+        if (dbConnected) {
+          const payload = {
+            nome: updates.name,
+            telefone: updates.phone,
+            email: updates.email,
+            convenio: updates.convenio,
+            status: updates.status,
+            data_nasc: updates.data_nasc,
+          };
+          const res = await SB.updatePaciente(id, payload);
+          if (res.data) {
+            setPatients(prev => prev.map(p => p.id === id ? SB.pacienteToPatient(res.data) : p));
+          }
+        }
+      }, [dbConnected]);
+
+      const counts = {
+        todas:       appts.length,
+        confirmed:   appts.filter(a => a.status === 'confirmed').length,
+        pending:     appts.filter(a => a.status === 'pending').length,
+        solicitado:  appts.filter(a => a.status === 'solicitado').length,
+        rescheduled: appts.filter(a => a.status === 'rescheduled').length,
+        canceled:    appts.filter(a => a.status === 'canceled').length,
+      };
+      const filteredList = filter === 'todas' ? appts : appts.filter(a => a.status === filter);
+
+      return (
+        <div style={{ display:'flex', height:'100vh', overflow:'hidden', background:'var(--supabase-bg-studio)' }}>
+          <Sidebar accent={accent} currentPage={page} onNavigate={setPage} />
+
+          {/* Main column */}
+          <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', minWidth:0 }}>
+
+            {page === 'agenda' && (
+              <React.Fragment>
+                <AgendaHeader
+                  accent={accent} counts={counts} filter={filter} setFilter={setFilter}
+                  layout={t.layout} setLayout={v => setTweak('layout', v)}
+                  onNewAppt={() => setNewApptOpen(true)}
+                  currentMonday={currentMonday}
+                  onPrevWeek={() => {
+                    const d = new Date(currentMonday);
+                    d.setDate(d.getDate() - 7);
+                    setCurrentMonday(d);
+                  }}
+                  onNextWeek={() => {
+                    const d = new Date(currentMonday);
+                    d.setDate(d.getDate() + 7);
+                    setCurrentMonday(d);
+                  }}
+                />
+                <div style={{ flex:1, overflow:'hidden', display:'flex', minHeight:0 }}>
+                  {t.layout === 'lista' && (
+                    <ListView appointments={filteredList} selectedId={selectedId}
+                      onSelect={setSelectedId} accent={accent} />
+                  )}
+                  {t.layout === 'calendário' && (
+                    <CalendarView appointments={appts} selectedId={selectedId}
+                      onSelect={setSelectedId} accent={accent} onMove={moveAppt}
+                      currentMonday={currentMonday} />
+                  )}
+                  {t.layout === 'kanban' && (
+                    <KanbanView appointments={appts} selectedId={selectedId}
+                      onSelect={setSelectedId} accent={accent} />
+                  )}
+                  {selected && (
+                    <DetailPanel appointment={selected} onClose={() => setSelectedId(null)}
+                      accent={accent}
+                      onUpdateStatus={(id, status) => updateConsulta(id, { status })}
+                      onDelete={deleteAppt}
+                      onUpdatePreco={(id, preco) => updateConsulta(id, { preco })}
+                    />
+                  )}
+                </div>
+              </React.Fragment>
+            )}
+
+            {page === 'patients' && (
+              <PatientsView
+                patients={patients}
+                onAddPatient={() => setNewPatientOpen(true)}
+                onNewAppointment={() => setNewApptOpen(true)}
+                onEditPatient={setEditingPatient}
+                accent={accent}
+              />
+            )}
+
+            {page === 'atendimentos' && (
+              <AtendimentosView accent={accent} />
+            )}
+
+            {page === 'reports' && (
+              <ReportsView accent={accent} />
+            )}
+
+            {page === 'automation' && (
+              <AutomationView accent={accent} />
+            )}
+          </div>
+
+          {/* ── Modals ─────────────────────────────────────────────── */}
+          {newApptOpen && (
+            <NewAppointmentModal
+              accent={accent}
+              patients={patients}
+              onClose={() => setNewApptOpen(false)}
+              onSave={addAppt}
+              currentMonday={currentMonday}
+            />
+          )}
+          {newPatientOpen && (
+            <AddPatientModal
+              accent={accent}
+              onClose={() => setNewPatientOpen(false)}
+              onSave={addPatient}
+            />
+          )}
+          {editingPatient && (
+            <EditPatientModal
+              accent={accent}
+              patient={editingPatient}
+              onClose={() => setEditingPatient(null)}
+              onSave={async (updatedData) => {
+                await updatePatient(editingPatient.id, updatedData);
+                setEditingPatient(null);
+              }}
+            />
+          )}
+
+          {/* ── Tweaks ──────────────────────────────────────────────── */}
+          <TweaksPanel title="Cliniflow Tweaks">
+            <TweakSection label="Visualização" />
+            <TweakRadio label="Layout" value={t.layout}
+              options={['lista','calendário','kanban']}
+              onChange={v => setTweak('layout', v)} />
+            <TweakSection label="Aparência" />
+            <TweakRadio label="Accent" value={t.accent}
+              options={['verde','azul','violeta','cyan']}
+              onChange={v => setTweak('accent', v)} />
+            <TweakRadio label="Tema" value={t.theme || 'dark'}
+              options={[{value:'dark', label:'Dark'}, {value:'light', label:'Light'}]}
+              onChange={v => setTweak('theme', v)} />
+            <TweakToggle label="Compacto" value={t.compacto}
+              onChange={v => setTweak('compacto', v)} />
+          </TweaksPanel>
+        </div>
+      );
+    }
+
+    function AgendaHeader({ accent, counts, filter, setFilter, layout, setLayout, onNewAppt, currentMonday, onPrevWeek, onNextWeek }) {
+      const formatWeekLabel = () => {
+        const mon = new Date(currentMonday);
+        const fri = new Date(currentMonday);
+        fri.setDate(currentMonday.getDate() + 4);
+        const months = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+        
+        let label = `Semana de ${mon.getDate()}`;
+        if (mon.getMonth() !== fri.getMonth()) {
+          label += ` de ${months[mon.getMonth()]}`;
+        }
+        label += `–${fri.getDate()} de ${months[fri.getMonth()]} · ${mon.getFullYear()}`;
+        return label;
+      };
+
+      return (
+        <div style={{ padding:'14px 20px 0', borderBottom:'1px solid #191919', flexShrink:0 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:13 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+              <h1 style={{ fontSize:15.5, fontWeight:600, color:'var(--supabase-text)', letterSpacing:'-.35px' }}>Agenda</h1>
+              <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                <NavBtn onClick={onPrevWeek}>‹</NavBtn>
+                <span style={{ fontSize:13, color:'#777', fontWeight:400, padding:'0 4px' }}>
+                  {formatWeekLabel()}
+                </span>
+                <NavBtn onClick={onNextWeek}>›</NavBtn>
+              </div>
+              <div style={{ display:'flex', gap:6, marginLeft:6 }}>
+                <StatChip value={counts.confirmed} label="Confirm." color="#3ecf8e" />
+                <StatChip value={counts.pending}   label="Pend."    color="#9ca3af" />
+                <StatChip value={counts.solicitado} label="Solicit." color="#a855f7" />
+                <StatChip value={counts.rescheduled} label="Reagend." color="#f59e0b" />
+                <StatChip value={counts.canceled}  label="Cancel."  color="#ef4444" />
+              </div>
+            </div>
+
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <div style={{
+                display:'flex', background:'var(--supabase-bg-card)', border:'1px solid var(--supabase-border)',
+                borderRadius:'var(--radius-studio)', padding:2, gap:1,
+              }}>
+                {Object.entries(LAYOUT_ICONS).map(([id, icon]) => (
+                  <LayoutBtn key={id} active={layout === id}
+                    onClick={() => setLayout(id)}
+                    accent={accent} icon={icon} label={id} />
+                ))}
+              </div>
+
+              <button onClick={onNewAppt} style={{
+                display:'flex', alignItems:'center', gap:5,
+                padding:'6px 13px', borderRadius:'var(--radius-studio)',
+                background: accent, border:'none',
+                color:'var(--supabase-bg-studio)', fontSize:12.5, fontWeight:600,
+                cursor:'pointer', letterSpacing:'-.2px', flexShrink:0,
+                transition:'var(--transition-studio)'
+              }}>
+                <span style={{ fontSize:16, lineHeight:1, marginTop:-1 }}>+</span> Nova consulta
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display:'flex', gap:0, marginBottom:'-1px' }}>
+            {FILTER_TABS.map(tab => {
+              const active = filter === tab.id;
+              return (
+                <button key={tab.id} onClick={() => setFilter(tab.id)} style={{
+                  padding:'8px 13px', border:'none', background:'transparent',
+                  borderBottom: active ? `2px solid ${accent}` : '2px solid transparent',
+                  color: active ? accent : '#484848',
+                  fontSize:12.5, fontWeight: active ? 500 : 400,
+                  cursor:'pointer', display:'flex', alignItems:'center', gap:5,
+                  transition:'all .13s', letterSpacing:'-.1px',
+                }}>
+                  {tab.label}
+                  <span style={{
+                    fontSize:10.5, minWidth:18, textAlign:'center',
+                    padding:'0 5px', borderRadius:8,
+                    background: active ? `${accent}20` : 'var(--supabase-bg-card)',
+                    color: active ? accent : 'var(--supabase-text-muted)',
+                  }}>{counts[tab.id]}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // ── Coming-soon stub ───────────────────────────────────────────────────
+
+    function ComingSoon({ page, accent }) {
+      const labels = { automation:'Automações', reports:'Relatórios' };
+      return (
+        <div style={{
+          flex:1, display:'flex', alignItems:'center', justifyContent:'center',
+          flexDirection:'column', gap:14, padding:40,
+        }}>
+          <div style={{
+            width:54, height:54, borderRadius:14,
+            background:`${accent}14`, border:`1px solid ${accent}30`,
+            display:'flex', alignItems:'center', justifyContent:'center',
+          }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill={accent}>
+              <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0013 3.06V1h-2v2.06A8.994 8.994 0 003.06 11H1v2h2.06A8.994 8.994 0 0011 20.94V23h2v-2.06A8.994 8.994 0 0020.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
+            </svg>
+          </div>
+          <div style={{ textAlign:'center' }}>
+            <div style={{ fontSize:16, fontWeight:600, color:'#ccc', marginBottom:4 }}>
+              {labels[page]} em breve
+            </div>
+            <div style={{ fontSize:13, color:'#555', maxWidth:340 }}>
+              Esta seção está em construção. Vamos definir o escopo na próxima rodada.
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ── Small UI helpers ───────────────────────────────────────────────────
+
+    function NavBtn({ children, onClick }) {
+      const [hov, setHov] = useState(false);
+      return (
+        <button
+          onClick={onClick}
+          onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+          style={{
+            width:22, height:22, borderRadius:4,
+            background: hov ? '#1c1c1c' : 'transparent',
+            border:'none', color: hov ? '#aaa' : '#444',
+            cursor:'pointer', fontSize:16, lineHeight:'22px',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            transition:'all .12s',
+          }}>
+          {children}
+        </button>
+      );
+    }
+
+    function StatChip({ value, label, color }) {
+      return (
+        <div style={{
+          display:'flex', alignItems:'center', gap:5,
+          padding:'3px 8px', borderRadius:5,
+          background:`${color}0e`, border:`1px solid ${color}22`,
+        }}>
+          <span style={{ width:6, height:6, borderRadius:'50%', background:color, flexShrink:0 }} />
+          <span style={{ fontSize:11, fontWeight:600, color }}>{value}</span>
+          <span style={{ fontSize:11, color:'#3a3a3a' }}>{label}</span>
+        </div>
+      );
+    }
+
+    function LayoutBtn({ active, onClick, accent, icon, label }) {
+      const [hov, setHov] = useState(false);
+      return (
+        <button onClick={onClick}
+          onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+          title={label.charAt(0).toUpperCase() + label.slice(1)}
+          style={{
+            padding:'5px 9px', borderRadius:4, border:'none',
+            background: active ? '#222' : hov ? '#181818' : 'transparent',
+            color: active ? accent : hov ? '#666' : '#383838',
+            cursor:'pointer', transition:'all .12s',
+            display:'flex', alignItems:'center', justifyContent:'center',
+          }}>
+          {icon}
+        </button>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

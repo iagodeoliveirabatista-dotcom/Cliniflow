@@ -1,0 +1,24 @@
+# ── SEGREDOS — nunca commitar ────────────────────────────────
+# .mcp.json guarda o Personal Access Token do Supabase (sbp_...)
+# e o JWT da API do n8n. Ambos dão acesso administrativo.
+.mcp.json
+.env
+.env.*
+*.pem
+*.key
+
+# ── Binários e dependências ──────────────────────────────────
+*.exe
+node_modules/
+target/
+dist/
+
+# ── Estado local de ferramentas ──────────────────────────────
+supabase/.temp/
+.claude/
+scratch/
+
+# ── Sistema ──────────────────────────────────────────────────
+Thumbs.db
+desktop.ini
+.DS_Store

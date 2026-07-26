@@ -1,0 +1,13 @@
+{
+  "execution": {
+    "id": "63225",
+    "workflowId": "3emkawQseclLd2gw",
+    "mode": "manual",
+    "status": "success",
+    "startedAt": "2026-06-17T22:16:56.717Z",
+    "stoppedAt": "2026-06-17T22:16:56.775Z",
+    "retryOf": null,
+    "retrySuccessId": null,
+    "waitTill": null
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "execution": {
+    "id": "63234",
+    "workflowId": "3emkawQseclLd2gw",
+    "mode": "webhook",
+    "status": "success",
+    "startedAt": "2026-06-19T02:14:02.638Z",
+    "stoppedAt": "2026-06-19T02:14:03.145Z",
+    "retryOf": null,
+    "retrySuccessId": null,
+    "waitTill": null
+  }
+}
