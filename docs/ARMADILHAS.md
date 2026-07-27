@@ -326,3 +326,62 @@ confiar na doc.**
 **Verificado rodando:** Playwright abriu o CRM local, painel mostrou "Bot online" /
 "Conectado", zero erros de console — confirmado contra a Evolution real
 (`{"data":{"Connected":true,"LoggedIn":true,"Name":"Iago Batista"}}`).
+
+---
+
+## 12. Buffer de debounce sem TTL corrompia a conversa ✅ CORRIGIDO
+
+**Sintoma:** o paciente manda "oi" e a IA responde chamando ele por um nome errado, ou
+respondendo a uma pergunta que ele fez semanas atrás. **Nenhum erro em lugar nenhum** — a
+execução aparece `success` no n8n e a mensagem sai com `status='sent'`.
+
+**Causa:** `append_whatsapp_buffer()` concatenava sem olhar a idade do buffer. O único
+lugar que limpava a tabela era o nó `Limpa Buffer (Fim)`, que **só roda no caminho feliz**.
+Quando um fluxo morria no meio (o nó `Envia Resposta do Agent` falhou 15x entre 25/06 e
+02/07 com "The service was not able to process your request"), o texto ficava na tabela
+para sempre. A mensagem seguinte daquele telefone era colada no lixo antigo.
+
+**Custo real observado em 27/07/2026:** o paciente mandou um único "oi". O agente recebeu
+`"Oi Oi Oi Oi oi oi Jn bom dia oi oi"` — 10 mensagens de 30/06, 02/07 e 27/07 grudadas — e
+respondeu **"Bom dia, Jn!"**, tratando um "Jn" digitado por engano 25 dias antes como o
+nome do paciente. O paciente real se chama "iago de oliveira".
+
+**Por que ninguém pegou isso:** não gera exceção, não gera log, o n8n marca `success`.
+O `detectar_silencio()` também não vê — ele procura *ausência* de resposta, e aqui a
+resposta existe, só está errada.
+
+**Correção aplicada (27/07/2026):** `CASE` de TTL dentro do `ON CONFLICT DO UPDATE` —
+buffer com mais de 5 min vira mensagem nova em vez de ser concatenado
+(`docs/db/02-functions-triggers.sql` §1). Debounce é 15s, então 5 min é 20x a janela:
+rajada legítima nunca é truncada. Testado nos dois sentidos (buffer de 10 min → descartado;
+buffer recente → concatena normal). Os 2 buffers órfãos de junho foram removidos.
+
+**Não remova o `CASE`.** Sem ele o bug volta na primeira falha de rede da Evolution.
+
+---
+
+## 13. Toda tabela nova em `public` nasce com RLS ligado e SEM policy ⚠️ ATIVO
+
+**Sintoma:** você cria uma tabela, popula, e o n8n/CRM lê **zero linhas** com a chave anon.
+Sem erro — `HTTP 200` e `[]`.
+
+**Causa:** existe um event trigger `ensure_rls` (função `public.rls_auto_enable`) que roda
+em todo `CREATE TABLE` no schema `public` e executa `enable row level security`. Ele **não**
+cria policy nenhuma. RLS ligado sem policy = ninguém lê nada, exceto `service_role`.
+
+**Confirmado em 27/07/2026** — teste com a chave anon via PostgREST:
+
+| Tabela | Linhas reais | Anon enxerga |
+|---|---|---|
+| `patients`, `mensagem_logs`, `conversations`, `config_automacao`, `logs_erro` | 3 / 24 / 3 / 3 / 34 | tudo (policy `allow_all`) |
+| `clinics` | 1 | **0** — é o que protege a `evolution_apikey` ✅ |
+| `documentos_clinica` (RAG) | 7 | **0** ⚠️ |
+| `whatsapp_buffer`, `n8n_chat_histories` | 2 / 2 | **0** (ok: as funções são SECURITY DEFINER) |
+
+**A pegar antes de confiar:** `match_documentos_clinica()` é SECURITY **INVOKER**, então
+respeita o RLS de quem chama. Testado com a chave anon: devolve `[]`. Se a credencial
+Supabase do nó `Consulta na database` no n8n for a chave anon, **o RAG devolve zero
+documentos e a IA responde sem a base de conhecimento, em silêncio.** O MCP redige
+credenciais, então isso **não foi possível verificar** — ver "Pontos cegos" no `AGENTS.md`.
+
+**Ao criar tabela nova:** ou crie a policy junto, ou saiba que só `service_role` vai ler.

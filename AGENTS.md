@@ -20,6 +20,8 @@ Multi-clínica por `clinic_id`.
 | **Nó Supabase usa `create`, não `insert`** | `insert` é PostgREST, não n8n. §5e |
 | **`cron.schedule` não valida o comando** | Aceita SQL quebrado e só falha ao rodar. Custou 48 dias de lembretes mortos. §10 |
 | **Fechar RLS de `consultas` quebra a IA em silêncio** | A tool de agendamento usa chave anon. `docs/plano-auth-rls.md` §3.2 |
+| **Tabela nova nasce com RLS ligado e SEM policy** | Event trigger `ensure_rls`. Anon lê `[]` com HTTP 200. §13 |
+| **Não tire o TTL do buffer de debounce** | Sem ele, falha de envio gruda a conversa velha na nova. §12 |
 
 ## Estado atual (27/07/2026)
 
@@ -53,31 +55,71 @@ Multi-clínica por `clinic_id`.
     real. Ver `ARMADILHAS.md` §11. Verificado: painel mostra "Bot online" / "Conectado" contra a
     Evolution real.
 
-- ⚠️ **Aplicado mas NUNCA EXECUTADO em condição real:**
-  - **Os dois workflows têm ZERO execuções de mensagem de paciente.** Nenhuma mensagem passou
-    pelo sistema via WhatsApp real na janela de retenção. As 5 correções de 26/07 e a pausa
-    da IA/telefoneSessao() foram verificadas **na configuração e no browser**, não com um
-    paciente de verdade batendo no webhook.
-  - `Pausa IA (Urgência)` e `AVISO URGÊNCIA` (nós novos): a credencial Supabase foi **escolhida por
-    inferência** (`hJIcCVPmy1j9Vjq1`) porque o MCP redige credenciais. Ambos têm
-    `onError: continueRegularOutput`, então uma falha ali não bloqueia a resposta ao paciente —
-    mas o handoff de urgência pode simplesmente não acontecer. **Confirme no primeiro teste real.**
+  - 🎉 **O FLUXO INBOUND FUNCIONA PONTA A PONTA — provado em 27/07/2026.**
+    Execução n8n **79158**, `status: success`, modo `webhook`, 22:53:34 → 22:53:58 (24s).
+    Mensagem real de WhatsApp entrou, passou pelo debounce de 15s, o AI Agent respondeu e a
+    Evolution entregou (`mensagem_logs` gravou a saída com `status='sent'`).
+    **Isto derruba o "zero execuções" que este doc afirmou até 26/07.**
+
+- ⚠️ **Verificado com ressalva / ainda não exercitado:**
+  - **O RAG não foi exercitado nem uma vez.** Na execução 79158 o agente fez
+    `tool_calls.requested: 0` — não chamou `Consulta na database`. Ou seja: a IA respondeu
+    **sem tocar na base de conhecimento**. Para uma saudação isso até é o comportamento
+    desejado, mas significa que o caminho do RAG segue **sem prova de vida**. Ver o ponto
+    cego #1 abaixo — há risco real dele estar mudo por RLS.
+  - `Pausa IA (Urgência)` e `AVISO URGÊNCIA`: a credencial Supabase foi **escolhida por
+    inferência** (`hJIcCVPmy1j9Vjq1`) porque o MCP redige credenciais.
+    ❌ **CORREÇÃO AO QUE ESTE DOC AFIRMAVA:** eu havia escrito que os dois tinham
+    `onError: continueRegularOutput`. **Não têm.** Li a `activeVersion` em 27/07: os únicos
+    nós com tratamento de erro no workflow inteiro são `Cancela evento - RED`,
+    `Confirma evento - GREEN`, `Busca Paciente` e `Update an event`. Consequência real no
+    ponto cego #2.
   - As checagens 2 e 3 do detector (envio preso, paciente sem resposta) **nunca dispararam de
-    verdade** — não houve tráfego. Só a checagem 1 (cron) foi vista funcionando.
+    verdade**. Só a checagem 1 (cron) foi vista funcionando.
 
 - ⛔ **Não existe:** login no CRM · RLS por clínica · toggle `bot_ativo` por clínica.
 
 - 🚫 **Removido de propósito:** notas internas privadas no CRM (decisão do usuário — ver
   `docs/DECISIONS.md` D-2). Não reintroduza sem antes corrigir o trigger (`ARMADILHAS.md` §2).
 
+## 🕳️ Pontos cegos conhecidos (auditoria de 27/07/2026)
+
+Ordenados por risco. Nenhum destes gera erro — é por isso que estão aqui.
+
+1. **RAG pode estar mudo por RLS e ninguém saberia.** `documentos_clinica` tem RLS ligado e
+   **zero policies** (culpa do event trigger `ensure_rls` — `ARMADILHAS.md` §13).
+   `match_documentos_clinica()` é SECURITY INVOKER, então respeita o RLS do chamador.
+   **Testado com a chave anon: devolve `[]`.** Se a credencial do nó `Consulta na database`
+   for a anon, a IA responde sem base de conhecimento, sempre, em silêncio. O MCP não
+   revela credenciais — **só um teste real com pergunta específica ("qual o preço de X?")
+   resolve isso.** É o teste mais importante pendente.
+2. **Urgência (`[ACIONAR_HUMANO]`) é um campo minado.** `Pausa IA (Urgência)` usa
+   `operation: create` (INSERT) em `sessoes_ativas`, cuja PK é `telefone`. Se já existir
+   sessão para aquele telefone → violação de chave → o nó falha → **como não tem `onError`,
+   o workflow inteiro aborta**. Num pedido de urgência, o pior resultado possível: o
+   paciente não recebe resposta nenhuma. Precisa virar upsert.
+3. **`Envia Resposta do Agent` não tem retry** e já falhou **15 vezes** (25/06 a 02/07) com
+   "The service was not able to process your request". Era a origem da corrupção de buffer
+   (`ARMADILHAS.md` §12, já corrigida na raiz) — mas o paciente continua ficando sem resposta
+   quando a Evolution dá soluço.
+4. **Mensagem de entrada nunca sai de `status='pending'`** (17 linhas). Não quebra nada, mas
+   o painel do CRM mostra "pending" para tudo que o paciente escreveu, o que confunde.
+5. **`callN8nWebhook()` e `config.js:n8nBaseUrl` viraram código morto** no CRM depois que o
+   status do bot passou para a Edge Function. Nada mais chama. Não removi (não foi pedido).
+
 ## 🎯 Próximos passos (comece por aqui)
 
-1. **Teste real ponta a ponta.** Apontar o webhook da instância Evolution nova para
-   `/webhook/conta-pessoal` e mandar uma mensagem de um paciente de verdade. O CRM já foi
-   verificado no browser (27/07) e o painel "Saúde do sistema" já renderiza com dados reais —
-   mas isso é diferente de uma mensagem de paciente ter passado pelo fluxo completo.
-2. **Envio travado em `sending`**: mensagem que falha nunca mais é reenviável. `ARMADILHAS.md` §5c.
-3. **Login + RLS** — plano pronto em `docs/plano-auth-rls.md` (delegado ao Gemini, D-3 e D-6).
+1. **Provar o RAG.** Mande pelo WhatsApp uma pergunta que **só** a base responde
+   ("quanto custa o clareamento?", "qual o horário de sábado?"). Se a IA inventar ou desviar,
+   é o ponto cego #1 — a credencial do nó `Consulta na database` é a chave anon e o RLS está
+   comendo os 7 documentos. É o teste mais barato com maior valor de informação hoje.
+2. **Consertar o caminho de urgência** (ponto cego #2): `create` → upsert em
+   `Pausa IA (Urgência)`, mais `onError: continueRegularOutput` nele e no `AVISO URGÊNCIA`.
+   Hoje um pedido de urgência repetido derruba a resposta ao paciente.
+3. **Retry no `Envia Resposta do Agent`** (ponto cego #3) — 15 falhas transitórias já
+   registradas.
+4. **Envio travado em `sending`**: mensagem que falha nunca mais é reenviável. `ARMADILHAS.md` §5c.
+5. **Login + RLS** — plano pronto em `docs/plano-auth-rls.md` (delegado ao Gemini, D-3 e D-6).
    É o que eu considero impeditivo para atender paciente real.
 
 ## Como rodar

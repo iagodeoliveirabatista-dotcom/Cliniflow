@@ -8,9 +8,17 @@
 -- ============================================================
 
 
--- ── 1. BUFFER DE DEBOUNCE (append atômico) ──────────────────
+-- ── 1. BUFFER DE DEBOUNCE (append atômico + TTL) ────────────
 -- Chamada pelo n8n em "Append Buffer (RPC)" com a chave ANON.
 -- É SECURITY DEFINER, por isso funciona mesmo com whatsapp_buffer sem policy.
+--
+-- ⚠️ O `CASE` do TTL não é enfeite — ver ARMADILHAS.md §12.
+-- Sem ele, um fluxo que falha depois do append deixa o texto na tabela para
+-- sempre (o nó "Limpa Buffer (Fim)" só roda no caminho feliz), e a próxima
+-- mensagem do mesmo telefone é concatenada ao lixo antigo. Em 27/07/2026 isso
+-- despejou 25 dias de mensagens acumuladas no prompt do agente.
+-- Janela de debounce = 15s; 5 min é 20x isso — rajada legítima nunca é
+-- truncada, e nada de conversa anterior sobrevive.
 CREATE OR REPLACE FUNCTION public.append_whatsapp_buffer(p_telefone text, p_novo_texto text)
  RETURNS TABLE(updated_at timestamp with time zone, mensagem_acumulada text)
  LANGUAGE plpgsql
@@ -24,7 +32,11 @@ BEGIN
   VALUES (p_telefone, p_novo_texto, now())
   ON CONFLICT (telefone) DO UPDATE
   SET
-    mensagem_acumulada = public.whatsapp_buffer.mensagem_acumulada || ' ' || p_novo_texto,
+    mensagem_acumulada = CASE
+      WHEN public.whatsapp_buffer.updated_at < now() - interval '5 minutes'
+        THEN p_novo_texto
+      ELSE public.whatsapp_buffer.mensagem_acumulada || ' ' || p_novo_texto
+    END,
     updated_at = now()
   RETURNING public.whatsapp_buffer.updated_at, public.whatsapp_buffer.mensagem_acumulada
   INTO v_updated_at, v_mensagem;
