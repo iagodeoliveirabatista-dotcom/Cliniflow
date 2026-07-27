@@ -156,14 +156,20 @@ CREATE TABLE public.historico_confirmacoes (
     criado_em            timestamptz DEFAULT now()
 );
 
+-- Destino único de erro dos três componentes (n8n, edge functions, frontend).
+-- workflow_name/node_name nasceram mapeados ao nó do n8n; nas edge functions viram
+-- slug da função e ponto de falha.
 CREATE TABLE public.logs_erro (
     id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     workflow_name text NOT NULL,
     node_name     text NOT NULL,
     error_message text NOT NULL,
     execution_id  text,
-    criado_em     timestamptz DEFAULT now()
+    criado_em     timestamptz DEFAULT now(),
+    origem        text NOT NULL DEFAULT 'n8n'::text   -- 'n8n' | 'edge' | 'frontend'
 );
+-- O DEFAULT 'n8n' é o que mantém o nó `LOG DE ERRO` do n8n funcionando sem alteração:
+-- ele não mapeia `origem`, e a coluna é NOT NULL. Não remova o default.
 
 
 -- ── AUTOMAÇÃO DE LEMBRETES ──────────────────────────────────

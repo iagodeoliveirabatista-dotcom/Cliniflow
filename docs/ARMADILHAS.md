@@ -139,6 +139,10 @@ duplicata. Se o envio à Evolution falhar depois disso, ninguém reverte o statu
 trava só libera quando `status != 'sending'`, **nenhuma tentativa futura consegue pegar
 aquela mensagem**. Ela fica permanentemente em `sending`.
 
+**Já existe detecção (não correção):** `detectar_silencio()` roda a cada 10 min e grava em
+`logs_erro` quando há mensagem de saída presa em `pending`/`sending` há mais de 5 min.
+Isso faz você **saber**; não desfaz a trava. A correção abaixo continua pendente.
+
 **Correção sugerida:** tratar o erro no nó de envio (`onError: continueErrorOutput`) e
 gravar `status='failed'` na saída de erro, para que a mensagem volte a ser elegível.
 Alternativamente, um job que devolva a `pending` mensagens presas em `sending` há mais de
@@ -199,7 +203,7 @@ O MCP do n8n em `.mcp.json` está retornando **401** — token revogado/expirado
 
 ---
 
-## 7. Edge function grava coluna que não existe mais
+## 7. Edge function gravava coluna que não existe mais ✅ CORRIGIDO E DEPLOYADO
 
 **Sintoma:** lembrete é enviado mas a sessão de 16h não abre; paciente responde
 "CONFIRMAR" e cai no fluxo do agente de vendas em vez do fluxo de confirmação.
@@ -210,8 +214,13 @@ O MCP do n8n em `.mcp.json` está retornando **401** — token revogado/expirado
 
 A tabela hoje tem `consulta_id` para esse papel.
 
-**Status:** ABERTO. Correção: trocar `google_event_id` por `consulta_id` e
-redeployar a função.
+**Status:** ✅ resolvido em 26/07/2026. `enviar-whatsapp` **v8** está ACTIVE com `consulta_id`.
+Na mesma mudança foi criado o helper `logErro()` e a coluna `logs_erro.origem`
+(`NOT NULL DEFAULT 'n8n'`), para que o erro do upsert deixe de ser engolido.
+
+**Não remova o default de `origem`:** o nó `LOG DE ERRO` do n8n não mapeia essa coluna.
+Sem o default, todo log de erro do n8n passa a violar NOT NULL — e você perde justamente
+a observabilidade no momento em que mais precisa dela.
 
 ---
 

@@ -28,6 +28,9 @@ Multi-clínica por `clinic_id`.
   - Os dois workflows do n8n estão **ativos**, e as 5 correções abaixo estão na `activeVersion`
     (li de volta da instância depois de publicar).
   - `cliniflow-export/supabase-client.js` passa em `node --check`.
+  - Edge function `enviar-whatsapp` **v8 ACTIVE** — grava `consulta_id` (antes gravava
+    `google_event_id`, coluna inexistente, e o erro era engolido). Junto veio o helper
+    `logErro()` e a coluna `logs_erro.origem` (`NOT NULL DEFAULT 'n8n'`).
 
 - ⚠️ **Aplicado mas NUNCA EXECUTADO** — isto é o mais importante desta seção:
   - **Os dois workflows têm ZERO execuções.** Nenhuma mensagem passou pelo sistema na janela de
@@ -48,10 +51,8 @@ Multi-clínica por `clinic_id`.
 1. **Teste real ponta a ponta.** Apontar o webhook da instância Evolution nova para
    `/webhook/conta-pessoal` e mandar uma mensagem. Sem isso, nada acima é comprovável.
 2. **Publicar o CRM** com as correções já feitas nos arquivos.
-3. **Corrigir a edge function `enviar-whatsapp`**: grava `google_event_id`, coluna que não existe.
-   Trocar por `consulta_id` e redeployar. `ARMADILHAS.md` §7.
-4. **Envio travado em `sending`**: mensagem que falha nunca mais é reenviável. §5c.
-5. **Login + RLS** — plano pronto em `docs/plano-auth-rls.md` (delegado ao Gemini, D-3).
+3. **Envio travado em `sending`**: mensagem que falha nunca mais é reenviável. `ARMADILHAS.md` §5c.
+4. **Login + RLS** — plano pronto em `docs/plano-auth-rls.md` (delegado ao Gemini, D-3 e D-6).
    É o que eu considero impeditivo para atender paciente real.
 
 ## Como rodar

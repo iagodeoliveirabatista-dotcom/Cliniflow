@@ -33,6 +33,7 @@ function AutomationView({ accent }) {
   const [logs, setLogs] = useStateA([]);
   const [loading, setLoading] = useStateA(true);
   const [evoStatus, setEvoStatus] = useStateA(null); // null | { connected: true/false }
+  const [saude, setSaude] = useStateA([]); // erros agrupados por assinatura
   const [saving, setSaving] = useStateA(false);
   const [toast, setToast] = useStateA(null);
 
@@ -46,12 +47,14 @@ function AutomationView({ accent }) {
 
   const loadData = useCallbackA(async () => {
     setLoading(true);
-    const [cfgRes, logsRes] = await Promise.all([
+    const [cfgRes, logsRes, saudeRes] = await Promise.all([
       window.SupabaseService.fetchConfigAutomacao(),
       window.SupabaseService.fetchMensagemLogs({ limit: 30 }),
+      window.SupabaseService.fetchSaudeSistema(7),
     ]);
     if (cfgRes.data) setConfigs(cfgRes.data);
     if (logsRes.data) setLogs(logsRes.data);
+    if (saudeRes.data) setSaude(saudeRes.data);
     setLoading(false);
 
     // Check Evolution API status
@@ -166,7 +169,7 @@ function AutomationView({ accent }) {
           <HistoricoTab logs={displayLogs} accent={accent} onRefresh={loadData} loading={loading} />
         )}
         {tab === 'status' && (
-          <StatusTab accent={accent} evoStatus={evoStatus} logs={displayLogs} isConnected={isConnected} />
+          <StatusTab accent={accent} evoStatus={evoStatus} logs={displayLogs} saude={saude} isConnected={isConnected} />
         )}
       </div>
 
@@ -527,7 +530,7 @@ function MensagemRow({ log, accent }) {
 
 // ─── STATUS TAB ──────────────────────────────────────────────────────────────
 
-function StatusTab({ accent, evoStatus, logs, isConnected }) {
+function StatusTab({ accent, evoStatus, logs, saude, isConnected }) {
   const today = new Date().toDateString();
   const msgHoje = logs.filter(l => new Date(l.enviado_em).toDateString() === today);
   const enviados = msgHoje.filter(l => l.direcao === 'saida').length;
@@ -567,6 +570,9 @@ function StatusTab({ accent, evoStatus, logs, isConnected }) {
           </div>
         </div>
       </div>
+
+      {/* Saúde do sistema — erros agrupados por assinatura */}
+      <SaudeSistemaCard saude={saude} isConnected={isConnected} />
 
       {/* Today stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
@@ -614,6 +620,84 @@ function StatusTab({ accent, evoStatus, logs, isConnected }) {
           </span>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Erros de TODOS os componentes (n8n, edge functions, detector de silêncio) agrupados por
+// assinatura. O que importa aqui é "quantos problemas distintos", não "quantas linhas":
+// em 26/07/2026 a tabela tinha 33 linhas para 8 problemas reais.
+const ORIGEM_CFG = {
+  n8n:      { label: 'n8n',      color: '#ea4b71' },
+  edge:     { label: 'edge',     color: '#3ecf8e' },
+  cron:     { label: 'cron',     color: '#f59e0b' },
+  frontend: { label: 'frontend', color: '#5b8cff' },
+};
+
+function SaudeSistemaCard({ saude, isConnected }) {
+  const itens = saude || [];
+
+  return (
+    <div style={{
+      background: '#101010', border: '1px solid #1c1c1c', borderRadius: 8, padding: '18px 20px',
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 14,
+      }}>
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: '#888' }}>Saúde do sistema</div>
+        <div style={{ fontSize: 11, color: '#444' }}>últimos 7 dias · agrupado por erro</div>
+      </div>
+
+      {!isConnected ? (
+        <div style={{ fontSize: 12.5, color: '#444' }}>Modo demonstração</div>
+      ) : itens.length === 0 ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#00d084' }} />
+          <span style={{ fontSize: 13, color: '#00d084', fontWeight: 500 }}>
+            Nenhum erro registrado
+          </span>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {itens.map((item, i) => {
+            const org = ORIGEM_CFG[item.origem] || { label: item.origem, color: '#666' };
+            return (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10,
+                paddingBottom: i < itens.length - 1 ? 10 : 0,
+                borderBottom: i < itens.length - 1 ? '1px solid #191919' : 'none',
+              }}>
+                <span style={{
+                  flexShrink: 0, marginTop: 1, padding: '1px 6px', borderRadius: 3,
+                  fontSize: 10, fontWeight: 600, color: org.color,
+                  background: `${org.color}1a`, border: `1px solid ${org.color}33`,
+                }}>{org.label}</span>
+
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 12.5, color: '#d0d0d0', marginBottom: 2 }}>
+                    {item.node_name}
+                    <span style={{ color: '#444' }}> · {item.workflow_name}</span>
+                  </div>
+                  <div style={{
+                    fontSize: 11.5, color: '#666', lineHeight: 1.5,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }} title={item.error_message}>{item.error_message}</div>
+                  <div style={{ fontSize: 10.5, color: '#3a3a3a', marginTop: 3 }}>
+                    {new Date(item.ultima).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
+                  </div>
+                </div>
+
+                {item.ocorrencias > 1 && (
+                  <span style={{
+                    flexShrink: 0, marginTop: 1, padding: '1px 7px', borderRadius: 10,
+                    fontSize: 10.5, fontWeight: 600, color: '#888', background: '#1c1c1c',
+                  }}>{item.ocorrencias}×</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

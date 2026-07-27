@@ -276,6 +276,47 @@
     });
   }
 
+  // ── SAÚDE DO SISTEMA ────────────────────────────────────────────────────────
+
+  // Agrupa logs_erro por assinatura (origem + workflow + nó + mensagem). O banco já
+  // deduplica a GRAVAÇÃO numa janela de 1h (função detectar_silencio); aqui agrupamos o
+  // histórico para a tela mostrar "8 problemas" em vez de "33 linhas".
+  async function fetchSaudeSistema(dias = 7) {
+    const desde = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString();
+    const res = await query(async (sb) => {
+      return sb.from('logs_erro')
+        .select('origem, workflow_name, node_name, error_message, criado_em')
+        .gte('criado_em', desde)
+        .order('criado_em', { ascending: false })
+        .limit(500);
+    });
+    if (!res.data) return res;
+
+    // Vem ordenado do mais recente para o mais antigo, então o primeiro que aparece
+    // de cada assinatura é a última ocorrência.
+    const porAssinatura = new Map();
+    for (const linha of res.data) {
+      const chave = `${linha.origem}|${linha.workflow_name}|${linha.node_name}|${linha.error_message}`;
+      const atual = porAssinatura.get(chave);
+      if (atual) {
+        atual.ocorrencias += 1;
+        atual.primeira = linha.criado_em;
+      } else {
+        porAssinatura.set(chave, {
+          ...linha,
+          ocorrencias: 1,
+          ultima: linha.criado_em,
+          primeira: linha.criado_em,
+        });
+      }
+    }
+
+    return {
+      data: Array.from(porAssinatura.values()).sort((a, b) => b.ultima.localeCompare(a.ultima)),
+      error: null,
+    };
+  }
+
   // ── CONFIGURAÇÃO DE AUTOMAÇÃO ───────────────────────────────────────────────
 
   async function fetchConfigAutomacao() {
@@ -687,6 +728,7 @@
 
     // Config
     fetchConfigAutomacao,
+    fetchSaudeSistema,
     updateConfigAutomacao,
 
     // Histórico
