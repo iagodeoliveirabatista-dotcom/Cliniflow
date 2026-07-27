@@ -21,35 +21,47 @@ Multi-clínica por `clinic_id`.
 | **`cron.schedule` não valida o comando** | Aceita SQL quebrado e só falha ao rodar. Custou 48 dias de lembretes mortos. §10 |
 | **Fechar RLS de `consultas` quebra a IA em silêncio** | A tool de agendamento usa chave anon. `docs/plano-auth-rls.md` §3.2 |
 
-## Estado atual (26/07/2026)
+## Estado atual (27/07/2026)
 
 - ✅ **Funciona (verificado):**
-  - Supabase `mxvaufkqijdkapvtkvee` **ACTIVE_HEALTHY** (estava pausado; restaurado nesta data).
+  - Supabase `mxvaufkqijdkapvtkvee` **ACTIVE_HEALTHY** (estava pausado; restaurado em 26/07).
     Dados intactos: 3 pacientes, 22 mensagens, 7 docs RAG, 1 clínica.
-  - Os dois workflows do n8n estão **ativos**, e as 5 correções abaixo estão na `activeVersion`
+  - Os dois workflows do n8n estão **ativos**, e as 5 correções de 26/07 estão na `activeVersion`
     (li de volta da instância depois de publicar).
   - `cliniflow-export/supabase-client.js` passa em `node --check`.
   - Edge function `enviar-whatsapp` **v8 ACTIVE** — grava `consulta_id` (antes gravava
     `google_event_id`, coluna inexistente, e o erro era engolido). Junto veio o helper
     `logErro()` e a coluna `logs_erro.origem` (`NOT NULL DEFAULT 'n8n'`).
-  - **Lembretes voltaram a funcionar.** O job `disparar-lembretes` falhava desde 08/06 por erro
-    de sintaxe (`ARMADILHAS.md` §10). Rodei o comando corrigido à mão: HTTP **200**,
-    `{"ok":true,"disparados":0,"erros":[]}` — `disparados: 0` porque `consultas` está vazia.
+  - **Lembretes funcionando de verdade, não só testado à mão:** confirmado em 27/07 que
+    `cron.job_run_details` tem **26 execuções `succeeded` seguidas** do job `disparar-lembretes`
+    desde a correção do §10 (`ARMADILHAS.md`) — não é mais só o comando manual, o cron agendado
+    está rodando limpo.
   - **Detector de silêncio no ar:** `public.detectar_silencio()`, job `detector-silencio`
     a cada 10 min. Testado: 1ª execução gravou 1 (pegou a última falha real do cron das 19:00),
     2ª gravou 0 — provando a dedup por assinatura na janela de 1 h.
   - Os 5 `.jsx` transpilam com `@babel/preset-react`, o mesmo preset que o navegador usa.
+  - **CRM rodou de verdade no browser (27/07/2026, via Playwright):** carrega dados reais do
+    Supabase sem erro de console. Confirmado ao vivo: D-2 (sem UI de nota interna na conversa),
+    toggle "Controle do Agente IA" aparece, painel **"Saúde do sistema" renderizou pela primeira
+    vez** com dados reais (o erro de cron mostrado é histórico, de antes do fix — não recorreu).
+    **Não testei enviar mensagem pelo CRM** — dispararia uma mensagem real de WhatsApp a um
+    paciente de verdade; não fiz isso sem autorização explícita.
+  - **Widget "Status do bot" corrigido e verificado (27/07/2026):** chamava um webhook n8n
+    (`status-evo`) que nunca existiu. Criada a Edge Function `status-evolution` (segue D-7,
+    guarda a `evolution_apikey` no servidor). Achei e corrigi de quebra um mismatch de
+    maiúscula/minúscula (`Connected` vs `connected`) entre `evolution_api_reference.md` e a API
+    real. Ver `ARMADILHAS.md` §11. Verificado: painel mostra "Bot online" / "Conectado" contra a
+    Evolution real.
 
-- ⚠️ **Aplicado mas NUNCA EXECUTADO** — isto é o mais importante desta seção:
-  - **Os dois workflows têm ZERO execuções.** Nenhuma mensagem passou pelo sistema na janela de
-    retenção. As 5 correções foram verificadas **na configuração**, não em comportamento.
+- ⚠️ **Aplicado mas NUNCA EXECUTADO em condição real:**
+  - **Os dois workflows têm ZERO execuções de mensagem de paciente.** Nenhuma mensagem passou
+    pelo sistema via WhatsApp real na janela de retenção. As 5 correções de 26/07 e a pausa
+    da IA/telefoneSessao() foram verificadas **na configuração e no browser**, não com um
+    paciente de verdade batendo no webhook.
   - `Pausa IA (Urgência)` e `AVISO URGÊNCIA` (nós novos): a credencial Supabase foi **escolhida por
     inferência** (`hJIcCVPmy1j9Vjq1`) porque o MCP redige credenciais. Ambos têm
     `onError: continueRegularOutput`, então uma falha ali não bloqueia a resposta ao paciente —
     mas o handoff de urgência pode simplesmente não acontecer. **Confirme no primeiro teste real.**
-  - Correções do CRM (pausa da IA, `telefoneSessao()`, remoção das notas internas): **sem deploy**.
-  - **Painel "Saúde do sistema"** (aba Automações → Status): o código transpila e a query foi
-    conferida por SQL, mas **ninguém abriu a tela ainda**. Renderização não verificada.
   - As checagens 2 e 3 do detector (envio preso, paciente sem resposta) **nunca dispararam de
     verdade** — não houve tráfego. Só a checagem 1 (cron) foi vista funcionando.
 
@@ -61,12 +73,11 @@ Multi-clínica por `clinic_id`.
 ## 🎯 Próximos passos (comece por aqui)
 
 1. **Teste real ponta a ponta.** Apontar o webhook da instância Evolution nova para
-   `/webhook/conta-pessoal` e mandar uma mensagem. Sem isso, nada acima é comprovável.
-   Durante o teste, abra **Automações → Status**: é a primeira vez que o painel "Saúde do
-   sistema" roda com dados reais, e é lá que aparece qualquer erro dos três componentes.
-2. **Publicar o CRM** com as correções já feitas nos arquivos.
-3. **Envio travado em `sending`**: mensagem que falha nunca mais é reenviável. `ARMADILHAS.md` §5c.
-4. **Login + RLS** — plano pronto em `docs/plano-auth-rls.md` (delegado ao Gemini, D-3 e D-6).
+   `/webhook/conta-pessoal` e mandar uma mensagem de um paciente de verdade. O CRM já foi
+   verificado no browser (27/07) e o painel "Saúde do sistema" já renderiza com dados reais —
+   mas isso é diferente de uma mensagem de paciente ter passado pelo fluxo completo.
+2. **Envio travado em `sending`**: mensagem que falha nunca mais é reenviável. `ARMADILHAS.md` §5c.
+3. **Login + RLS** — plano pronto em `docs/plano-auth-rls.md` (delegado ao Gemini, D-3 e D-6).
    É o que eu considero impeditivo para atender paciente real.
 
 ## Como rodar

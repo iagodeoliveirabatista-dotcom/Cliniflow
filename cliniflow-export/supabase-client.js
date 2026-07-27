@@ -410,7 +410,18 @@
   }
 
   async function verificarStatusEvo() {
-    return callN8nWebhook('webhook/status-evo', {});
+    const client = getClient();
+    if (!client) return { success: false, error: 'Supabase não configurado' };
+    try {
+      // Chamado direto no Supabase (não no n8n): guarda a evolution_apikey
+      // no servidor e evita CORS de um webhook n8n que não existe.
+      const { data, error } = await client.functions.invoke('status-evolution');
+      if (error) return { success: false, error: error.message };
+      return { success: !!data?.ok, data };
+    } catch (err) {
+      console.error('[Cliniflow] Erro ao verificar status Evolution:', err);
+      return { success: false, error: err.message };
+    }
   }
 
   // ── CONVERSAS & ATENDIMENTOS ───────────────────────────────────────────────

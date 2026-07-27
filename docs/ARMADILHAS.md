@@ -291,3 +291,38 @@ Retorna igual para comando válido e inválido.
 **Prevenção instalada em 26/07/2026:** a função `public.detectar_silencio()` (job
 `detector-silencio`, a cada 10 min) varre `cron.job_run_details` e grava qualquer falha em
 `logs_erro`. Teria pego este bug no dia 08/06 em vez de 48 dias depois.
+
+**Status:** ✅ CORRIGIDO E VERIFICADO em 27/07/2026 — `cron.job` já guarda o comando com o
+header montado sem a quebra de aspas, e `cron.job_run_details` mostra 26 execuções
+`succeeded` seguidas desde o fix (nenhuma `failed`). O erro que ainda aparece no painel
+"Saúde do sistema" (26/07/2026 17:21) é histórico, de antes da correção — não recorreu.
+
+---
+
+## 11. Widget "Status do bot" no CRM chamava um webhook n8n que nunca existiu
+
+**Sintoma:** aba Automações → Status sempre mostrava "Bot offline" / "Desconectado",
+mesmo com a Evolution genuinamente conectada. Console do browser acusava erro de CORS em
+`https://n8n.iagobatista.cloud/webhook/status-evo`.
+
+**Causa real:** não era falta de header CORS — esse webhook **nunca foi criado** no n8n.
+Das 5 workflows que existem de fato na instância (`search_workflows` sem filtro), só
+`enviar-mensagem` e `conta-pessoal` existem como paths de webhook. `verificarStatusEvo()`
+em `supabase-client.js` chamava uma rota morta; o erro de CORS era só o efeito colateral de
+bater num 404.
+
+**Correção aplicada (27/07/2026):** seguindo D-7 (observabilidade é do Supabase, não do
+n8n), criada a Edge Function `status-evolution` — guarda a `evolution_apikey` no servidor
+(nunca no browser), chama `GET {EVOLUTION_BASE_URL}/instance/status` direto e devolve
+`{ok, connected, instance}` com CORS próprio. `verificarStatusEvo()` agora chama
+`client.functions.invoke('status-evolution')` em vez do webhook n8n.
+
+**Armadilha extra encontrada no meio da correção:** `evolution_api_reference.md` (§C)
+documenta a resposta como `data.connected` (minúsculo), mas a instância viva devolve
+`data.Connected` (maiúsculo). A função lê as duas chaves (`Connected ?? connected`) para não
+repetir o erro. **Se for usar esse endpoint em outro lugar, confira a resposta real antes de
+confiar na doc.**
+
+**Verificado rodando:** Playwright abriu o CRM local, painel mostrou "Bot online" /
+"Conectado", zero erros de console — confirmado contra a Evolution real
+(`{"data":{"Connected":true,"LoggedIn":true,"Name":"Iago Batista"}}`).
