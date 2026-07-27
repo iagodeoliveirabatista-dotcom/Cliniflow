@@ -251,3 +251,43 @@ salva a `evolution_apikey`.
 
 **Status:** ABERTO. Depende de Supabase Auth no CRM (Tarefa 2).
 Ver `docs/db/03-rls-policies.sql`.
+
+---
+
+## 10. `cron.schedule` aceita comando quebrado e só falha na hora de rodar
+
+**Sintoma:** o recurso simplesmente não acontece. Nenhum erro em lugar nenhum, nenhuma
+requisição chega ao destino, o job aparece `active = true` na `cron.job`.
+
+**Causa:** `cron.schedule` guarda o comando como **texto** e **não valida a sintaxe**.
+O job dos lembretes foi criado substituindo o placeholder `<ANON_KEY>` pela chave **com as
+aspas simples junto**, produzindo:
+
+```sql
+headers := '{"Authorization": "Bearer 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'"}'::jsonb
+```
+
+A string SQL fecha em `Bearer '` e o token vira lixo sintático. Agendar funcionou;
+executar nunca funcionou.
+
+**Custo real:** 744 execuções, 744 falhas, **zero sucessos entre 08/06 e 26/07/2026**.
+48 dias com o recurso morto e a tela de automações mostrando os lembretes como ativos.
+Ninguém percebeu porque nada vigiava o `pg_cron`.
+
+**Como confirmar em 10 segundos:**
+```sql
+select status, count(*), max(return_message)
+from cron.job_run_details where jobid = <id> group by status;
+```
+Se só existir `failed`, o job nunca rodou — não importa o que a `cron.job` diga.
+
+**Correção:** ao criar job com `net.http_post`, montar o header sem aspas simples internas
+e **testar rodando o comando à mão** antes de confiar no agendamento. Depois conferir a
+resposta em `net._http_response`.
+
+**Não faça:** supor que `cron.schedule` retornar um `jobid` significa que o job funciona.
+Retorna igual para comando válido e inválido.
+
+**Prevenção instalada em 26/07/2026:** a função `public.detectar_silencio()` (job
+`detector-silencio`, a cada 10 min) varre `cron.job_run_details` e grava qualquer falha em
+`logs_erro`. Teria pego este bug no dia 08/06 em vez de 48 dias depois.

@@ -23,6 +23,23 @@ Fechar exige login no CRM, que não existe. Fechar antes do login derruba a tela
 (`docs/plano-auth-rls.md`), a execução foi delegada (D-3).
 **Status:** aguardando o usuário definir a data de corte.
 
+### D-OPEN-3 — Por onde o alerta de erro chega até você
+**Contexto:** o detector de silêncio já grava tudo em `logs_erro` e o painel da aba
+**Automações → Status** mostra. Falta o *push* — hoje ninguém é avisado sem abrir a tela.
+
+Restrição descoberta em 26/07/2026: `enviar-whatsapp` **não fala com a Evolution direto**,
+ele chama o webhook do n8n. Alertar por esse caminho faz uma queda do n8n silenciar
+justamente o alerta de que o n8n caiu.
+
+| Opção | Prós | Contras |
+|---|---|---|
+| Evolution API direto da função | Contorna o n8n; credenciais já estão em `clinics` | Mais um lugar que fala com a Evolution |
+| E-mail (Resend) | Independente de tudo | Precisa de chave nova |
+| Só o painel (estado atual) | Zero dependência | Você só sabe se abrir a tela |
+
+**Recomendação:** Evolution direto, gravando a linha no banco de qualquer forma para o
+painel não depender do push. **Status:** aguardando o usuário.
+
 ### D-OPEN-2 — A pasta `apify/` pertence a este projeto?
 `apify/blueoceansem-posts.json` e `captions-ranked.txt` não têm relação com o Cliniflow.
 Parecem de outro trabalho. Foram **mantidos** na limpeza de 26/07/2026 por precaução.
@@ -81,6 +98,33 @@ significado degrada de *"quem assumiu"* para *"se alguém assumiu"* — ainda al
 alguém perguntar "quem respondeu esse paciente?".
 
 ---
+
+### D-7 — O n8n é executor, não observador · 26/07/2026
+**Decisão:** o n8n fica **só** com o fluxo conversacional inbound (AI Agent + RAG + memória +
+debounce). Agendamento e observabilidade passam para o Supabase (`pg_cron` + funções SQL +
+Edge Functions). O `Error Trigger` continua, mas rebaixado a **escritor** em `logs_erro` — o
+cérebro do alerta sai de dentro do workflow de 71 nós.
+
+**Por quê:** o `Error Trigger` só enxerga exceção do próprio n8n. Já era cego para as duas
+Edge Functions, para o frontend e — o que mais importa num bot de WhatsApp — para o modo de
+falha dominante, que é o **silêncio** (webhook não chega, envio preso, cron morto). Nada
+disso lança exceção. Somado a isso, o n8n é instância única: usá-lo como vigia faz o vigia
+morrer junto com o paciente. O Supabase não adiciona ponto único novo, já que é dependência
+dura de tudo.
+
+**Consequência prática:** ao criar automação nova neste projeto, o default é função SQL ou
+Edge Function agendada por `pg_cron` — não workflow n8n.
+
+### D-8 — O detector de silêncio é função SQL, não Edge Function · 26/07/2026
+**Decisão:** `public.detectar_silencio()` em plpgsql, agendada direto por `pg_cron`
+(`select public.detectar_silencio()`), em vez da Edge Function + `net.http_post` que eu
+havia planejado.
+
+**Por quê:** `cron.job_run_details` não é exposto via PostgREST, então uma Edge Function
+precisaria de uma RPC de qualquer jeito — a chamada HTTP só somava peças que podem quebrar.
+Do jeito escolhido o detector não depende de HTTP, de JWT, nem das Edge Functions estarem no
+ar. E elimina de vez a classe de bug da `ARMADILHAS.md` §10, que nasceu justamente de montar
+header com chave dentro de um comando de cron.
 
 ## 🚫 Rejeitadas (NÃO reintroduza)
 
