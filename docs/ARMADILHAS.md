@@ -175,6 +175,26 @@ produção seguia com o bug.
 
 ---
 
+## 5f. O MCP do n8n NÃO escreve configuração de nó (retry, onError)
+
+**Sintoma:** você quer ligar `retryOnFail` ou `onError` num nó, procura a operação no
+`update_workflow` e não acha. Fica tentando enfiar dentro de `parameters` e não pega.
+
+**Causa:** no modelo de dados do n8n, `retryOnFail`, `maxTries`, `waitBetweenTries`,
+`onError`, `alwaysOutputData` e `executeOnce` são **irmãos** de `parameters` no objeto do
+nó, não filhos. As operações do `update_workflow` (`updateNodeParameters`,
+`setNodeParameter`) só alcançam `node.parameters`. Nenhuma das 11 operações mexe em
+configuração de nó.
+
+**O que fazer:** essas mudanças são **manuais, pela UI** — abra o nó → aba *Settings*.
+Não vale a pena hand-rollar um `PUT` na API REST: exigiria reenviar o workflow inteiro
+(69 nós) numa instância com versionamento draft/active, e um campo perdido no caminho
+derruba produção. Risco alto para uma mudança de um campo.
+
+**Verificado em:** 27/07/2026, tentando ligar retry no `Envia Resposta do Agent`.
+
+---
+
 ## 5e. O nó Supabase usa `create`, não `insert`
 
 **Sintoma:** `INVALID_PARAMETER: Invalid value for "parameters.operation": got "insert",

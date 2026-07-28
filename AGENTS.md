@@ -111,7 +111,12 @@ Ordenados por risco. Nenhum destes gera erro — é por isso que estão aqui.
    é o ponto cego #1 — a credencial do nó `Consulta na database` é a chave anon e o RLS está
    comendo os 7 documentos. É o teste mais barato com maior valor de informação hoje.
 2. **Retry no `Envia Resposta do Agent`** (ponto cego #3) — 15 falhas transitórias já
-   registradas.
+   registradas. ⚠️ **É MANUAL, pela UI do n8n** — o MCP não escreve configuração de nó
+   (`ARMADILHAS.md` §5f). Abrir o nó → *Settings* → `Retry On Fail` ligado ·
+   `Max Tries: 3` · `Wait Between Tries: 2000ms`.
+   **Não ligue `On Error: Continue`** nesse nó: se o envio falhar mesmo após as tentativas,
+   o abort é desejado — é ele que faz o `Error Trigger` gravar em `logs_erro`. Com
+   `Continue`, o fluxo seguiria e gravaria `status='sent'` numa mensagem que nunca saiu.
 4. **Envio travado em `sending`**: mensagem que falha nunca mais é reenviável. `ARMADILHAS.md` §5c.
 5. **Login + RLS** — plano pronto em `docs/plano-auth-rls.md` (delegado ao Gemini, D-3 e D-6).
    É o que eu considero impeditivo para atender paciente real.
