@@ -173,18 +173,44 @@ function Sidebar({ accent, currentPage, onNavigate }) {
           onClick={() => {}}
         />
         {/* Profile */}
-        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', marginTop:2, borderTop:'1px solid #191919' }}>
-          <div style={{
-            width:26, height:26, borderRadius:'50%', flexShrink:0,
-            background:'#1e1e1e', border:'1px solid #2a2a2a',
-            display:'flex', alignItems:'center', justifyContent:'center',
-            fontSize:10, fontWeight:600, color:'#666',
-          }}>CM</div>
-          <div style={{ minWidth:0 }}>
-            <div style={{ fontSize:12, fontWeight:500, color:'#bbb', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>Dr. Carlos M.</div>
-            <div style={{ fontSize:10.5, color:'#3d3d3d' }}>Administrador</div>
-          </div>
+        <ProfileFooter />
+      </div>
+    </div>
+  );
+}
+
+// Conta da clínica (um login por clínica — DECISIONS D-6). Em modo de
+// demonstração, sem Supabase configurado, não há sessão nem botão de sair.
+function ProfileFooter() {
+  const SB = window.SupabaseService;
+  const email = (SB && SB.getCurrentUserEmail && SB.getCurrentUserEmail()) || null;
+  const iniciais = email ? email.slice(0, 2).toUpperCase() : '--';
+  const [hov, setHov] = useState(false);
+
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', marginTop:2, borderTop:'1px solid #191919' }}>
+      <div style={{
+        width:26, height:26, borderRadius:'50%', flexShrink:0,
+        background:'#1e1e1e', border:'1px solid #2a2a2a',
+        display:'flex', alignItems:'center', justifyContent:'center',
+        fontSize:10, fontWeight:600, color:'#666',
+      }}>{iniciais}</div>
+      <div style={{ minWidth:0 }}>
+        <div style={{ fontSize:12, fontWeight:500, color:'#bbb', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+          {email || 'Modo demonstração'}
         </div>
+        {email && (
+          <button
+            onClick={() => SB.signOut()}
+            onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+            style={{
+              padding:0, border:'none', background:'none',
+              fontSize:10.5, color: hov ? '#888' : '#3d3d3d',
+              cursor:'pointer', transition:'color .12s',
+            }}>
+            Sair
+          </button>
+        )}
       </div>
     </div>
   );
@@ -1014,7 +1040,9 @@ function AtendimentosView({ accent }) {
 
   const messagesEndRef = useRefChat(null);
   const isConnected = window.SupabaseService && window.SupabaseService.isConnected();
-  const currentUserId = 'd3b07384-ad6b-4f5c-9ab4-66e2854d88ad'; // Mock do usuário logado (Dr. Carlos)
+  // Um login por clínica (DECISIONS D-6): identifica a conta, não a pessoa.
+  // Alimenta o rótulo "Humano" e as abas minhas/não atribuídas — "alguém assumiu".
+  const currentUserId = (window.SupabaseService && window.SupabaseService.getCurrentUserId()) || null;
 
   const selectedConversa = conversas.find(c => c.id === selectedId) || null;
 

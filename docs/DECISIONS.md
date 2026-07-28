@@ -63,11 +63,17 @@ paciente** pelo WhatsApp. Sem o recurso, nada grava `private=true` e o vazamento
 ocorrer. **O trigger continua sem o filtro** — ver `ARMADILHAS.md` §2 antes de reintroduzir.
 
 ### D-3 — O login (Auth + RLS) será executado por outro agente · 26/07/2026
-**Decisão:** escrever o plano de execução em `docs/plano-auth-rls.md` e passar para o Gemini
-implementar, em vez de implementar aqui.
-**Por quê:** decisão do usuário, para economizar tokens desta sessão. O plano é autocontido:
-inclui as armadilhas, a ordem de fechamento tabela por tabela com teste entre cada passo, e o
-rollback.
+### ↳ REABERTA E REVERTIDA em 28/07/2026 — voltou para o Claude
+**Decisão original:** escrever o plano de execução em `docs/plano-auth-rls.md` e passar para o
+Gemini implementar, em vez de implementar aqui.
+**Por quê:** decisão do usuário, para economizar tokens da sessão de 26/07. O plano é
+autocontido: inclui as armadilhas, a ordem de fechamento tabela por tabela com teste entre
+cada passo, e o rollback.
+
+**Reversão (28/07/2026):** o usuário escolheu "eu assumo o login + RLS inteiro" durante a
+auditoria de LGPD. A execução voltou para esta sessão.
+⚠️ **O Gemini precisa ser avisado** — se ele estiver com o plano em mãos, dois agentes vão
+escrever nas mesmas tabelas. As etapas 1 e 2 do plano já estão aplicadas no banco.
 
 ### D-4 — Aplicar correções do n8n via MCP, não pela interface · 26/07/2026
 **Decisão:** usar `update_workflow` + `publish_workflow` do MCP do n8n.
@@ -145,6 +151,36 @@ precisaria de uma RPC de qualquer jeito — a chamada HTTP só somava peças que
 Do jeito escolhido o detector não depende de HTTP, de JWT, nem das Edge Functions estarem no
 ar. E elimina de vez a classe de bug da `ARMADILHAS.md` §10, que nasceu justamente de montar
 header com chave dentro de um comando de cron.
+
+### D-10 — Views `kpi_*`: `security_invoker`, não revogar o `SELECT` de anon · 28/07/2026
+**Decisão:** aplicar `ALTER VIEW ... SET (security_invoker = on)` nas 4 views de KPI, em vez
+de revogar o `SELECT` da role `anon`.
+
+**Por quê:** as duas opções fecham o mesmo vazamento (`kpi_retencao` entregava nome +
+telefone + convênio + histórico por fora do RLS — `ARMADILHAS.md` §16). Mas revogar o
+`SELECT` **quebraria a aba de Relatórios hoje**, porque o CRM ainda não tem login e lê as
+views com a chave anon. Já o `security_invoker` é **no-op enquanto as policies forem
+`USING (true)`** e fecha sozinho, automaticamente, no dia em que as tabelas forem fechadas.
+
+**Consequência:** a correção não precisou esperar o login — e não existe um intervalo em que
+alguém "esqueça" de voltar para fechar a view. Verificado: consultadas como role `anon` as 4
+views continuam respondendo.
+
+**Reabrir quando:** depois do login estar no ar, revogar o `SELECT` de `anon` nas 4 views
+vira uma limpeza barata e vale fazer (defesa em profundidade). Está na etapa 9 do
+`docs/db/04-fechamento-rls.sql`.
+
+### D-11 — `data_hora` do pré-agendamento fica `now()` como placeholder · 28/07/2026
+**Decisão:** a RPC `criar_pre_agendamento` grava `data_hora = now()`.
+
+**Por quê:** a coluna é `NOT NULL` sem default e a IA não negocia horário — ela captura só
+turno de preferência ("manhã"/"tarde"), que vai para `notas`. Quem define o horário real é a
+recepção, ao aprovar o `solicitado`.
+
+**Consequência assumida:** um pré-agendamento aparece na agenda no instante em que foi pedido,
+não no horário desejado. Se a aba de agenda ordenar por `data_hora`, ele aparece "agora".
+**Confirme isso na primeira vez que um `solicitado` real cair na tela** — se incomodar, a
+alternativa é tornar `data_hora` nullable e a agenda tratar `solicitado` como lista separada.
 
 ## 🚫 Rejeitadas (NÃO reintroduza)
 

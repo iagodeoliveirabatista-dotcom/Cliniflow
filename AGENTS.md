@@ -20,6 +20,8 @@ Multi-clínica por `clinic_id`.
 | **Nó Supabase usa `create`, não `insert`** | `insert` é PostgREST, não n8n. §5e |
 | **`cron.schedule` não valida o comando** | Aceita SQL quebrado e só falha ao rodar. Custou 48 dias de lembretes mortos. §10 |
 | **Fechar RLS de `consultas` quebra a IA em silêncio** | A tool de agendamento usa chave anon. `docs/plano-auth-rls.md` §3.2 |
+| **Tabela fechada ≠ dado protegido** | View/função `SECURITY DEFINER` passa por cima do RLS. `clinics` estava "fechada" e vazava a `evolution_apikey`. §16 |
+| **`REVOKE ... FROM PUBLIC` não basta** | O Supabase concede a `anon` por fora. São duas concessões — leia o `proacl` depois. §17 |
 | **Tabela nova nasce com RLS ligado e SEM policy** | Event trigger `ensure_rls`. Anon lê `[]` com HTTP 200. §13 |
 | **Não tire o TTL do buffer de debounce** | Sem ele, falha de envio gruda a conversa velha na nova. §12 |
 
@@ -74,7 +76,31 @@ Multi-clínica por `clinic_id`.
   - As checagens 2 e 3 do detector (envio preso, paciente sem resposta) **nunca dispararam de
     verdade**. Só a checagem 1 (cron) foi vista funcionando.
 
-- ⛔ **Não existe:** login no CRM · RLS por clínica · toggle `bot_ativo` por clínica.
+### 🔒 Auditoria LGPD + início do fechamento do RLS (28/07/2026)
+
+- ✅ **Dois vazamentos fechados — os dois passavam POR FORA do RLS**, então sobreviveriam
+  ao `plano-auth-rls.md` inteiro. Ver `ARMADILHAS.md` §16.
+  - As 4 views `kpi_*` eram `SECURITY DEFINER`: a `kpi_retencao` entregava nome + telefone +
+    convênio + histórico para a chave anon. Agora `security_invoker = on` (D-10).
+    Verificado: consultadas como role `anon`, as 4 continuam respondendo — CRM intacto.
+  - A RPC `process_secretary_message` devolvia **`clinics.evolution_apikey`** para quem
+    chamasse. ACL agora é `postgres | service_role`.
+- ✅ **Etapas 1 e 2 do plano aplicadas:** `clinic_users`, `auth_clinic_id()`, policy
+  `clinic_users_self`, e a RPC `criar_pre_agendamento` (testada com paciente real,
+  transação abortada).
+- ✅ **Credencial do n8n MEDIDA como `service_role`**, nos dois workflows — era a suposição
+  em que o plano inteiro se apoiava (§2) e ninguém tinha medido.
+  Prova A: execução 79162 passou pela RPC já fechada para anon.
+  Prova B: o RAG respondeu (`documentos_clinica` tem RLS e zero policy → só service_role lê).
+- ⚠️ **Login do CRM: código pronto, render NÃO verificado.** `LoginScreen` + `Root` em
+  `Cliniflow.html`, auth em `supabase-client.js`, `Sair` no rodapé da sidebar, e o uuid
+  fantasma `d3b07384-...` removido (era mock, nem é a clínica atual). Os 5 `.jsx` **e** o
+  bloco inline transpilam com `@babel/preset-react` 7.29.0 — mas **ninguém abriu a tela**.
+- ⛔ **NENHUMA tabela de paciente foi fechada.** Os dados continuam legíveis e graváveis
+  pela chave anon pública. O roteiro pronto para colar está em `docs/db/04-fechamento-rls.sql`.
+
+- ⛔ **Não existe:** login no CRM (código escrito, não verificado) · RLS por clínica ·
+  toggle `bot_ativo` por clínica · retenção/expurgo de dados · via de exclusão de paciente.
 
 - 🚫 **Removido de propósito:** notas internas privadas no CRM (decisão do usuário — ver
   `docs/DECISIONS.md` D-2). Não reintroduza sem antes corrigir o trigger (`ARMADILHAS.md` §2).
@@ -112,9 +138,22 @@ ficam registrados para ninguém reabrir a investigação do zero.
    comercial, ótimo — feche em `DECISIONS.md` e considere tirar o documento 22 do RAG.
    Se a IA deveria dar preço, é bug de chunking: quebrar a tabela em uma frase por
    procedimento resolve.
-4. **Envio travado em `sending`**: mensagem que falha nunca mais é reenviável. `ARMADILHAS.md` §5c.
-5. **Login + RLS** — plano pronto em `docs/plano-auth-rls.md` (delegado ao Gemini, D-3 e D-6).
-   É o que eu considero impeditivo para atender paciente real.
+2. **⛔ TERMINAR O FECHAMENTO DO RLS.** Isto virou o item nº 1 de risco: o sistema agora
+   recebe mensagem real de paciente (§ acima) **com os dados abertos para a chave pública**.
+   A D-3 foi revertida — voltou para o Claude, **avise o Gemini** se ele estiver com o plano.
+   Roteiro pronto para colar, passo a passo com teste e rollback: `docs/db/04-fechamento-rls.sql`.
+   Três coisas travam o início, todas suas:
+   - **Criar a conta** da clínica (painel → Authentication → Add user, *Auto Confirm*) e rodar
+     o `INSERT` do PASSO 0. Sem isso `auth_clinic_id()` devolve NULL e toda policy nega tudo.
+   - **Publicar o nó `criar_pre_agendamento`** no n8n — a troca para a RPC ficou **só no
+     rascunho** (bloqueio de permissão). Sem publicar, o PASSO 4 mata a ferramenta da IA.
+   - **Abrir o CRM** e confirmar que a tela de login renderiza.
+3. **Envio travado em `sending`**: mensagem que falha nunca mais é reenviável. `ARMADILHAS.md` §5c.
+4. **LGPD além do RLS** — fechar o RLS resolve o art. 46, não a lei toda. Continuam
+   inexistentes: aviso de privacidade na 1ª mensagem do bot, base legal para dado sensível
+   (art. 11), prazo de retenção + rotina de expurgo (arts. 15-16), e via de exclusão de
+   paciente (art. 18). O bot pergunta "o que mais te incomoda" e grava a resposta — isso é
+   dado de saúde. Nenhum desses depende de código: dependem de você decidir o prazo e o texto.
 
 ## Como rodar
 - **CRM:** `cliniflow-export/servir-local.bat` (HTML + React via CDN, sem build step).
@@ -130,14 +169,15 @@ ficam registrados para ninguém reabrir a investigação do zero.
 | O que já custou horas | `docs/ARMADILHAS.md` |
 | Decisões e o que foi rejeitado | `docs/DECISIONS.md` |
 | Schema, funções, triggers, RLS | `docs/db/` |
-| Login e fechamento do RLS | `docs/plano-auth-rls.md` |
+| Login e fechamento do RLS | `docs/plano-auth-rls.md` (o **roteiro para executar** é `docs/db/04-fechamento-rls.sql`) |
 | Como o sistema funciona (visão geral) | `DOCUMENTACAO.md` |
 | Histórico entre sessões de agentes | `SYNC_STATUS.md` |
 | Frontend do CRM | `cliniflow-export/` |
 | Workflow principal (referência, não deploy) | `Projeto Clínica - Evo Go ....json` |
 | Dados puxados do n8n vivo | `docs/n8n-evidencia/` |
 
-**IDs úteis:** n8n `ZAQ6I2CiBGh8swye` (Evo-Go, 71 nós) · `snHQtmgTKLgQEpqk` (Enviar Mensagem CRM) ·
+**IDs úteis:** n8n `ZAQ6I2CiBGh8swye` (Evo-Go, **69 nós** após a remoção da urgência, D-9) ·
+`snHQtmgTKLgQEpqk` (Enviar Mensagem CRM) ·
 Supabase `mxvaufkqijdkapvtkvee` · Evolution `https://n8n-evolution-evo-go.1qkdsj.easypanel.host`
 
 ## Regras para agentes (CONTRATO)

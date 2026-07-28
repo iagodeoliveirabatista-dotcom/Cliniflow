@@ -9,6 +9,26 @@ seção 3 derrubam a implementação se forem descobertas no meio do caminho.
 
 ---
 
+## ⚠️ ERRATA — 28/07/2026 (leia antes do resto)
+
+Este plano foi parcialmente executado em 28/07. **Quatro coisas nele estão erradas ou
+incompletas.** O roteiro corrigido, pronto para colar, é
+[`db/04-fechamento-rls.sql`](db/04-fechamento-rls.sql) — use aquele, não os SQLs daqui.
+
+| Onde | O que o plano diz | O que é verdade |
+|---|---|---|
+| §2 | "a credencial do n8n **é** `service_role`" (inferência) | ✅ **Confirmado por medição** em 28/07, nos dois workflows. Não é mais suposição. |
+| §4.2 | `REVOKE ALL ON FUNCTION ... FROM public;` | **Insuficiente sozinho.** O Supabase concede `EXECUTE` a `anon` por fora, via `ALTER DEFAULT PRIVILEGES`. São duas concessões. `ARMADILHAS.md` §17 |
+| §4.3 | dropar as policies de `logs_erro`, `config_automacao`, `historico_confirmacoes` e não criar nada | **Quebra o CRM.** `fetchSaudeSistema()` lê `logs_erro` (é o único lugar onde erro aparece), a aba Automações lê e escreve `config_automacao`. Precisam de policy para `authenticated`. |
+| §5 | "hoje isso só não estoura porque a tabela está vazia" | **Falso.** `consultas.data_hora` é `NOT NULL` sem default e o nó nunca mandava o campo: a ferramenta já falhava com `23502`, independente de RLS. `ARMADILHAS.md` §18 |
+
+**E o que o plano não cobre:** fechar a tabela não fecha o dado. Havia duas passagens
+`SECURITY DEFINER` alcançáveis pela chave anon — a view `kpi_retencao` e a RPC
+`process_secretary_message`, que devolvia a `evolution_apikey`. Ambas fechadas em 28/07,
+mas **nada neste plano teria pego isso**. Ver `ARMADILHAS.md` §16.
+
+---
+
 ## 1. Objetivo
 
 Hoje o CRM não tem login. Por causa disso, sete tabelas estão com política

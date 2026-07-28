@@ -1,12 +1,19 @@
 -- ============================================================
--- Cliniflow — Políticas RLS (estado REAL em 2026-07-26)
+-- Cliniflow — Políticas RLS (estado REAL em 2026-07-28)
 -- Projeto: mxvaufkqijdkapvtkvee
 --
 -- ⚠️ ESTE É O ESTADO ATUAL, NÃO O ESTADO DESEJADO.
--- Sete tabelas estão abertas para a chave anon (que é pública: está no
+-- Oito tabelas continuam abertas para a chave anon (que é pública: está no
 -- config.js servido ao browser e hardcoded em nós do n8n).
 -- Verificado empiricamente com a anon key: patients e mensagem_logs
 -- retornaram linhas reais de paciente.
+--
+-- ⚠️⚠️ RLS DE TABELA NÃO É A HISTÓRIA TODA. Antes de concluir que algo está
+-- protegido, cheque também views e funções SECURITY DEFINER — elas passam por
+-- cima do RLS por definição. Duas passagens assim foram fechadas em 28/07/2026
+-- (seção no fim deste arquivo). Ver ARMADILHAS.md §16 e §17.
+--
+-- O roteiro de fechamento, pronto para colar, está em 04-fechamento-rls.sql.
 -- ============================================================
 
 
@@ -61,6 +68,34 @@ CREATE POLICY "Allow anon update conversations" ON public.conversations
   FOR UPDATE USING (true);
 CREATE POLICY "Allow anon insert conversations" ON public.conversations
   FOR INSERT WITH CHECK (true);
+
+
+-- ── APLICADO EM 28/07/2026 ──────────────────────────────────
+
+-- Vínculo conta ↔ clínica. A policy usa a função, NUNCA a própria tabela
+-- (senão o Postgres entra em recursão infinita — plano §3.1).
+ALTER TABLE public.clinic_users ENABLE ROW LEVEL SECURITY;
+CREATE POLICY clinic_users_self ON public.clinic_users
+  FOR SELECT TO authenticated
+  USING (user_id = auth.uid());
+
+
+-- ── VAZAMENTOS QUE NÃO PASSAVAM PELO RLS (fechados em 28/07/2026) ──
+--
+-- 1) As 4 views kpi_* eram SECURITY DEFINER (default do Postgres para views),
+--    então ignoravam o RLS de `consultas` e `patients`. A kpi_retencao entregava
+--    nome + telefone + convenio + histórico de sessões para a chave anon.
+ALTER VIEW public.kpi_comparecimento     SET (security_invoker = on);
+ALTER VIEW public.kpi_resumo_mensal      SET (security_invoker = on);
+ALTER VIEW public.kpi_sessoes_dia_semana SET (security_invoker = on);
+ALTER VIEW public.kpi_retencao           SET (security_invoker = on);
+-- No-op enquanto as policies forem USING(true); fecha sozinho no dia do
+-- fechamento. Escolhido em vez de revogar o SELECT de anon porque revogar
+-- quebraria a aba de Relatórios hoje (sem login). Ver DECISIONS.md D-10.
+--
+-- 2) A RPC process_secretary_message devolvia clinics.evolution_apikey para
+--    quem chamasse. Grants corrigidos em 02-functions-triggers.sql.
+--    `clinics` estar com RLS e zero policy NÃO impedia isso.
 
 
 -- ============================================================

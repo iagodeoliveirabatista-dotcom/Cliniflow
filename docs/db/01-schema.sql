@@ -24,6 +24,18 @@ CREATE TABLE public.clinics (
 );
 
 
+-- Vínculo conta ↔ clínica. Um login por clínica (DECISIONS.md D-6).
+-- Criada em 28/07/2026, etapa 1 do docs/plano-auth-rls.md.
+CREATE TABLE public.clinic_users (
+    user_id   uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    clinic_id uuid NOT NULL REFERENCES public.clinics(id) ON DELETE CASCADE,
+    nome      text,
+    papel     text NOT NULL DEFAULT 'recepcao',   -- 'recepcao' | 'admin'
+    criado_em timestamptz DEFAULT now()
+);
+CREATE INDEX clinic_users_clinic_idx ON public.clinic_users(clinic_id);
+
+
 -- ── PACIENTES ───────────────────────────────────────────────
 -- ⚠️ telefone aqui é gravado com 11 DÍGITOS (DDD+9+número), sem o DDI 55.
 --    Já sessoes_ativas.telefone e mensagem_logs.telefone usam 13 dígitos.

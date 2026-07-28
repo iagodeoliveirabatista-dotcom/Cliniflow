@@ -40,6 +40,70 @@
     return !!getClient();
   }
 
+  // ── AUTH ────────────────────────────────────────────────────────────────────
+  // O supabase-js v2 já persiste a sessão em localStorage e renova o token
+  // sozinho. Os defaults estão certos — não desabilite, e não monte o header
+  // Authorization à mão.
+
+  let _session = null;
+
+  async function getSession() {
+    const client = getClient();
+    if (!client) return null;
+    const { data } = await client.auth.getSession();
+    _session = data.session || null;
+    return _session;
+  }
+
+  // Um login por clínica (DECISIONS D-6): este uid identifica a CONTA da clínica,
+  // não a pessoa. Serve para "alguém assumiu", nunca para "quem assumiu".
+  function getCurrentUserId() {
+    return (_session && _session.user && _session.user.id) || null;
+  }
+
+  function getCurrentUserEmail() {
+    return (_session && _session.user && _session.user.email) || null;
+  }
+
+  // Traduz o erro do Supabase. Nunca devolva o erro cru para a tela.
+  function traduzErroLogin(error) {
+    const msg = String((error && error.message) || '');
+    if (/Invalid login credentials/i.test(msg)) return 'E-mail ou senha incorretos.';
+    if (/Failed to fetch|NetworkError|network/i.test(msg)) return 'Sem conexão com o servidor. Verifique a internet.';
+    return 'Não foi possível entrar. Tente de novo.';
+  }
+
+  async function signIn(email, senha) {
+    const client = getClient();
+    if (!client) return { success: false, error: 'Supabase não configurado' };
+    try {
+      const { data, error } = await client.auth.signInWithPassword({ email, password: senha });
+      if (error) return { success: false, error: traduzErroLogin(error) };
+      _session = data.session || null;
+      return { success: true, session: _session };
+    } catch (err) {
+      return { success: false, error: traduzErroLogin(err) };
+    }
+  }
+
+  async function signOut() {
+    const client = getClient();
+    if (!client) return { success: false };
+    const { error } = await client.auth.signOut();
+    _session = null;
+    return { success: !error };
+  }
+
+  function onAuthStateChange(callback) {
+    const client = getClient();
+    if (!client) return null;
+    const { data } = client.auth.onAuthStateChange((_event, session) => {
+      _session = session || null;
+      callback(_session);
+    });
+    return data.subscription;
+  }
+
   // sessoes_ativas.telefone é gravada pelo n8n ("Normalizar Dados v2") no formato
   // 55 + DDD + 9 + número (13 dígitos), enquanto patients.telefone guarda 11 dígitos.
   // Sem converter, todo .eq('telefone', ...) nessa tabela erra a linha.
@@ -454,9 +518,6 @@
 
   async function updateConversa(id, updates) {
     const cleanUpdates = { ...updates };
-    if (cleanUpdates.assignee_id === 'd3b07384-ad6b-4f5c-9ab4-66e2854d88ad') {
-      cleanUpdates.assignee_id = null;
-    }
     return query(async (sb) => {
       return sb.from('conversations')
         .update(cleanUpdates)
@@ -478,11 +539,12 @@
     });
   }
 
+  // senderId é aceito por compatibilidade com os chamadores, mas ignorado:
+  // com um login por clínica (DECISIONS D-6) gravar o uid não diz quem escreveu,
+  // e dado sem informação engana quem for ler depois. sender_id fica sempre NULL.
   async function enviarMensagemCRM(conversaId, pacienteId, telefone, texto, senderId = null) {
     const client = getClient();
     if (!client) return { success: false, error: 'Supabase não configurado' };
-
-    const cleanSenderId = (senderId && senderId !== 'd3b07384-ad6b-4f5c-9ab4-66e2854d88ad') ? senderId : null;
 
     try {
       // 1. Grava no banco local
@@ -495,7 +557,7 @@
           tipo: 'manual',
           canal: 'whatsapp',
           direcao: 'saida',
-          sender_id: cleanSenderId,
+          sender_id: null,
           status: 'pending',
         }).select().single();
       });
@@ -703,6 +765,14 @@
     // Status
     isConnected,
     getClient,
+
+    // Auth
+    getSession,
+    getCurrentUserId,
+    getCurrentUserEmail,
+    signIn,
+    signOut,
+    onAuthStateChange,
 
     // Pacientes
     fetchPacientes,

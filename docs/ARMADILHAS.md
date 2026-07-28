@@ -449,7 +449,7 @@ cria policy nenhuma. RLS ligado sem policy = ninguém lê nada, exceto `service_
 | Tabela | Linhas reais | Anon enxerga |
 |---|---|---|
 | `patients`, `mensagem_logs`, `conversations`, `config_automacao`, `logs_erro` | 3 / 24 / 3 / 3 / 34 | tudo (policy `allow_all`) |
-| `clinics` | 1 | **0** — é o que protege a `evolution_apikey` ✅ |
+| `clinics` | 1 | **0** — mas isso NÃO protegia a `evolution_apikey`. Ver §16 |
 | `documentos_clinica` (RAG) | 7 | **0** ⚠️ |
 | `whatsapp_buffer`, `n8n_chat_histories` | 2 / 2 | **0** (ok: as funções são SECURITY DEFINER) |
 
@@ -460,3 +460,125 @@ documentos e a IA responde sem a base de conhecimento, em silêncio.** O MCP red
 credenciais, então isso **não foi possível verificar** — ver "Pontos cegos" no `AGENTS.md`.
 
 **Ao criar tabela nova:** ou crie a policy junto, ou saiba que só `service_role` vai ler.
+
+---
+
+## 16. Fechar a TABELA não fecha o dado: `SECURITY DEFINER` passa por cima ✅ CORRIGIDO
+
+**Sintoma:** o RLS está ligado, a tabela não tem policy nenhuma, você confere com a chave
+anon e vê `[]`. Conclui que o dado está protegido. **Não está.**
+
+**Causa:** `SECURITY DEFINER` roda com os privilégios do **dono** do objeto, não de quem
+chamou. Então qualquer view ou função marcada assim ignora o RLS das tabelas que ela lê.
+Havia duas passagens assim, ambas alcançáveis pela chave anon pública do `config.js`:
+
+| Objeto | O que entregava |
+|---|---|
+| view `kpi_retencao` | `nome`, `telefone`, `convenio`, nº de sessões, primeira/última — por fora do RLS de `patients` e `consultas` |
+| RPC `process_secretary_message(uuid)` | **`clinics.evolution_apikey`** — a chave da instância WhatsApp da clínica, apesar de `clinics` estar com RLS e zero policy |
+
+A cadeia completa da segunda, só com a chave pública: `GET /rest/v1/conversations` →
+`POST /rest/v1/mensagem_logs` (`tipo=manual`, `direcao=saida`, o que já dispara um envio
+real pelo trigger) → `POST /rest/v1/rpc/process_secretary_message` → apikey na mão →
+Evolution API direto, sem passar mais pelo Cliniflow.
+
+**Por que passou despercebido:** o `docs/db/03-rls-policies.sql` listava `clinics` como
+"fechada ✅ protege evolution_apikey", e estava certo **sobre a tabela**. O vazamento não
+era pela tabela.
+
+**Como confirmar em 10 segundos:**
+```sql
+-- views SECURITY DEFINER (Postgres: ausência de security_invoker = definer)
+select c.relname, c.reloptions from pg_class c join pg_namespace n on n.oid=c.relnamespace
+where n.nspname='public' and c.relkind='v';
+
+-- funções SECURITY DEFINER e quem pode executar
+select proname, prosecdef, array_to_string(proacl,' | ')
+from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+where n.nspname='public' and p.prosecdef;
+```
+
+**Correção aplicada em 28/07/2026:**
+- as 4 views `kpi_*` receberam `ALTER VIEW ... SET (security_invoker = on)`. Escolha
+  deliberada em vez de revogar o `SELECT` de `anon`: revogar quebraria a aba de Relatórios
+  **hoje** (não há login ainda), enquanto `security_invoker` é no-op enquanto as policies
+  forem `USING (true)` e fecha sozinho no dia do fechamento. Ver `DECISIONS.md` D-10.
+- `process_secretary_message` teve o `EXECUTE` revogado de `PUBLIC`, `anon` e
+  `authenticated`. ACL final: `postgres | service_role`.
+
+**Não faça:** auditar RLS olhando só `pg_policy`. Uma tabela sem policy pode estar
+sangrando por uma view ou por uma RPC.
+
+---
+
+## 17. `REVOKE ... FROM PUBLIC` não basta no Supabase — são DUAS concessões ⚠️ LEIA ANTES DE REVOGAR
+
+**Sintoma:** você revoga, o comando volta `Success`, e o acesso continua exatamente igual.
+
+**Causa:** toda função no Postgres nasce com `EXECUTE` para `PUBLIC` (pseudo-papel que
+significa "todo mundo"). **Além disso**, o Supabase tem `ALTER DEFAULT PRIVILEGES` que
+concede `EXECUTE` **nominalmente** a `anon`, `authenticated` e `service_role`. São duas
+concessões independentes: matar uma não mata a outra.
+
+Aconteceu duas vezes seguidas em 28/07/2026, nas duas direções:
+
+```
+REVOKE ... FROM anon, authenticated;   -- ACL: =X/postgres | ... ainda tem PUBLIC
+REVOKE ... FROM PUBLIC;                -- ACL: ... | anon=X/postgres  ainda tem anon
+```
+
+**Como confirmar — sempre depois de revogar, nunca antes:**
+```sql
+select proname, coalesce(array_to_string(proacl,' | '),'sem ACL explicita')
+from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+where n.nspname='public' and proname = '<funcao>';
+```
+No ACL, `quem=oquê/quem_concedeu`. **Nome vazio antes do `=` é `PUBLIC`** (`=X/postgres`).
+Só considere fechado quando `anon` **e** o `=X` sumirem dos dois.
+
+**Correção:** revogar de `PUBLIC` **e** de `anon`/`authenticated`, e depois **ler o
+`proacl`**. O `Success` do comando não é evidência de nada.
+
+**Isto corrige o `docs/plano-auth-rls.md` §4.2**, que manda só
+`REVOKE ALL ON FUNCTION public.auth_clinic_id() FROM public;` — insuficiente sozinho.
+
+**Deixado aberto de propósito:** `append_whatsapp_buffer` mantém `anon` (o nó
+`Append Buffer (RPC)` do n8n depende, plano §2). `trigger_secretary_webhook` e
+`rls_auto_enable` não foram tocadas: são funções de trigger/event trigger, não são
+chamáveis fora do contexto do trigger, e mexer no grant delas arrisca quebrar o
+`INSERT` em `mensagem_logs` em silêncio.
+
+---
+
+## 18. A ferramenta de pré-agendamento da IA já estava quebrada, não "vai quebrar" ✅ CORRIGIDO NO BANCO
+
+**Sintoma:** a IA diz ao paciente que separou o horário e **nada** aparece em `consultas`.
+
+**Causa:** `consultas.data_hora` é `NOT NULL` **sem default**, e o nó `criar_pre_agendamento`
+(toolCode) nunca mandava esse campo. Todo insert morria com `23502`. O `catch` do nó
+devolvia `{success:false}` para o modelo, que — sem instrução do contrário — segue a
+conversa como se tivesse dado certo.
+
+**Confirmado em 28/07/2026** por sonda que não grava nada:
+```sql
+do $$ declare v text; begin
+  begin insert into public.consultas (patient_id,clinic_id,status,tipo)
+        values (null,null,'solicitado','sonda'); v:='PASSOU';
+  exception when others then v:='FALHOU -> '||SQLSTATE||' : '||SQLERRM; end;
+  raise exception '%', v;   -- aborta e mostra
+end $$;
+-- 23502 : null value in column "data_hora" violates not-null constraint
+```
+
+**Isto corrige o `docs/plano-auth-rls.md` §5**, que diz "hoje isso só não estoura porque a
+tabela está vazia". Tabela vazia não evita violação de `NOT NULL`. A ferramenta estava
+morta independente de RLS.
+
+**Correção:** RPC `public.criar_pre_agendamento(uuid,uuid,text,text)`, `SECURITY DEFINER`,
+que valida que o paciente pertence à clínica e preenche `data_hora` com `now()` como
+placeholder (a recepção define o horário real ao aprovar o `solicitado`).
+`EXECUTE` só para `anon` (a chave que o nó usa) e `service_role`.
+
+**Status:** ✅ no banco, testada com paciente real (transação abortada).
+⚠️ **O nó do n8n está com a troca SÓ NO RASCUNHO** — sem `publish_workflow`, produção
+continua fazendo `POST /rest/v1/consultas` e continua falhando. Ver §5d.

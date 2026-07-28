@@ -13,10 +13,10 @@
   <script src="supabase.js"></script>
 
   <script src="config.js"></script>
-  <script src="supabase-client.js?v=9"></script>
+  <script src="supabase-client.js?v=10"></script>
 
   <script type="text/babel" src="tweaks-panel.jsx?v=4"></script>
-  <script type="text/babel" src="cliniflow-components.jsx?v=7"></script>
+  <script type="text/babel" src="cliniflow-components.jsx?v=8"></script>
   <script type="text/babel" src="patients-components.jsx?v=7"></script>
   <script type="text/babel" src="reports-components.jsx?v=4"></script>
   <script type="text/babel" src="automation-components.jsx?v=4"></script>
@@ -610,7 +610,125 @@
       );
     }
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    // ── Login ──────────────────────────────────────────────────────────────
+
+    function LoginScreen() {
+      const [email, setEmail] = useState('');
+      const [senha, setSenha] = useState('');
+      const [erro, setErro] = useState('');
+      const [enviando, setEnviando] = useState(false);
+
+      const inputStyle = {
+        width:'100%', padding:'9px 11px', fontSize:14,
+        background:'#161616', color:'var(--supabase-text-light)',
+        border:'1px solid var(--supabase-border)', borderRadius:8,
+        outline:'none',
+      };
+
+      async function entrar(e) {
+        e.preventDefault();
+        if (enviando) return;
+        setErro('');
+        setEnviando(true);
+        const res = await SB.signIn(email.trim(), senha);
+        if (!res.success) {
+          setErro(res.error);
+          setEnviando(false);
+        }
+        // sucesso: o onAuthStateChange no Root troca a tela.
+      }
+
+      return (
+        <div style={{
+          height:'100%', display:'flex', alignItems:'center', justifyContent:'center',
+          background:'var(--supabase-bg-studio)',
+        }}>
+          <form onSubmit={entrar} style={{
+            width:320, padding:28, borderRadius:8,
+            background:'var(--supabase-bg-card)',
+            border:'1px solid var(--supabase-border)',
+            display:'flex', flexDirection:'column', gap:14,
+          }}>
+            <div style={{ fontSize:17, fontWeight:600, color:'var(--supabase-text)', marginBottom:2 }}>
+              Cliniflow
+            </div>
+
+            <input
+              type="email" autoComplete="username" placeholder="E-mail" required
+              value={email} onChange={e => setEmail(e.target.value)}
+              style={inputStyle}
+            />
+            <input
+              type="password" autoComplete="current-password" placeholder="Senha" required
+              value={senha} onChange={e => setSenha(e.target.value)}
+              style={inputStyle}
+            />
+
+            {erro && (
+              <div style={{ fontSize:13, color:'#f87171' }}>{erro}</div>
+            )}
+
+            <button type="submit" disabled={enviando} style={{
+              padding:'9px 11px', fontSize:14, fontWeight:600,
+              background:'var(--supabase-brand)', color:'#0f0f0f',
+              border:'none', borderRadius:8,
+              cursor: enviando ? 'default' : 'pointer',
+              opacity: enviando ? 0.6 : 1,
+            }}>
+              {enviando ? '...' : 'Entrar'}
+            </button>
+          </form>
+        </div>
+      );
+    }
+
+    // ── Root: portão de autenticação ───────────────────────────────────────
+    // O App só monta quando há sessão. Isso é o que garante que as inscrições
+    // do Realtime (criadas nos useEffect do App) subam com JWT — sem isso, com
+    // o RLS fechado, o canal sobe sem token e não entrega evento nenhum, em
+    // silêncio. Ver docs/plano-auth-rls.md, armadilhas 3.4 e 6.2.
+
+    function Root() {
+      const [session, setSession] = useState(null);
+      const [carregando, setCarregando] = useState(true);
+
+      useEffect(() => {
+        // Sem Supabase configurado o CRM roda em modo de demonstração (mock),
+        // como antes — não faz sentido pedir login para dado falso.
+        if (!SB || !SB.isConnected()) {
+          setCarregando(false);
+          return;
+        }
+
+        let sub = null;
+        SB.getSession().then(s => {
+          setSession(s);
+          setCarregando(false);
+          sub = SB.onAuthStateChange(s2 => setSession(s2));
+        });
+
+        return () => { if (sub) sub.unsubscribe(); };
+      }, []);
+
+      if (carregando) {
+        return (
+          <div style={{
+            height:'100%', display:'flex', alignItems:'center', justifyContent:'center',
+            background:'var(--supabase-bg-studio)', color:'var(--supabase-text-muted)', fontSize:14,
+          }}>
+            Carregando...
+          </div>
+        );
+      }
+
+      const modoDemo = !SB || !SB.isConnected();
+      if (!modoDemo && !session) return <LoginScreen />;
+
+      // key força o App a remontar quando a conta muda, refazendo as inscrições.
+      return <App key={session ? session.user.id : 'demo'} />;
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<Root />);
   </script>
 </body>
 </html>

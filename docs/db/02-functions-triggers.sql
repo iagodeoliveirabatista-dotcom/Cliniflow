@@ -299,3 +299,81 @@ $function$;
 -- vector   → documentos_clinica.embedding
 -- pg_net   → trigger_secretary_webhook() e os jobs do cron
 -- pg_cron  → disparar-lembretes, detector-silencio
+
+
+-- ============================================================
+-- ADICIONADO EM 28/07/2026 — etapas 1 e 2 do docs/plano-auth-rls.md
+-- ============================================================
+
+-- Resolve a clínica do usuário logado. SECURITY DEFINER é obrigatório:
+-- roda fora do RLS e é o que evita a recursão infinita numa policy de
+-- clinic_users que consultasse clinic_users (plano §3.1).
+CREATE OR REPLACE FUNCTION public.auth_clinic_id()
+RETURNS uuid
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT clinic_id FROM public.clinic_users WHERE user_id = auth.uid();
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.auth_clinic_id() FROM PUBLIC, anon;
+GRANT  EXECUTE ON FUNCTION public.auth_clinic_id() TO authenticated;
+-- ⚠️ PUBLIC e anon são DUAS concessões distintas. Ver ARMADILHAS.md §17.
+
+
+-- Substitui o POST direto em /rest/v1/consultas que o nó toolCode
+-- `criar_pre_agendamento` fazia com a chave anon. Dois motivos:
+--   (a) sobrevive ao fechamento de `consultas` (plano §3.2);
+--   (b) preenche data_hora, que é NOT NULL sem default — o nó nunca mandava
+--       e a ferramenta falhava com 23502. Ver ARMADILHAS.md §18.
+CREATE OR REPLACE FUNCTION public.criar_pre_agendamento(
+  p_patient_id uuid,
+  p_clinic_id  uuid,
+  p_tipo       text DEFAULT 'consulta',
+  p_notas      text DEFAULT NULL
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE v_id uuid;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.patients
+    WHERE id = p_patient_id AND clinic_id = p_clinic_id
+  ) THEN
+    RAISE EXCEPTION 'paciente % nao pertence a clinica %', p_patient_id, p_clinic_id;
+  END IF;
+
+  -- now() é placeholder: a recepção define o horário ao aprovar. DECISIONS D-11.
+  INSERT INTO public.consultas (patient_id, clinic_id, status, tipo, notas, data_hora)
+  VALUES (p_patient_id, p_clinic_id, 'solicitado', p_tipo, p_notas, now())
+  RETURNING id INTO v_id;
+
+  RETURN v_id;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.criar_pre_agendamento(uuid,uuid,text,text) FROM PUBLIC, authenticated;
+GRANT  EXECUTE ON FUNCTION public.criar_pre_agendamento(uuid,uuid,text,text) TO anon, service_role;
+
+
+-- ── GRANTS CORRIGIDOS EM 28/07/2026 ─────────────────────────
+-- process_secretary_message retorna clinics.evolution_apikey. Com EXECUTE para
+-- anon, a chave pública do config.js extraía a API key da instância WhatsApp
+-- contornando o RLS de `clinics`. Ver ARMADILHAS.md §16.
+REVOKE EXECUTE ON FUNCTION public.process_secretary_message(uuid) FROM PUBLIC, anon, authenticated;
+GRANT  EXECUTE ON FUNCTION public.process_secretary_message(uuid) TO service_role;
+-- ACL final conferido: postgres=X | service_role=X
+
+REVOKE EXECUTE ON FUNCTION public.detectar_silencio() FROM PUBLIC, anon, authenticated;
+-- roda pelo pg_cron como postgres; anon não tem o que fazer com ela.
+
+-- NÃO TOCADAS de propósito:
+--   append_whatsapp_buffer  → anon é por design (nó `Append Buffer (RPC)` do n8n)
+--   trigger_secretary_webhook, rls_auto_enable → funções de trigger/event trigger,
+--   não chamáveis fora do contexto do trigger; mexer no grant arrisca quebrar o
+--   INSERT em mensagem_logs em silêncio.
