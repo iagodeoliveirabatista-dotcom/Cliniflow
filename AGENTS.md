@@ -62,11 +62,9 @@ Multi-clínica por `clinic_id`.
     **Isto derruba o "zero execuções" que este doc afirmou até 26/07.**
 
 - ⚠️ **Verificado com ressalva / ainda não exercitado:**
-  - **O RAG não foi exercitado nem uma vez.** Na execução 79158 o agente fez
-    `tool_calls.requested: 0` — não chamou `Consulta na database`. Ou seja: a IA respondeu
-    **sem tocar na base de conhecimento**. Para uma saudação isso até é o comportamento
-    desejado, mas significa que o caminho do RAG segue **sem prova de vida**. Ver o ponto
-    cego #1 abaixo — há risco real dele estar mudo por RLS.
+  - **O RAG tem retrieval torto para preço.** Funciona (ver abaixo), mas na pergunta
+    "Quanto custa o clareamento?" os 4 documentos retornados **não incluíram** o que contém
+    a tabela de valores. `ARMADILHAS.md` §15 — precisa de decisão sua se é bug ou estratégia.
   - **Tratamento de erro é quase inexistente.** Li a `activeVersion` em 27/07: os únicos
     nós com `onError`/`retryOnFail` no workflow inteiro são `Cancela evento - RED`,
     `Confirma evento - GREEN`, `Busca Paciente` e `Update an event`. Todos os outros ~26 nós
@@ -81,24 +79,27 @@ Multi-clínica por `clinic_id`.
 - 🚫 **Removido de propósito:** notas internas privadas no CRM (decisão do usuário — ver
   `docs/DECISIONS.md` D-2). Não reintroduza sem antes corrigir o trigger (`ARMADILHAS.md` §2).
 
-## 🕳️ Pontos cegos conhecidos (auditoria de 27/07/2026)
+## 🕳️ Pontos cegos (auditoria 27/07 · revisada 28/07/2026)
 
-Ordenados por risco. Nenhum destes gera erro — é por isso que estão aqui.
+Nenhum destes gera erro — é por isso que estão aqui. **3 dos 5 já caíram**; os riscados
+ficam registrados para ninguém reabrir a investigação do zero.
 
-1. **RAG pode estar mudo por RLS e ninguém saberia.** `documentos_clinica` tem RLS ligado e
-   **zero policies** (culpa do event trigger `ensure_rls` — `ARMADILHAS.md` §13).
-   `match_documentos_clinica()` é SECURITY INVOKER, então respeita o RLS do chamador.
-   **Testado com a chave anon: devolve `[]`.** Se a credencial do nó `Consulta na database`
-   for a anon, a IA responde sem base de conhecimento, sempre, em silêncio. O MCP não
-   revela credenciais — **só um teste real com pergunta específica ("qual o preço de X?")
-   resolve isso.** É o teste mais importante pendente.
+1. ~~RAG pode estar mudo por RLS~~ → ✅ **RESOLVIDO em 28/07/2026. O RAG FUNCIONA.**
+   Execução **79160** é a prova: o nó `Consulta na database` foi chamado com o termo
+   `"clareamento"` e devolveu **4 documentos reais** da `documentos_clinica`. Logo, a
+   credencial daquele nó atravessa o RLS (não é a chave anon).
+   ⚠️ A métrica `tool_calls.requested` **mente** — nessa mesma execução ela marcou `0`
+   enquanto `completed` marcou `1`. Ver `ARMADILHAS.md` §14 antes de auditar execução de
+   AI Agent, ou você repete o erro de concluir que a tool não foi chamada.
+   Resta o §15: a recuperação não traz a tabela de preços.
 2. ~~Urgência é um campo minado~~ → **RESOLVIDO em 27/07/2026 removendo o recurso**
    (decisão do usuário, `DECISIONS.md` D-9). O switch `Filtra urgência` ficou como
    passa-tudo inerte de propósito — **não "conserte" isso.**
-3. **`Envia Resposta do Agent` não tem retry** e já falhou **15 vezes** (25/06 a 02/07) com
-   "The service was not able to process your request". Era a origem da corrupção de buffer
-   (`ARMADILHAS.md` §12, já corrigida na raiz) — mas o paciente continua ficando sem resposta
-   quando a Evolution dá soluço.
+3. ~~`Envia Resposta do Agent` não tem retry~~ → ✅ **RESOLVIDO em 28/07/2026.**
+   Aplicado pelo usuário na UI e publicado. Conferido na `activeVersion`:
+   `retryOnFail: true`, `waitBetweenTries: 2000`, `onError` no padrão (*stop*) —
+   intencional, para o `Error Trigger` continuar gravando em `logs_erro`.
+   (`maxTries` ficou sem valor explícito → n8n usa o default, 3.)
 4. **Mensagem de entrada nunca sai de `status='pending'`** (17 linhas). Não quebra nada, mas
    o painel do CRM mostra "pending" para tudo que o paciente escreveu, o que confunde.
 5. **`callN8nWebhook()` e `config.js:n8nBaseUrl` viraram código morto** no CRM depois que o
@@ -106,17 +107,11 @@ Ordenados por risco. Nenhum destes gera erro — é por isso que estão aqui.
 
 ## 🎯 Próximos passos (comece por aqui)
 
-1. **Provar o RAG.** Mande pelo WhatsApp uma pergunta que **só** a base responde
-   ("quanto custa o clareamento?", "qual o horário de sábado?"). Se a IA inventar ou desviar,
-   é o ponto cego #1 — a credencial do nó `Consulta na database` é a chave anon e o RLS está
-   comendo os 7 documentos. É o teste mais barato com maior valor de informação hoje.
-2. **Retry no `Envia Resposta do Agent`** (ponto cego #3) — 15 falhas transitórias já
-   registradas. ⚠️ **É MANUAL, pela UI do n8n** — o MCP não escreve configuração de nó
-   (`ARMADILHAS.md` §5f). Abrir o nó → *Settings* → `Retry On Fail` ligado ·
-   `Max Tries: 3` · `Wait Between Tries: 2000ms`.
-   **Não ligue `On Error: Continue`** nesse nó: se o envio falhar mesmo após as tentativas,
-   o abort é desejado — é ele que faz o `Error Trigger` gravar em `logs_erro`. Com
-   `Continue`, o fluxo seguiria e gravaria `status='sent'` numa mensagem que nunca saiu.
+1. **Decidir o que fazer com preço no RAG** (`ARMADILHAS.md` §15). Hoje a busca não traz a
+   tabela de valores, e a IA desvia para "depende de avaliação". Se isso é a estratégia
+   comercial, ótimo — feche em `DECISIONS.md` e considere tirar o documento 22 do RAG.
+   Se a IA deveria dar preço, é bug de chunking: quebrar a tabela em uma frase por
+   procedimento resolve.
 4. **Envio travado em `sending`**: mensagem que falha nunca mais é reenviável. `ARMADILHAS.md` §5c.
 5. **Login + RLS** — plano pronto em `docs/plano-auth-rls.md` (delegado ao Gemini, D-3 e D-6).
    É o que eu considero impeditivo para atender paciente real.

@@ -349,6 +349,61 @@ confiar na doc.**
 
 ---
 
+## 14. `tool_calls.requested` mente — use `completed` ou o runData
+
+**Sintoma:** você abre uma execução do AI Agent, lê
+`"ai.agent.tool_calls.requested": 0` e conclui que a IA respondeu sem consultar o RAG.
+**Quase sempre errado.**
+
+**Evidência (execução 79160, 28/07/2026):**
+```
+"ai.agent.tool_calls.requested": 0     <-- mente
+"ai.agent.tool_calls.completed": 1     <-- verdade
+```
+Na mesma execução o nó `Consulta na database` aparece no `runData` com `input: "clareamento"`
+e 4 documentos retornados. A tool **foi** chamada.
+
+**Causa provável:** o contador `requested` não é incrementado no caminho de streaming
+(`ai.agent.streaming.enabled: true`) desta versão do n8n.
+
+**Como verificar de verdade — em ordem de confiabilidade:**
+1. O nó `Consulta na database` **aparece no `runData`** da execução? Essa é a prova.
+2. `tool_calls.completed >= 1`.
+3. `subNodeExecutionData.actions[]` lista a chamada com o input usado.
+
+**Custo real:** esta armadilha quase fez a auditoria de 27/07 registrar "o RAG pode estar
+mudo" como bug aberto, quando o RAG estava funcionando.
+
+---
+
+## 15. O RAG funciona, mas a recuperação erra a tabela de preços ⚠️ ABERTO
+
+**Status do RAG:** ✅ **funcionando** — provado na execução 79160. A credencial do nó
+`Consulta na database` atravessa o RLS de `documentos_clinica` (não é a chave anon).
+Isso **fecha** o ponto cego #1 levantado em 27/07.
+
+**O que ainda está torto:** na pergunta *"Quanto custa o clareamento?"*, a busca vetorial
+devolveu 4 documentos — profissionais, regras+FAQ, contato de emergência e estrutura+planos.
+**O documento 22 (`Procedimentos e Valores`), que contém literalmente
+`| Clareamento dental | R$ 950 | 3 |`, não veio.**
+
+Ou seja: para a pergunta mais óbvia de preço, o chunk com o preço não entrou no top-4.
+
+**Hipótese:** tabelas markdown embedam mal comparadas a texto corrido — a similaridade de
+um termo solto ("clareamento") puxa parágrafos narrativos antes de linhas de tabela.
+
+**Por que não foi "corrigido":** não dá para saber se é bug ou estratégia. A IA respondeu
+*"o valor exato depende de uma avaliação"* e desviou para agendamento, o que é comportamento
+comum (e possivelmente desejado) de bot de clínica estética. **Se a intenção for dar preço,
+isto é bug.** Se for sempre desviar para avaliação, o documento 22 é inútil no RAG.
+Decisão do dono — ver `DECISIONS.md`.
+
+**Se for para corrigir:** aumentar o `match_count`, ou quebrar a tabela de valores em um
+chunk por procedimento (linha vira frase: "Clareamento dental custa em média R$ 950 em 3
+sessões"), que embeda muito melhor.
+
+---
+
 ## 12. Buffer de debounce sem TTL corrompia a conversa ✅ CORRIGIDO
 
 **Sintoma:** o paciente manda "oi" e a IA responde chamando ele por um nome errado, ou
