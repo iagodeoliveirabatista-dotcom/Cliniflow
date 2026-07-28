@@ -115,6 +115,26 @@ dura de tudo.
 **Consequência prática:** ao criar automação nova neste projeto, o default é função SQL ou
 Edge Function agendada por `pg_cron` — não workflow n8n.
 
+### D-9 — Remover o handoff de urgência do workflow · 27/07/2026
+**Decisão:** removidos os nós `Pausa IA (Urgência)` e `AVISO URGÊNCIA` do workflow
+`ZAQ6I2CiBGh8swye`. Publicado e conferido na `activeVersion` (71 → 69 nós).
+**Por quê:** decisão do usuário — o recurso era "praticamente cosmético". Somado a isso, a
+auditoria de 27/07 mostrou que ele era **ativamente perigoso**: `Pausa IA (Urgência)` fazia
+`INSERT` em `sessoes_ativas`, cuja PK é o telefone. Na segunda urgência do mesmo paciente
+daria violação de chave e, como o nó não tinha `onError`, **derrubaria o workflow inteiro** —
+justamente no caso em que o paciente mais precisa de resposta.
+
+**O que ficou:** o switch `Filtra urgência` continua no fluxo, mas agora as duas saídas vão
+para `Veio do Webhook?` — ou seja, **é um passa-tudo inerte**, o mesmo estado de antes de
+26/07. Isso é intencional, **não é bug**: mantê-lo custa zero e evitou cirurgia de conexão
+num workflow que tinha acabado de provar que funciona.
+
+⚠️ **Ao próximo agente:** se você notar que `[ACIONAR_HUMANO]` "não faz nada", **isso é de
+propósito**. Não reintroduza os nós — foi exatamente esse o ciclo que aconteceu em 26/07
+(alguém viu o marcador decorativo, "consertou", e criou o bug de chave duplicada).
+Se um dia o handoff voltar, ele precisa ser **upsert**, não insert, e ter
+`onError: continueRegularOutput`.
+
 ### D-8 — O detector de silêncio é função SQL, não Edge Function · 26/07/2026
 **Decisão:** `public.detectar_silencio()` em plpgsql, agendada direto por `pg_cron`
 (`select public.detectar_silencio()`), em vez da Edge Function + `net.http_post` que eu

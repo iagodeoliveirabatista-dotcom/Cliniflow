@@ -67,13 +67,12 @@ Multi-clínica por `clinic_id`.
     **sem tocar na base de conhecimento**. Para uma saudação isso até é o comportamento
     desejado, mas significa que o caminho do RAG segue **sem prova de vida**. Ver o ponto
     cego #1 abaixo — há risco real dele estar mudo por RLS.
-  - `Pausa IA (Urgência)` e `AVISO URGÊNCIA`: a credencial Supabase foi **escolhida por
-    inferência** (`hJIcCVPmy1j9Vjq1`) porque o MCP redige credenciais.
-    ❌ **CORREÇÃO AO QUE ESTE DOC AFIRMAVA:** eu havia escrito que os dois tinham
-    `onError: continueRegularOutput`. **Não têm.** Li a `activeVersion` em 27/07: os únicos
-    nós com tratamento de erro no workflow inteiro são `Cancela evento - RED`,
-    `Confirma evento - GREEN`, `Busca Paciente` e `Update an event`. Consequência real no
-    ponto cego #2.
+  - **Tratamento de erro é quase inexistente.** Li a `activeVersion` em 27/07: os únicos
+    nós com `onError`/`retryOnFail` no workflow inteiro são `Cancela evento - RED`,
+    `Confirma evento - GREEN`, `Busca Paciente` e `Update an event`. Todos os outros ~26 nós
+    de I/O externo abortam o fluxo se falharem.
+    (Este doc já afirmou que os nós de urgência tinham `onError: continueRegularOutput` —
+    era **falso**; os nós foram removidos em 27/07, ver `DECISIONS.md` D-9.)
   - As checagens 2 e 3 do detector (envio preso, paciente sem resposta) **nunca dispararam de
     verdade**. Só a checagem 1 (cron) foi vista funcionando.
 
@@ -93,11 +92,9 @@ Ordenados por risco. Nenhum destes gera erro — é por isso que estão aqui.
    for a anon, a IA responde sem base de conhecimento, sempre, em silêncio. O MCP não
    revela credenciais — **só um teste real com pergunta específica ("qual o preço de X?")
    resolve isso.** É o teste mais importante pendente.
-2. **Urgência (`[ACIONAR_HUMANO]`) é um campo minado.** `Pausa IA (Urgência)` usa
-   `operation: create` (INSERT) em `sessoes_ativas`, cuja PK é `telefone`. Se já existir
-   sessão para aquele telefone → violação de chave → o nó falha → **como não tem `onError`,
-   o workflow inteiro aborta**. Num pedido de urgência, o pior resultado possível: o
-   paciente não recebe resposta nenhuma. Precisa virar upsert.
+2. ~~Urgência é um campo minado~~ → **RESOLVIDO em 27/07/2026 removendo o recurso**
+   (decisão do usuário, `DECISIONS.md` D-9). O switch `Filtra urgência` ficou como
+   passa-tudo inerte de propósito — **não "conserte" isso.**
 3. **`Envia Resposta do Agent` não tem retry** e já falhou **15 vezes** (25/06 a 02/07) com
    "The service was not able to process your request". Era a origem da corrupção de buffer
    (`ARMADILHAS.md` §12, já corrigida na raiz) — mas o paciente continua ficando sem resposta
@@ -113,10 +110,7 @@ Ordenados por risco. Nenhum destes gera erro — é por isso que estão aqui.
    ("quanto custa o clareamento?", "qual o horário de sábado?"). Se a IA inventar ou desviar,
    é o ponto cego #1 — a credencial do nó `Consulta na database` é a chave anon e o RLS está
    comendo os 7 documentos. É o teste mais barato com maior valor de informação hoje.
-2. **Consertar o caminho de urgência** (ponto cego #2): `create` → upsert em
-   `Pausa IA (Urgência)`, mais `onError: continueRegularOutput` nele e no `AVISO URGÊNCIA`.
-   Hoje um pedido de urgência repetido derruba a resposta ao paciente.
-3. **Retry no `Envia Resposta do Agent`** (ponto cego #3) — 15 falhas transitórias já
+2. **Retry no `Envia Resposta do Agent`** (ponto cego #3) — 15 falhas transitórias já
    registradas.
 4. **Envio travado em `sending`**: mensagem que falha nunca mais é reenviável. `ARMADILHAS.md` §5c.
 5. **Login + RLS** — plano pronto em `docs/plano-auth-rls.md` (delegado ao Gemini, D-3 e D-6).
