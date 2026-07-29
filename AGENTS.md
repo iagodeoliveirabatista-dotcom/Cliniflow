@@ -25,7 +25,7 @@ Multi-clínica por `clinic_id`.
 | **Tabela nova nasce com RLS ligado e SEM policy** | Event trigger `ensure_rls`. Anon lê `[]` com HTTP 200. §13 |
 | **Não tire o TTL do buffer de debounce** | Sem ele, falha de envio gruda a conversa velha na nova. §12 |
 
-## Estado atual (27/07/2026)
+## Estado atual (28/07/2026)
 
 - ✅ **Funciona (verificado):**
   - Supabase `mxvaufkqijdkapvtkvee` **ACTIVE_HEALTHY** (estava pausado; restaurado em 26/07).
@@ -122,7 +122,9 @@ ficam registrados para ninguém reabrir a investigação do zero.
    comercial, ótimo — feche em `DECISIONS.md` e considere tirar o documento 22 do RAG.
    Se a IA deveria dar preço, é bug de chunking: quebrar a tabela em uma frase por
    procedimento resolve.
-2. ✅ **RLS Totalmente Fechado e Verificado:** Todas as tabelas sensíveis de paciente e CRM agora estão trancadas por clínica e protegidas contra chaves anônimas públicas.
+2. **Decidir o Google OAuth** (`DECISIONS.md` D-OPEN-4). O botão de login é barato e aditivo;
+   o **autocadastro de clínica reverte a D-6** e abre escrita em `clinics`/`clinic_users`.
+   Separe as duas coisas antes de mandar alguém implementar.
 3. **Envio travado em `sending`**: mensagem que falha nunca mais é reenviável. `ARMADILHAS.md` §5c.
 4. **LGPD além do RLS** — fechar o RLS resolve o art. 46, não a lei toda. Continuam
    inexistentes: aviso de privacidade na 1ª mensagem do bot, base legal para dado sensível

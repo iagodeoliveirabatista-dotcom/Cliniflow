@@ -40,6 +40,35 @@ justamente o alerta de que o n8n caiu.
 **Recomendação:** Evolution direto, gravando a linha no banco de qualquer forma para o
 painel não depender do push. **Status:** aguardando o usuário.
 
+### D-OPEN-4 — Login com Google + autocadastro de clínica
+**Contexto:** o usuário perguntou em 28/07/2026 se dá para ligar "Entrar com o Google" (OAuth)
+e um fluxo de onboarding que detecta `auth_clinic_id() = NULL` e oferece "Cadastre sua Clínica".
+
+⚠️ **A segunda metade colide de frente com a D-6**, que fechou: *"contas criadas pelo dono, pelo
+painel do Supabase — não construa autocadastro nem convite por e-mail"*. Por isso está aqui e
+não foi implementado.
+
+**As duas partes são separáveis, e isso importa:**
+
+| Parte | Custo | Risco |
+|---|---|---|
+| **Só o botão do Google** (login, sem cadastro) | ~20 linhas + 2 configs no console (Google Cloud e Supabase → Providers) | Baixo. É aditivo, não toca em policy nenhuma. Quem cria conta continua sendo o dono |
+| **Onboarding self-service** | ~1h | **Alto se feito errado.** Exige abrir caminho de escrita em `clinics` e `clinic_users` — hoje `clinics` tem RLS e zero policy, e é isso que mais protege o sistema |
+
+**A aresta afiada:** se o usuário puder escolher o `clinic_id` que insere em `clinic_users`, ele
+digita o uuid de uma clínica existente e entra na base de pacientes dela. A inserção **tem** que
+ser por RPC `SECURITY DEFINER` que gera o `clinic_id` no servidor, nunca aceita um vindo do
+cliente, e recusa se o usuário já tiver vínculo.
+
+**Dois detalhes práticos:** `redirectTo: window.location.origin` precisa estar na allowlist de
+Redirect URLs do Supabase e **muda quando publicar** (hoje é `localhost` via `servir-local.bat`);
+e uma clínica auto-cadastrada nasce sem `evolution_apikey`/`evolution_instance`, ou seja, uma
+casca que não atende ninguém até alguém provisionar a Evolution à mão.
+
+**Recomendação:** fazer só o botão do Google agora; deixar o onboarding para quando existir a
+2ª clínica — aí ele deixa de ser conveniência e vira produto, e a RPC blindada vale o esforço.
+**Status:** aguardando o usuário.
+
 ### D-OPEN-2 — A pasta `apify/` pertence a este projeto?
 `apify/blueoceansem-posts.json` e `captions-ranked.txt` não têm relação com o Cliniflow.
 Parecem de outro trabalho. Foram **mantidos** na limpeza de 26/07/2026 por precaução.

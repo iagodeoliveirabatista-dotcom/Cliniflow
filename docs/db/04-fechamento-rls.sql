@@ -1,8 +1,19 @@
 -- ============================================================
+-- ✅ JÁ EXECUTADO — 28/07/2026. NÃO RODE DE NOVO.
+--
+-- Este roteiro foi aplicado e verificado no mesmo dia em que foi escrito.
+-- O estado resultante está em 03-rls-policies.sql, que é o arquivo a ler
+-- para saber como as policies estão HOJE.
+--
+-- Rodar de novo dá erro (as policies já existem) e o PASSO 0 duplicaria o
+-- vínculo em clinic_users. Mantido no repo como REGISTRO do que foi feito,
+-- e como modelo para quando entrar a 2ª clínica.
+-- ============================================================
+--
 -- Cliniflow — ROTEIRO DE FECHAMENTO DO RLS
 -- Escrito em 28/07/2026. Projeto: mxvaufkqijdkapvtkvee
 --
--- Este arquivo é para EXECUTAR, um passo por vez, testando entre cada um.
+-- Este arquivo era para EXECUTAR, um passo por vez, testando entre cada um.
 -- NÃO cole o arquivo inteiro de uma vez. Fechar as oito de uma vez e depois
 -- debugar é como este projeto já se enrolou antes (plano §3.5).
 --
