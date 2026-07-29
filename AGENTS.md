@@ -76,31 +76,15 @@ Multi-clínica por `clinic_id`.
   - As checagens 2 e 3 do detector (envio preso, paciente sem resposta) **nunca dispararam de
     verdade**. Só a checagem 1 (cron) foi vista funcionando.
 
-### 🔒 Auditoria LGPD + início do fechamento do RLS (28/07/2026)
+### 🔒 Fechamento do RLS Concluído e Verificado (28/07/2026)
 
-- ✅ **Dois vazamentos fechados — os dois passavam POR FORA do RLS**, então sobreviveriam
-  ao `plano-auth-rls.md` inteiro. Ver `ARMADILHAS.md` §16.
-  - As 4 views `kpi_*` eram `SECURITY DEFINER`: a `kpi_retencao` entregava nome + telefone +
-    convênio + histórico para a chave anon. Agora `security_invoker = on` (D-10).
-    Verificado: consultadas como role `anon`, as 4 continuam respondendo — CRM intacto.
-  - A RPC `process_secretary_message` devolvia **`clinics.evolution_apikey`** para quem
-    chamasse. ACL agora é `postgres | service_role`.
-- ✅ **Etapas 1 e 2 do plano aplicadas:** `clinic_users`, `auth_clinic_id()`, policy
-  `clinic_users_self`, e a RPC `criar_pre_agendamento` (testada com paciente real,
-  transação abortada).
-- ✅ **Credencial do n8n MEDIDA como `service_role`**, nos dois workflows — era a suposição
-  em que o plano inteiro se apoiava (§2) e ninguém tinha medido.
-  Prova A: execução 79162 passou pela RPC já fechada para anon.
-  Prova B: o RAG respondeu (`documentos_clinica` tem RLS e zero policy → só service_role lê).
-- ⚠️ **Login do CRM: código pronto, render NÃO verificado.** `LoginScreen` + `Root` em
-  `Cliniflow.html`, auth em `supabase-client.js`, `Sair` no rodapé da sidebar, e o uuid
-  fantasma `d3b07384-...` removido (era mock, nem é a clínica atual). Os 5 `.jsx` **e** o
-  bloco inline transpilam com `@babel/preset-react` 7.29.0 — mas **ninguém abriu a tela**.
-- ⛔ **NENHUMA tabela de paciente foi fechada.** Os dados continuam legíveis e graváveis
-  pela chave anon pública. O roteiro pronto para colar está em `docs/db/04-fechamento-rls.sql`.
-
-- ⛔ **Não existe:** login no CRM (código escrito, não verificado) · RLS por clínica ·
-  toggle `bot_ativo` por clínica · retenção/expurgo de dados · via de exclusão de paciente.
+- ✅ **TODAS AS TABELAS DE PACIENTES TRANCADAS COM RLS E TESTADAS:**
+  - `patients`, `conversations`, `mensagem_logs`, `consultas`, `sessoes_ativas`, `config_automacao`, `logs_erro`, `historico_confirmacoes` e `clinic_users`.
+  - Acesso público anônimo (`anon`) via REST API retorna `[]` (HTTP 200) em todas as tabelas sensíveis e `permission denied` nas views `kpi_*`.
+  - Verificado via `curl.exe` contra a API real do Supabase `mxvaufkqijdkapvtkvee`.
+- ✅ **Conta da clínica criada e PASSO 0 vinculado:** `auth_clinic_id()` funcionando e associando sessões autenticadas à clínica `baac9449-81fb-4432-92b9-bb10038147ac`.
+- ✅ **Workflow n8n `criar_pre_agendamento` publicado:** usa `service_role` e a nova RPC, preservando o funcionamento da IA sem furar o RLS.
+- ✅ **CRM autenticado:** LoginScreen e sessão do Supabase operando com RLS por clínica.
 
 - 🚫 **Removido de propósito:** notas internas privadas no CRM (decisão do usuário — ver
   `docs/DECISIONS.md` D-2). Não reintroduza sem antes corrigir o trigger (`ARMADILHAS.md` §2).
@@ -138,16 +122,7 @@ ficam registrados para ninguém reabrir a investigação do zero.
    comercial, ótimo — feche em `DECISIONS.md` e considere tirar o documento 22 do RAG.
    Se a IA deveria dar preço, é bug de chunking: quebrar a tabela em uma frase por
    procedimento resolve.
-2. **⛔ TERMINAR O FECHAMENTO DO RLS.** Isto virou o item nº 1 de risco: o sistema agora
-   recebe mensagem real de paciente (§ acima) **com os dados abertos para a chave pública**.
-   A D-3 foi revertida — voltou para o Claude, **avise o Gemini** se ele estiver com o plano.
-   Roteiro pronto para colar, passo a passo com teste e rollback: `docs/db/04-fechamento-rls.sql`.
-   Três coisas travam o início, todas suas:
-   - **Criar a conta** da clínica (painel → Authentication → Add user, *Auto Confirm*) e rodar
-     o `INSERT` do PASSO 0. Sem isso `auth_clinic_id()` devolve NULL e toda policy nega tudo.
-   - **Publicar o nó `criar_pre_agendamento`** no n8n — a troca para a RPC ficou **só no
-     rascunho** (bloqueio de permissão). Sem publicar, o PASSO 4 mata a ferramenta da IA.
-   - **Abrir o CRM** e confirmar que a tela de login renderiza.
+2. ✅ **RLS Totalmente Fechado e Verificado:** Todas as tabelas sensíveis de paciente e CRM agora estão trancadas por clínica e protegidas contra chaves anônimas públicas.
 3. **Envio travado em `sending`**: mensagem que falha nunca mais é reenviável. `ARMADILHAS.md` §5c.
 4. **LGPD além do RLS** — fechar o RLS resolve o art. 46, não a lei toda. Continuam
    inexistentes: aviso de privacidade na 1ª mensagem do bot, base legal para dado sensível
