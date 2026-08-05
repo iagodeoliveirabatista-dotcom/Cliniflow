@@ -49,6 +49,23 @@ Parecem de outro trabalho. Foram **mantidos** na limpeza de 26/07/2026 por preca
 
 ## 🟢 Tomadas
 
+### D-13 — Migração Evolution API → Meta WhatsApp Cloud API fica para depois, não hoje · 04/08/2026
+**Decisão:** o lançamento de amanhã (clínicas da irmã e da tia do usuário) sobe com a Evolution
+API, como está hoje, provada ponta a ponta. A migração para a API oficial da Meta vira um
+projeto separado, sem pressa de deploy.
+
+**Por quê:** o usuário não tem nenhuma configuração da Meta WhatsApp Cloud API ainda (sem
+Business Manager, sem App, sem número verificado). Além do tempo de setup (que depende de
+aprovação da Meta, não só de código), a Cloud API exige **template pré-aprovado** para qualquer
+mensagem enviada fora da janela de 24h da última mensagem do paciente — e é exatamente isso que
+`disparar-lembretes` faz hoje (texto livre, fora da janela). Trocar de provedor às vésperas do
+primeiro atendimento real em duas clínicas novas arriscava derrubar o único canal de WhatsApp
+delas sem necessidade.
+
+**Consequência prática:** ao planejar a migração, ela não é "trocar o endpoint" — é reprojetar
+o fluxo de lembretes/mensagens proativas em cima de templates aprovados pela Meta, e prever o
+tempo de aprovação de Business Manager/número/templates antes de qualquer corte de produção.
+
 ### D-1 — Restaurar o Supabase e versionar o schema · 26/07/2026
 **Decisão:** restaurar o projeto pausado e extrair schema, funções, triggers e RLS para `docs/db/`.
 **Por quê:** funções e triggers (incluindo o disparo `pg_net` que envia as mensagens do CRM)

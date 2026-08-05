@@ -39,6 +39,14 @@
       /* Cantos e Transições */
       --radius-studio: 6px;
       --transition-studio: all 0.2s ease-in-out;
+
+      /* Polimento "premium": easing, elevação e glow do brand — usados
+         globalmente abaixo, não mudam nenhum token que os componentes já leem. */
+      --ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.28);
+      --shadow-md: 0 6px 20px -6px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.24);
+      --shadow-lg: 0 20px 48px -16px rgba(0,0,0,0.55);
+      --shadow-brand: 0 0 0 3px rgba(62,207,142,0.15);
     }
     :root[data-theme="light"] {
       --supabase-bg-main: #fbfcfd;
@@ -48,18 +56,55 @@
       --supabase-text: #1f2937;
       --supabase-text-light: #4b5563;
       --supabase-text-muted: #8c92a0;
+
+      --shadow-sm: 0 1px 2px rgba(15,23,42,0.06);
+      --shadow-md: 0 8px 24px -8px rgba(15,23,42,0.12), 0 1px 2px rgba(15,23,42,0.05);
+      --shadow-lg: 0 24px 56px -20px rgba(15,23,42,0.2);
+      --shadow-brand: 0 0 0 3px rgba(62,207,142,0.18);
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { height: 100%; overflow: hidden; }
-    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--supabase-bg-main); color: var(--supabase-text-light); }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--supabase-bg-main);
+      background-image: radial-gradient(circle at 12% -10%, rgba(62,207,142,0.06), transparent 42%);
+      background-attachment: fixed;
+      color: var(--supabase-text-light);
+    }
+    #root { animation: fadeIn 0.4s var(--ease-premium); }
     ::-webkit-scrollbar { width: 4px; height: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--supabase-border); border-radius: var(--radius-studio); }
+    ::-webkit-scrollbar-thumb { background: var(--supabase-border); border-radius: var(--radius-studio); transition: background 0.2s var(--ease-premium); }
     ::-webkit-scrollbar-thumb:hover { background: var(--supabase-text-muted); }
+    ::selection { background: rgba(62,207,142,0.28); color: var(--supabase-text); }
     button { font-family: inherit; }
     input, textarea, select { font-family: inherit; }
+
+    /* Feedback tátil universal — cobre todo botão/campo dos 5 arquivos sem
+       precisar editar cada componente. Só adiciona propriedades que nenhum
+       inline style já define (transform, filter, box-shadow em hover/focus). */
+    button:not(:disabled) { transition: transform 0.15s var(--ease-premium), filter 0.15s var(--ease-premium), opacity 0.15s var(--ease-premium); }
+    button:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.06); }
+    button:not(:disabled):active { transform: translateY(0) scale(0.98); filter: brightness(0.97); }
+    button:disabled { cursor: default; }
+
+    input, textarea, select { transition: border-color 0.15s var(--ease-premium), box-shadow 0.15s var(--ease-premium); }
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: var(--supabase-brand) !important;
+      box-shadow: var(--shadow-brand);
+    }
+    button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
+      outline: 2px solid var(--supabase-brand);
+      outline-offset: 2px;
+    }
+
     @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
     @keyframes slideUp { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: translateY(0) } }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+    }
   </style>
 </head>
 <body style="font-family: Inter; font-size: 15px">
@@ -652,13 +697,28 @@
           background:'var(--supabase-bg-studio)',
         }}>
           <form onSubmit={entrar} style={{
-            width:320, padding:28, borderRadius:8,
+            width:360, padding:32, borderRadius:16,
             background:'var(--supabase-bg-card)',
             border:'1px solid var(--supabase-border)',
+            boxShadow:'var(--shadow-lg)',
+            animation:'slideUp 0.5s var(--ease-premium)',
             display:'flex', flexDirection:'column', gap:14,
           }}>
-            <div style={{ fontSize:17, fontWeight:600, color:'var(--supabase-text)', marginBottom:2 }}>
-              Cliniflow
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:6 }}>
+              <div style={{
+                width:32, height:32, borderRadius:9, flexShrink:0,
+                background:'linear-gradient(135deg, var(--supabase-brand), #22d3ee)',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                fontSize:15, fontWeight:700, color:'#0f0f0f',
+              }}>C</div>
+              <div>
+                <div style={{ fontSize:17, fontWeight:600, color:'var(--supabase-text)', lineHeight:1.2 }}>
+                  Cliniflow
+                </div>
+                <div style={{ fontSize:12.5, color:'var(--supabase-text-muted)' }}>
+                  Entre para continuar
+                </div>
+              </div>
             </div>
 
             <input
@@ -680,6 +740,7 @@
               padding:'9px 11px', fontSize:14, fontWeight:600,
               background:'var(--supabase-brand)', color:'#0f0f0f',
               border:'none', borderRadius:8,
+              boxShadow:'0 4px 14px -4px rgba(62,207,142,0.5)',
               cursor: enviando ? 'default' : 'pointer',
               opacity: enviando ? 0.6 : 1,
             }}>
@@ -749,9 +810,11 @@
           background:'var(--supabase-bg-studio)',
         }}>
           <form onSubmit={cadastrar} style={{
-            width:360, padding:28, borderRadius:8,
+            width:360, padding:32, borderRadius:16,
             background:'var(--supabase-bg-card)',
             border:'1px solid var(--supabase-border)',
+            boxShadow:'var(--shadow-lg)',
+            animation:'slideUp 0.5s var(--ease-premium)',
             display:'flex', flexDirection:'column', gap:14,
           }}>
             <div style={{ fontSize:17, fontWeight:600, color:'var(--supabase-text)' }}>

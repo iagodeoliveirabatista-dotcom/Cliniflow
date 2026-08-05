@@ -26,6 +26,26 @@ Multi-clínica por `clinic_id`.
 | **Não tire o TTL do buffer de debounce** | Sem ele, falha de envio gruda a conversa velha na nova. §12 |
 | **1º login por Google pode cair no onboarding em vez da clínica real** | Só teste com `iagodeoliveirabatista@gmail.com`; se aparecer "Cadastre sua clínica", PARE. §19 |
 
+## Estado atual (04/08/2026)
+
+- 🚀 **Amanhã (05/08) é o primeiro deploy em clínicas reais** (da irmã e da tia do usuário),
+  ainda 100% em cima da Evolution API. Migração para Meta WhatsApp Cloud API foi
+  deliberadamente adiada — ver `DECISIONS.md` D-13 (a Cloud API exige template aprovado para
+  mensagem fora da janela de 24h, o que quebraria `disparar-lembretes` sem reprojeto).
+- ✅ **Polimento visual "premium" aplicado hoje, verificado rodando:** camada de CSS global em
+  `Cliniflow.html` (tokens `--shadow-sm/md/lg`, `--shadow-brand`, `--ease-premium`) +
+  feedback tátil universal (`button:hover/active`, `input:focus`) que se aplica a **todo**
+  botão/campo dos 5 arquivos sem precisar editar cada componente. Tela de Login e de
+  Onboarding ganharam cartão com sombra/animação de entrada — conferido via
+  `getComputedStyle` no navegador real (borderRadius 16px, boxShadow, animationName
+  aplicados; sem erro de console). As telas autenticadas (Agenda/Kanban/Pacientes/
+  Relatórios/Automações) herdam a mesma camada global mas **não foram abertas com login
+  real** nesta sessão — eram já um design consistente antes de hoje; não confie em "ficou
+  mais bonito" ali sem abrir e olhar.
+  **Screenshot não disponível nesta sessão** (a aba do navegador não compositava frame) —
+  a verificação foi por DOM/computed style e pela árvore de acessibilidade, não visual.
+  Recomendado: dar uma olhada rápida no CRM de verdade antes de amanhã.
+
 ## Estado atual (29/07/2026)
 
 - ✅ **Funciona (verificado):**
