@@ -47,7 +47,7 @@ const pct = (a, b) => b === 0 ? 0 : Math.round(a / b * 100);
 function KpiCard({ label, value, sub, color, trend, icon }) {
   return (
     <div style={{
-      background:'var(--supabase-bg-card)', border:'1px solid var(--supabase-border)', borderRadius:8,
+      background:'var(--supabase-bg-studio)', border:'1px solid var(--supabase-border)', borderRadius:8,
       padding:'18px 20px', display:'flex', flexDirection:'column', gap:10,
     }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
@@ -113,7 +113,7 @@ function BarChart({ data, accent, mode }) {
               <div style={{
                 position:'absolute', bottom:0, left:0, right:0,
                 height:`${totalH}%`, borderRadius:'3px 3px 0 0',
-                background: 'var(--supabase-bg-hover)',
+                background: 'var(--supabase-border)',
               }} />
               {/* Confirmed (foreground) */}
               <div style={{
@@ -217,7 +217,7 @@ function RetentionTable({ data, accent }) {
             </div>
           </div>
           {/* Bar */}
-          <div style={{ height:4, background:'var(--supabase-bg-hover)', borderRadius:2, overflow:'hidden' }}>
+          <div style={{ height:4, background:'var(--supabase-border)', borderRadius:2, overflow:'hidden' }}>
             <div style={{
               height:'100%', borderRadius:2,
               width:`${Math.round(p.sessoes / max * 100)}%`,
@@ -320,7 +320,7 @@ function ReportsView({ accent }) {
             return (
               <button key={p} onClick={() => setPeriod(p)} style={{
                 padding:'5px 11px', borderRadius:4, border:'none',
-                background: active ? 'var(--supabase-bg-hover)' : 'transparent',
+                background: active ? 'var(--supabase-border)' : 'transparent',
                 color: active ? accent : 'var(--supabase-text-muted)',
                 fontSize:11.5, fontWeight: active ? 500 : 400,
                 cursor:'pointer', transition:'all .12s', whiteSpace:'nowrap',
@@ -365,19 +365,19 @@ function ReportsView({ accent }) {
         {/* Charts row */}
         <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:12, marginBottom:20 }}>
           {/* Monthly trend */}
-          <div style={{ background:'var(--supabase-bg-card)', border:'1px solid var(--supabase-border)', borderRadius:8, padding:'18px 20px' }}>
+          <div style={{ background:'var(--supabase-bg-studio)', border:'1px solid var(--supabase-border)', borderRadius:8, padding:'18px 20px' }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
               <span style={{ fontSize:12.5, fontWeight:600, color:'var(--supabase-text-muted)' }}>Consultas por mês</span>
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                 <LegendDot color={accent} label="Confirmados" />
-                <LegendDot color="var(--supabase-bg-hover)" label="Total" />
+                <LegendDot color="var(--supabase-border)" label="Total" />
               </div>
             </div>
             <BarChart data={monthly} accent={accent} mode="month" />
           </div>
 
           {/* Status breakdown */}
-          <div style={{ background:'var(--supabase-bg-card)', border:'1px solid var(--supabase-border)', borderRadius:8, padding:'18px 20px' }}>
+          <div style={{ background:'var(--supabase-bg-studio)', border:'1px solid var(--supabase-border)', borderRadius:8, padding:'18px 20px' }}>
             <span style={{ fontSize:12.5, fontWeight:600, color:'var(--supabase-text-muted)', display:'block', marginBottom:18 }}>
               Distribuição de status
             </span>
@@ -394,7 +394,7 @@ function ReportsView({ accent }) {
         {/* Second row */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:20 }}>
           {/* Weekday distribution */}
-          <div style={{ background:'var(--supabase-bg-card)', border:'1px solid var(--supabase-border)', borderRadius:8, padding:'18px 20px' }}>
+          <div style={{ background:'var(--supabase-bg-studio)', border:'1px solid var(--supabase-border)', borderRadius:8, padding:'18px 20px' }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
               <span style={{ fontSize:12.5, fontWeight:600, color:'var(--supabase-text-muted)' }}>Sessões por dia da semana</span>
             </div>
@@ -402,7 +402,7 @@ function ReportsView({ accent }) {
           </div>
 
           {/* Revenue trend mini */}
-          <div style={{ background:'var(--supabase-bg-card)', border:'1px solid var(--supabase-border)', borderRadius:8, padding:'18px 20px' }}>
+          <div style={{ background:'var(--supabase-bg-studio)', border:'1px solid var(--supabase-border)', borderRadius:8, padding:'18px 20px' }}>
             <span style={{ fontSize:12.5, fontWeight:600, color:'var(--supabase-text-muted)', display:'block', marginBottom:16 }}>
               Receita estimada — últimos 6 meses
             </span>
@@ -411,7 +411,7 @@ function ReportsView({ accent }) {
         </div>
 
         {/* Retention table */}
-        <div style={{ background:'var(--supabase-bg-card)', border:'1px solid var(--supabase-border)', borderRadius:8, padding:'18px 20px' }}>
+        <div style={{ background:'var(--supabase-bg-studio)', border:'1px solid var(--supabase-border)', borderRadius:8, padding:'18px 20px' }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
             <div>
               <span style={{ fontSize:12.5, fontWeight:600, color:'var(--supabase-text-muted)' }}>Pacientes mais frequentes</span>
