@@ -103,10 +103,10 @@ function AutomationView({ accent }) {
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
       {/* Header */}
-      <div style={{ padding: '14px 20px 0', borderBottom: '1px solid #191919', flexShrink: 0 }}>
+      <div style={{ padding: '14px 20px 0', borderBottom: '1px solid var(--supabase-border)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 13 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <h1 style={{ fontSize: 15.5, fontWeight: 600, color: '#e8e8e8', letterSpacing: '-.35px' }}>Automações</h1>
+            <h1 style={{ fontSize: 15.5, fontWeight: 600, color: 'var(--supabase-text)', letterSpacing: '-.35px' }}>Automações</h1>
             {!isConnected && (
               <span style={{
                 fontSize: 10.5, padding: '3px 8px', borderRadius: 4,
@@ -141,7 +141,7 @@ function AutomationView({ accent }) {
               <button key={t.id} onClick={() => setTab(t.id)} style={{
                 padding: '8px 13px', border: 'none', background: 'transparent',
                 borderBottom: active ? `2px solid ${accent}` : '2px solid transparent',
-                color: active ? accent : '#484848',
+                color: active ? accent : 'var(--supabase-text-muted)',
                 fontSize: 12.5, fontWeight: active ? 500 : 400,
                 cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
               }}>
@@ -150,8 +150,8 @@ function AutomationView({ accent }) {
                   <span style={{
                     fontSize: 10.5, minWidth: 18, textAlign: 'center',
                     padding: '0 5px', borderRadius: 8,
-                    background: active ? `${accent}20` : '#181818',
-                    color: active ? accent : '#383838',
+                    background: active ? `${accent}20` : 'var(--supabase-bg-input)',
+                    color: active ? accent : 'var(--supabase-text-muted)',
                   }}>{t.count}</span>
                 )}
               </button>
@@ -192,7 +192,7 @@ function AutomationView({ accent }) {
 
 function LembretesTab({ configs, accent, onSave, saving, isConnected }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, animation: 'fadeIn .2s var(--ease-premium)' }}>
       {configs.map(cfg => (
         <LembreteCard key={cfg.id} config={cfg} accent={accent} onSave={onSave} saving={saving} isConnected={isConnected} />
       ))}
@@ -200,7 +200,7 @@ function LembretesTab({ configs, accent, onSave, saving, isConnected }) {
       {/* Info box */}
       <div style={{
         padding: '14px 18px', borderRadius: 8,
-        background: '#0c0c0c', border: '1px solid #191919',
+        background: 'var(--supabase-bg-studio)', border: '1px solid var(--supabase-border)',
         display: 'flex', alignItems: 'flex-start', gap: 12,
       }}>
         <div style={{
@@ -211,13 +211,13 @@ function LembretesTab({ configs, accent, onSave, saving, isConnected }) {
           <svg width="13" height="13" viewBox="0 0 24 24" fill="#5b8cff"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
         </div>
         <div>
-          <div style={{ fontSize: 12.5, fontWeight: 600, color: '#888', marginBottom: 4 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--supabase-text-muted)', marginBottom: 4 }}>
             Como funciona o disparo
           </div>
-          <div style={{ fontSize: 11.5, color: '#444', lineHeight: 1.6 }}>
+          <div style={{ fontSize: 11.5, color: 'var(--supabase-icon-inactive)', lineHeight: 1.6 }}>
             O Cliniflow salva a configuração no Supabase. O n8n lê essas configurações no horário programado,
             busca as consultas do dia seguinte, e envia os lembretes via Evolution API.
-            Variáveis disponíveis: <code style={{ background: '#181818', padding: '1px 5px', borderRadius: 3, color: '#666', fontSize: 10.5 }}>
+            Variáveis disponíveis: <code style={{ background: 'var(--supabase-bg-input)', padding: '1px 5px', borderRadius: 3, color: 'var(--supabase-text-muted)', fontSize: 10.5 }}>
             {'{nome}'} {'{primeiro_nome}'} {'{data}'} {'{hora}'} {'{medico}'} {'{tipo}'}
             </code>
           </div>
@@ -255,22 +255,22 @@ function LembreteCard({ config, accent, onSave, saving, isConnected }) {
 
   return (
     <div style={{
-      background: '#101010', border: `1px solid ${draft.ativo ? accent + '30' : '#1c1c1c'}`,
+      background: 'var(--supabase-bg-studio)', border: `1px solid ${draft.ativo ? accent + '30' : 'var(--supabase-border)'}`,
       borderRadius: 8, overflow: 'hidden',
       transition: 'border-color .2s',
     }}>
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '14px 18px', borderBottom: editando ? '1px solid #1c1c1c' : 'none',
+        padding: '14px 18px', borderBottom: editando ? '1px solid var(--supabase-border)' : 'none',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 20 }}>{info.icon}</span>
           <div>
-            <div style={{ fontSize: 13.5, fontWeight: 600, color: draft.ativo ? '#e0e0e0' : '#555' }}>
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: draft.ativo ? 'var(--supabase-text-light)' : 'var(--supabase-text-muted)' }}>
               {info.titulo}
             </div>
-            <div style={{ fontSize: 11.5, color: '#444', marginTop: 2 }}>
+            <div style={{ fontSize: 11.5, color: 'var(--supabase-text-muted)', marginTop: 2 }}>
               {info.desc}
               {draft.horario_envio && ` · Envio às ${draft.horario_envio}`}
               {draft.antecedencia_horas && ` · ${draft.antecedencia_horas}h antes`}
@@ -287,7 +287,7 @@ function LembreteCard({ config, accent, onSave, saving, isConnected }) {
             }}
             style={{
               position: 'relative', width: 36, height: 20, border: 0, borderRadius: 999,
-              background: draft.ativo ? accent : 'rgba(255,255,255,0.1)',
+              background: draft.ativo ? accent : 'var(--supabase-border)',
               cursor: 'pointer', padding: 0, transition: 'background .2s',
             }}
           >
@@ -300,9 +300,9 @@ function LembreteCard({ config, accent, onSave, saving, isConnected }) {
           {/* Edit button */}
           <button onClick={() => setEditando(!editando)} style={{
             padding: '5px 10px', borderRadius: 5, cursor: 'pointer',
-            background: editando ? `${accent}20` : '#181818',
-            border: `1px solid ${editando ? accent + '40' : '#252525'}`,
-            color: editando ? accent : '#666', fontSize: 11.5, fontWeight: 500,
+            background: editando ? `${accent}20` : 'var(--supabase-bg-input)',
+            border: `1px solid ${editando ? accent + '40' : 'var(--supabase-border)'}`,
+            color: editando ? accent : 'var(--supabase-text-muted)', fontSize: 11.5, fontWeight: 500,
           }}>
             {editando ? 'Fechar' : 'Editar'}
           </button>
@@ -315,7 +315,7 @@ function LembreteCard({ config, accent, onSave, saving, isConnected }) {
           {/* Row: horário + antecedência */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#555', textTransform: 'uppercase', letterSpacing: .7, marginBottom: 6 }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--supabase-text-muted)', textTransform: 'uppercase', letterSpacing: .7, marginBottom: 6 }}>
                 Horário de envio
               </label>
               <input
@@ -323,13 +323,13 @@ function LembreteCard({ config, accent, onSave, saving, isConnected }) {
                 onChange={e => set('horario_envio', e.target.value)}
                 style={{
                   width: '100%', padding: '8px 10px', borderRadius: 6,
-                  background: '#161616', border: '1px solid #242424',
-                  color: '#e0e0e0', fontSize: 13, outline: 'none',
+                  background: 'var(--supabase-bg-input)', border: '1px solid var(--supabase-border)',
+                  color: 'var(--supabase-text-light)', fontSize: 13, outline: 'none',
                 }}
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#555', textTransform: 'uppercase', letterSpacing: .7, marginBottom: 6 }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--supabase-text-muted)', textTransform: 'uppercase', letterSpacing: .7, marginBottom: 6 }}>
                 Antecedência
               </label>
               <select
@@ -337,8 +337,8 @@ function LembreteCard({ config, accent, onSave, saving, isConnected }) {
                 onChange={e => set('antecedencia_horas', e.target.value)}
                 style={{
                   width: '100%', padding: '8px 10px', borderRadius: 6,
-                  background: '#161616', border: '1px solid #242424',
-                  color: '#e0e0e0', fontSize: 13, outline: 'none', appearance: 'none',
+                  background: 'var(--supabase-bg-input)', border: '1px solid var(--supabase-border)',
+                  color: 'var(--supabase-text-light)', fontSize: 13, outline: 'none', appearance: 'none',
                 }}
               >
                 <option value={2}>2 horas antes</option>
@@ -352,7 +352,7 @@ function LembreteCard({ config, accent, onSave, saving, isConnected }) {
 
           {/* Template */}
           <div>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#555', textTransform: 'uppercase', letterSpacing: .7, marginBottom: 6 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--supabase-text-muted)', textTransform: 'uppercase', letterSpacing: .7, marginBottom: 6 }}>
               Template da mensagem
             </label>
             <textarea
@@ -361,8 +361,8 @@ function LembreteCard({ config, accent, onSave, saving, isConnected }) {
               rows={3}
               style={{
                 width: '100%', padding: '10px 12px', borderRadius: 6,
-                background: '#161616', border: '1px solid #242424',
-                color: '#e0e0e0', fontSize: 13, outline: 'none', resize: 'vertical',
+                background: 'var(--supabase-bg-input)', border: '1px solid var(--supabase-border)',
+                color: 'var(--supabase-text-light)', fontSize: 13, outline: 'none', resize: 'vertical',
                 lineHeight: 1.5, fontFamily: 'inherit',
               }}
             />
@@ -386,14 +386,14 @@ function LembreteCard({ config, accent, onSave, saving, isConnected }) {
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
             <button onClick={() => { setDraft({ ...config }); setEditando(false); }} style={{
               padding: '7px 14px', borderRadius: 6, cursor: 'pointer',
-              background: '#1a1a1a', border: '1px solid #262626',
-              color: '#888', fontSize: 12, fontWeight: 500,
+              background: 'var(--supabase-bg-card)', border: '1px solid var(--supabase-border)',
+              color: 'var(--supabase-text-muted)', fontSize: 12, fontWeight: 500,
             }}>Cancelar</button>
             <button onClick={handleSave} disabled={saving} style={{
               padding: '7px 16px', borderRadius: 6,
               cursor: saving ? 'not-allowed' : 'pointer',
-              background: saving ? '#333' : accent, border: 'none',
-              color: saving ? '#666' : 'rgba(0,0,0,0.85)',
+              background: saving ? 'var(--supabase-bg-hover)' : accent, border: 'none',
+              color: saving ? 'var(--supabase-icon-inactive)' : 'rgba(0,0,0,0.85)',
               fontSize: 12, fontWeight: 600,
             }}>{saving ? 'Salvando…' : 'Salvar configuração'}</button>
           </div>
@@ -414,23 +414,23 @@ function HistoricoTab({ logs, accent, onRefresh, loading }) {
   }, [logs, filtro]);
 
   return (
-    <div>
+    <div style={{ animation: 'fadeIn .2s var(--ease-premium)' }}>
       {/* Filters */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {['todos', 'reminder_24h', 'reminder_2h', 'confirmation', 'cancellation', 'manual', 'outlier'].map(f => (
             <button key={f} onClick={() => setFiltro(f)} style={{
               padding: '4px 10px', borderRadius: 5, cursor: 'pointer',
-              background: filtro === f ? `${accent}20` : '#141414',
-              border: `1px solid ${filtro === f ? accent + '40' : '#1f1f1f'}`,
-              color: filtro === f ? accent : '#555', fontSize: 11, fontWeight: 500,
+              background: filtro === f ? `${accent}20` : 'var(--supabase-bg-input)',
+              border: `1px solid ${filtro === f ? accent + '40' : 'var(--supabase-border)'}`,
+              color: filtro === f ? accent : 'var(--supabase-text-muted)', fontSize: 11, fontWeight: 500,
             }}>{f === 'todos' ? 'Todos' : (TIPO_LABELS[f] || f)}</button>
           ))}
         </div>
         <button onClick={onRefresh} disabled={loading} style={{
           padding: '5px 12px', borderRadius: 5, cursor: 'pointer',
-          background: '#161616', border: '1px solid #232323',
-          color: '#777', fontSize: 11.5, fontWeight: 500,
+          background: 'var(--supabase-bg-input)', border: '1px solid var(--supabase-border)',
+          color: 'var(--supabase-text-muted)', fontSize: 11.5, fontWeight: 500,
         }}>{loading ? 'Carregando…' : '↻ Atualizar'}</button>
       </div>
 
@@ -438,11 +438,11 @@ function HistoricoTab({ logs, accent, onRefresh, loading }) {
       <div style={{
         display: 'grid',
         gridTemplateColumns: '1fr 110px 100px 80px 80px 100px',
-        gap: 10, padding: '8px 12px', borderBottom: '1px solid #1a1a1a', marginBottom: 4,
+        gap: 10, padding: '8px 12px', borderBottom: '1px solid var(--supabase-border)', marginBottom: 4,
       }}>
         {['Paciente', 'Tipo', 'Direção', 'Status', 'Confiança', 'Horário'].map(h => (
           <span key={h} style={{
-            fontSize: 10, fontWeight: 600, color: '#333',
+            fontSize: 10, fontWeight: 600, color: 'var(--supabase-text-muted)',
             textTransform: 'uppercase', letterSpacing: .7,
           }}>{h}</span>
         ))}
@@ -451,7 +451,7 @@ function HistoricoTab({ logs, accent, onRefresh, loading }) {
       {/* Rows */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
         {filteredLogs.length === 0 && (
-          <div style={{ padding: '40px 20px', textAlign: 'center', color: '#444', fontSize: 13 }}>
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--supabase-text-muted)', fontSize: 13 }}>
             Nenhuma mensagem encontrada
           </div>
         )}
@@ -481,12 +481,12 @@ function MensagemRow({ log, accent }) {
           display: 'grid',
           gridTemplateColumns: '1fr 110px 100px 80px 80px 100px',
           gap: 10, padding: '10px 12px', alignItems: 'center',
-          borderBottom: '1px solid #131313',
-          background: hov ? '#121212' : 'transparent',
+          borderBottom: '1px solid var(--supabase-border)',
+          background: hov ? 'var(--supabase-bg-hover)' : 'transparent',
           cursor: 'pointer', transition: 'all .1s',
         }}
       >
-        <div style={{ fontSize: 12.5, color: '#d0d0d0', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div style={{ fontSize: 12.5, color: 'var(--supabase-text-light)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {nome}
         </div>
         <span style={{
@@ -494,16 +494,16 @@ function MensagemRow({ log, accent }) {
           background: `${accent}14`, color: accent, fontWeight: 500,
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         }}>{TIPO_LABELS[log.tipo] || log.tipo}</span>
-        <span style={{ fontSize: 11.5, color: log.direcao === 'entrada' ? '#5b8cff' : '#666' }}>
+        <span style={{ fontSize: 11.5, color: log.direcao === 'entrada' ? '#5b8cff' : 'var(--supabase-text-muted)' }}>
           {log.direcao === 'entrada' ? '← Entrada' : '→ Saída'}
         </span>
         <span style={{ fontSize: 11.5, color: st.color, fontWeight: 500 }}>
           {st.icon} {st.label}
         </span>
-        <span style={{ fontSize: 11.5, color: log.confianca_percentual > 0 ? '#888' : '#333' }}>
+        <span style={{ fontSize: 11.5, color: log.confianca_percentual > 0 ? 'var(--supabase-text-muted)' : 'var(--supabase-icon-inactive)' }}>
           {log.confianca_percentual > 0 ? `${log.confianca_percentual}%` : '—'}
         </span>
-        <span style={{ fontSize: 11.5, color: '#555' }}>
+        <span style={{ fontSize: 11.5, color: 'var(--supabase-text-muted)' }}>
           {data} {hora}
         </span>
       </div>
@@ -511,15 +511,15 @@ function MensagemRow({ log, accent }) {
       {/* Expanded content */}
       {expanded && (
         <div style={{
-          padding: '10px 12px 10px 24px', background: '#0d0d0d',
-          borderBottom: '1px solid #1a1a1a',
+          padding: '10px 12px 10px 24px', background: 'var(--supabase-bg-studio)',
+          borderBottom: '1px solid var(--supabase-border)',
         }}>
-          <div style={{ fontSize: 12, color: '#888', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+          <div style={{ fontSize: 12, color: 'var(--supabase-text-muted)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
             {log.mensagem || '(sem conteúdo)'}
           </div>
           {log.intencao_detectada && (
-            <div style={{ marginTop: 8, fontSize: 11, color: '#555' }}>
-              Intenção: <strong style={{ color: '#888' }}>{log.intencao_detectada}</strong>
+            <div style={{ marginTop: 8, fontSize: 11, color: 'var(--supabase-text-muted)' }}>
+              Intenção: <strong style={{ color: 'var(--supabase-text-light)' }}>{log.intencao_detectada}</strong>
             </div>
           )}
         </div>
@@ -539,12 +539,12 @@ function StatusTab({ accent, evoStatus, logs, saude, isConnected }) {
   const lastMsg = logs.length > 0 ? logs[0] : null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, animation: 'fadeIn .2s var(--ease-premium)' }}>
       {/* Connection status */}
       <div style={{
-        background: '#101010', border: '1px solid #1c1c1c', borderRadius: 8, padding: '20px',
+        background: 'var(--supabase-bg-studio)', border: '1px solid var(--supabase-border)', borderRadius: 8, padding: '20px',
       }}>
-        <div style={{ fontSize: 12.5, fontWeight: 600, color: '#888', marginBottom: 16 }}>Conexão Evolution API</div>
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--supabase-text-muted)', marginBottom: 16 }}>Conexão Evolution API</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{
             width: 48, height: 48, borderRadius: 12,
@@ -560,7 +560,7 @@ function StatusTab({ accent, evoStatus, logs, saude, isConnected }) {
             <div style={{ fontSize: 15, fontWeight: 600, color: evoStatus?.connected ? '#00d084' : '#ef4444' }}>
               {evoStatus?.connected ? 'Conectado' : isConnected ? 'Desconectado' : 'Não configurado'}
             </div>
-            <div style={{ fontSize: 12, color: '#555', marginTop: 2 }}>
+            <div style={{ fontSize: 12, color: 'var(--supabase-text-muted)', marginTop: 2 }}>
               {evoStatus?.connected
                 ? 'O bot está recebendo e enviando mensagens normalmente'
                 : isConnected
@@ -583,33 +583,33 @@ function StatusTab({ accent, evoStatus, logs, saude, isConnected }) {
 
       {/* Last message */}
       <div style={{
-        background: '#101010', border: '1px solid #1c1c1c', borderRadius: 8, padding: '18px 20px',
+        background: 'var(--supabase-bg-studio)', border: '1px solid var(--supabase-border)', borderRadius: 8, padding: '18px 20px',
       }}>
-        <div style={{ fontSize: 12.5, fontWeight: 600, color: '#888', marginBottom: 12 }}>Última mensagem</div>
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--supabase-text-muted)', marginBottom: 12 }}>Última mensagem</div>
         {lastMsg ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div style={{ fontSize: 13, color: '#d0d0d0' }}>{lastMsg.patient?.nome || lastMsg.telefone}</div>
-            <div style={{ fontSize: 12, color: '#555', whiteSpace: 'pre-wrap', maxHeight: 60, overflow: 'hidden' }}>
+            <div style={{ fontSize: 13, color: 'var(--supabase-text-light)' }}>{lastMsg.patient?.nome || lastMsg.telefone}</div>
+            <div style={{ fontSize: 12, color: 'var(--supabase-text-muted)', whiteSpace: 'pre-wrap', maxHeight: 60, overflow: 'hidden' }}>
               {lastMsg.mensagem || '(sem conteúdo)'}
             </div>
-            <div style={{ fontSize: 11, color: '#444' }}>
+            <div style={{ fontSize: 11, color: 'var(--supabase-text-muted)' }}>
               {new Date(lastMsg.enviado_em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
               {' · '}
-              <span style={{ color: (MSG_STATUS_CFG[lastMsg.status] || {}).color || '#555' }}>
+              <span style={{ color: (MSG_STATUS_CFG[lastMsg.status] || {}).color || 'var(--supabase-text-muted)' }}>
                 {(MSG_STATUS_CFG[lastMsg.status] || {}).label || lastMsg.status}
               </span>
             </div>
           </div>
         ) : (
-          <div style={{ fontSize: 12.5, color: '#444' }}>Nenhuma mensagem registrada</div>
+          <div style={{ fontSize: 12.5, color: 'var(--supabase-text-muted)' }}>Nenhuma mensagem registrada</div>
         )}
       </div>
 
       {/* Supabase connection */}
       <div style={{
-        background: '#101010', border: '1px solid #1c1c1c', borderRadius: 8, padding: '18px 20px',
+        background: 'var(--supabase-bg-studio)', border: '1px solid var(--supabase-border)', borderRadius: 8, padding: '18px 20px',
       }}>
-        <div style={{ fontSize: 12.5, fontWeight: 600, color: '#888', marginBottom: 12 }}>Conexão Supabase</div>
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--supabase-text-muted)', marginBottom: 12 }}>Conexão Supabase</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{
             width: 8, height: 8, borderRadius: '50%',
@@ -639,17 +639,17 @@ function SaudeSistemaCard({ saude, isConnected }) {
 
   return (
     <div style={{
-      background: '#101010', border: '1px solid #1c1c1c', borderRadius: 8, padding: '18px 20px',
+      background: 'var(--supabase-bg-studio)', border: '1px solid var(--supabase-border)', borderRadius: 8, padding: '18px 20px',
     }}>
       <div style={{
         display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 14,
       }}>
-        <div style={{ fontSize: 12.5, fontWeight: 600, color: '#888' }}>Saúde do sistema</div>
-        <div style={{ fontSize: 11, color: '#444' }}>últimos 7 dias · agrupado por erro</div>
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--supabase-text-muted)' }}>Saúde do sistema</div>
+        <div style={{ fontSize: 11, color: 'var(--supabase-icon-inactive)' }}>últimos 7 dias · agrupado por erro</div>
       </div>
 
       {!isConnected ? (
-        <div style={{ fontSize: 12.5, color: '#444' }}>Modo demonstração</div>
+        <div style={{ fontSize: 12.5, color: 'var(--supabase-text-muted)' }}>Modo demonstração</div>
       ) : itens.length === 0 ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#00d084' }} />
@@ -665,7 +665,7 @@ function SaudeSistemaCard({ saude, isConnected }) {
               <div key={i} style={{
                 display: 'flex', alignItems: 'flex-start', gap: 10,
                 paddingBottom: i < itens.length - 1 ? 10 : 0,
-                borderBottom: i < itens.length - 1 ? '1px solid #191919' : 'none',
+                borderBottom: i < itens.length - 1 ? '1px solid var(--supabase-border)' : 'none',
               }}>
                 <span style={{
                   flexShrink: 0, marginTop: 1, padding: '1px 6px', borderRadius: 3,
@@ -674,15 +674,15 @@ function SaudeSistemaCard({ saude, isConnected }) {
                 }}>{org.label}</span>
 
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 12.5, color: '#d0d0d0', marginBottom: 2 }}>
+                  <div style={{ fontSize: 12.5, color: 'var(--supabase-text-light)', marginBottom: 2 }}>
                     {item.node_name}
-                    <span style={{ color: '#444' }}> · {item.workflow_name}</span>
+                    <span style={{ color: 'var(--supabase-text-muted)' }}> · {item.workflow_name}</span>
                   </div>
                   <div style={{
-                    fontSize: 11.5, color: '#666', lineHeight: 1.5,
+                    fontSize: 11.5, color: 'var(--supabase-text-muted)', lineHeight: 1.5,
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   }} title={item.error_message}>{item.error_message}</div>
-                  <div style={{ fontSize: 10.5, color: '#3a3a3a', marginTop: 3 }}>
+                  <div style={{ fontSize: 10.5, color: 'var(--supabase-text-muted)', marginTop: 3 }}>
                     {new Date(item.ultima).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                   </div>
                 </div>
@@ -690,7 +690,7 @@ function SaudeSistemaCard({ saude, isConnected }) {
                 {item.ocorrencias > 1 && (
                   <span style={{
                     flexShrink: 0, marginTop: 1, padding: '1px 7px', borderRadius: 10,
-                    fontSize: 10.5, fontWeight: 600, color: '#888', background: '#1c1c1c',
+                    fontSize: 10.5, fontWeight: 600, color: 'var(--supabase-text-muted)', background: 'var(--supabase-bg-input)',
                   }}>{item.ocorrencias}×</span>
                 )}
               </div>
@@ -705,9 +705,9 @@ function SaudeSistemaCard({ saude, isConnected }) {
 function StatCard({ label, value, color, icon }) {
   return (
     <div style={{
-      background: '#101010', border: '1px solid #1c1c1c', borderRadius: 8, padding: '16px 18px',
+      background: 'var(--supabase-bg-studio)', border: '1px solid var(--supabase-border)', borderRadius: 8, padding: '16px 18px',
     }}>
-      <div style={{ fontSize: 10.5, fontWeight: 600, color: '#3a3a3a', textTransform: 'uppercase', letterSpacing: .7, marginBottom: 8 }}>
+      <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--supabase-text-muted)', textTransform: 'uppercase', letterSpacing: .7, marginBottom: 8 }}>
         {label}
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
