@@ -79,14 +79,14 @@ function Modal({ title, onClose, children, accent, width=460 }) {
       position:'fixed', inset:0, zIndex:1000,
       background:'rgba(0,0,0,0.62)', backdropFilter:'blur(3px)',
       display:'flex', alignItems:'center', justifyContent:'center',
-      animation:'fadeIn .15s ease-out',
+      animation:'fadeIn .2s var(--ease-premium)',
     }}>
       <div onClick={e => e.stopPropagation()} style={{
         width, maxWidth:'92vw', maxHeight:'88vh',
         background:'var(--supabase-bg-studio)', border:'1px solid var(--supabase-border)', borderRadius:'var(--radius-studio)',
-        boxShadow:'0 20px 60px -10px rgba(0,0,0,0.6)',
+        boxShadow:'var(--shadow-lg)',
         display:'flex', flexDirection:'column', overflow:'hidden',
-        animation:'slideUp .18s ease-out',
+        animation:'slideUp .25s var(--ease-premium)',
       }}>
         <div style={{
           display:'flex', alignItems:'center', justifyContent:'space-between',
@@ -94,7 +94,7 @@ function Modal({ title, onClose, children, accent, width=460 }) {
         }}>
           <span style={{ fontSize:14, fontWeight:600, color:'var(--supabase-text)', letterSpacing:'-.2px' }}>{title}</span>
           <button onClick={onClose} style={{
-            background:'none', border:'none', color:'#555', cursor:'pointer',
+            background:'none', border:'none', color:'var(--supabase-text-muted)', cursor:'pointer',
             width:24, height:24, borderRadius:4, fontSize:18, lineHeight:'24px',
           }}>×</button>
         </div>
@@ -108,20 +108,20 @@ function Field({ label, children, hint }) {
   return (
     <div style={{ marginBottom:14 }}>
       <label style={{
-        display:'block', fontSize:11, fontWeight:600, color:'#666',
+        display:'block', fontSize:11, fontWeight:600, color:'var(--supabase-text-muted)',
         textTransform:'uppercase', letterSpacing:.7, marginBottom:6,
       }}>{label}</label>
       {children}
-      {hint && <div style={{ fontSize:11, color:'#444', marginTop:5 }}>{hint}</div>}
+      {hint && <div style={{ fontSize:11, color:'var(--supabase-icon-inactive)', marginTop:5 }}>{hint}</div>}
     </div>
   );
 }
 
 const inputStyle = {
   width:'100%', padding:'9px 11px',
-  background:'var(--supabase-bg-card)', border:'1px solid var(--supabase-border)', borderRadius:'var(--radius-studio)',
+  background:'var(--supabase-bg-input)', border:'1px solid var(--supabase-border)', borderRadius:'var(--radius-studio)',
   color:'var(--supabase-text)', fontSize:13, outline:'none',
-  transition:'border-color .12s',
+  transition:'border-color .15s var(--ease-premium)',
 };
 
 function Input(props) {
@@ -130,7 +130,7 @@ function Input(props) {
     <input
       {...props}
       onFocus={() => setFoc(true)} onBlur={() => setFoc(false)}
-      style={{ ...inputStyle, borderColor: foc ? '#555' : 'var(--supabase-border)', ...(props.style||{}) }}
+      style={{ ...inputStyle, borderColor: foc ? 'var(--supabase-brand)' : 'var(--supabase-border)', ...(props.style||{}) }}
     />
   );
 }
@@ -143,7 +143,7 @@ function Select({ value, onChange, options }) {
       backgroundRepeat:'no-repeat', backgroundPosition:'right 10px center', paddingRight:30,
     }}>
       {options.map(o => (
-        <option key={o.value ?? o} value={o.value ?? o} style={{ background:'#161616' }}>
+        <option key={o.value ?? o} value={o.value ?? o} style={{ background:'var(--supabase-bg-input)' }}>
           {o.label ?? o}
         </option>
       ))}
@@ -160,13 +160,13 @@ function ModalFooter({ onCancel, onSave, saveLabel, accent, saveDisabled }) {
       <button onClick={onCancel} style={{
         padding:'8px 16px', borderRadius:'var(--radius-studio)', cursor:'pointer',
         background:'var(--supabase-bg-card)', border:'1px solid var(--supabase-border)',
-        color:'#888', fontSize:12.5, fontWeight:500,
+        color:'var(--supabase-text-muted)', fontSize:12.5, fontWeight:500,
       }}>Cancelar</button>
       <button onClick={onSave} disabled={saveDisabled} style={{
         padding:'8px 18px', borderRadius:6,
         cursor: saveDisabled ? 'not-allowed' : 'pointer',
-        background: saveDisabled ? '#222' : accent,
-        border:'none', color: saveDisabled ? '#555' : 'rgba(0,0,0,0.85)',
+        background: saveDisabled ? 'var(--supabase-bg-hover)' : accent,
+        border:'none', color: saveDisabled ? 'var(--supabase-icon-inactive)' : 'rgba(0,0,0,0.85)',
         fontSize:12.5, fontWeight:600, letterSpacing:'-.2px',
       }}>{saveLabel}</button>
     </div>
@@ -508,12 +508,12 @@ function PatientsView({ patients, onAddPatient, onNewAppointment, onEditPatient,
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:13 }}>
           <div style={{ display:'flex', alignItems:'center', gap:14 }}>
             <h1 style={{ fontSize:15.5, fontWeight:600, color:'var(--supabase-text)', letterSpacing:'-.35px' }}>Pacientes</h1>
-            <span style={{ fontSize:12, color:'#3a3a3a' }}>{patients.length} cadastrados</span>
+            <span style={{ fontSize:12, color:'var(--supabase-text-muted)' }}>{patients.length} cadastrados</span>
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
             {/* Search */}
             <div style={{ position:'relative' }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="#444" style={{
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="var(--supabase-icon-inactive)" style={{
                 position:'absolute', left:9, top:'50%', transform:'translateY(-50%)', pointerEvents:'none',
               }}>
                 <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
@@ -523,16 +523,16 @@ function PatientsView({ patients, onAddPatient, onNewAppointment, onEditPatient,
                 style={{
                   width:240, padding:'6px 11px 6px 28px', borderRadius:'var(--radius-studio)',
                   background:'var(--supabase-bg-card)', border:'1px solid var(--supabase-border)',
-                  color:'#ccc', fontSize:12.5, outline:'none',
+                  color:'var(--supabase-text-light)', fontSize:12.5, outline:'none',
                 }} />
             </div>
             <button onClick={() => onNewAppointment()} style={{
               padding:'6px 12px', borderRadius:6, cursor:'pointer',
-              background:'#161616', border:'1px solid #232323',
-              color:'#aaa', fontSize:12.5, fontWeight:500,
+              background:'var(--supabase-bg-input)', border:'1px solid var(--supabase-border)',
+              color:'var(--supabase-text-muted)', fontSize:12.5, fontWeight:500,
               display:'flex', alignItems:'center', gap:5,
             }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="#888"><path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z"/></svg>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="var(--supabase-text-muted)"><path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z"/></svg>
               Agendar
             </button>
             <button onClick={onAddPatient} style={{
@@ -559,7 +559,7 @@ function PatientsView({ patients, onAddPatient, onNewAppointment, onEditPatient,
               <button key={tab.id} onClick={() => setFilter(tab.id)} style={{
                 padding:'8px 13px', border:'none', background:'transparent',
                 borderBottom: active ? `2px solid ${accent}` : '2px solid transparent',
-                color: active ? accent : '#484848',
+                color: active ? accent : 'var(--supabase-text-muted)',
                 fontSize:12.5, fontWeight: active ? 500 : 400,
                 cursor:'pointer', display:'flex', alignItems:'center', gap:5,
               }}>
@@ -567,8 +567,8 @@ function PatientsView({ patients, onAddPatient, onNewAppointment, onEditPatient,
                 <span style={{
                   fontSize:10.5, minWidth:18, textAlign:'center',
                   padding:'0 5px', borderRadius:8,
-                  background: active ? `${accent}20` : '#181818',
-                  color: active ? accent : '#383838',
+                  background: active ? `${accent}20` : 'var(--supabase-bg-input)',
+                  color: active ? accent : 'var(--supabase-text-muted)',
                 }}>{counts[tab.id]}</span>
               </button>
             );
@@ -585,7 +585,7 @@ function PatientsView({ patients, onAddPatient, onNewAppointment, onEditPatient,
       }}>
         {['Paciente','Telefone','E-mail','Convênio','Última','Visitas','Status',''].map((h, i) => (
           <div key={i} style={{
-            fontSize:10.5, fontWeight:600, color:'#3a3a3a',
+            fontSize:10.5, fontWeight:600, color:'var(--supabase-text-muted)',
             textTransform:'uppercase', letterSpacing:.8,
           }}>{h}</div>
         ))}
@@ -594,7 +594,7 @@ function PatientsView({ patients, onAddPatient, onNewAppointment, onEditPatient,
       {/* Rows */}
       <div style={{ flex:1, overflowY:'auto' }}>
         {filtered.length === 0 && (
-          <div style={{ padding:'48px 20px', textAlign:'center', color:'#444', fontSize:13 }}>
+          <div style={{ padding:'48px 20px', textAlign:'center', color:'var(--supabase-text-muted)', fontSize:13 }}>
             Nenhum paciente encontrado
           </div>
         )}
@@ -629,18 +629,18 @@ function PatientRow({ p, onEdit, accent }) {
           fontSize:11, fontWeight:600, color: s.color,
         }}>{p.initials}</div>
         <div style={{ minWidth:0 }}>
-          <div style={{ fontSize:13, color:'#e0e0e0', fontWeight:500,
+          <div style={{ fontSize:13, color:'var(--supabase-text-light)', fontWeight:500,
             whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{p.name}</div>
-          <div style={{ fontSize:11, color:'#555' }}>
+          <div style={{ fontSize:11, color:'var(--supabase-text-muted)' }}>
             {p.data_nasc ? `${formatarDataBR(p.data_nasc)} (${p.age} anos)` : (p.age > 0 ? `${p.age} anos` : '—')}
           </div>
         </div>
       </div>
-      <div style={{ fontSize:12, color:'#888' }}>{formatarTelefone(p.phone)}</div>
-      <div style={{ fontSize:12, color:'#666', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{p.email}</div>
-      <div style={{ fontSize:12, color:'#777' }}>{p.convenio}</div>
-      <div style={{ fontSize:12, color:'#555' }}>{p.last}</div>
-      <div style={{ fontSize:12, color:'#666' }}>{p.visits}</div>
+      <div style={{ fontSize:12, color:'var(--supabase-text-muted)' }}>{formatarTelefone(p.phone)}</div>
+      <div style={{ fontSize:12, color:'var(--supabase-text-muted)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{p.email}</div>
+      <div style={{ fontSize:12, color:'var(--supabase-text-muted)' }}>{p.convenio}</div>
+      <div style={{ fontSize:12, color:'var(--supabase-text-muted)' }}>{p.last}</div>
+      <div style={{ fontSize:12, color:'var(--supabase-text-muted)' }}>{p.visits}</div>
       <div>
         <span style={{
           display:'inline-flex', alignItems:'center', gap:4,
