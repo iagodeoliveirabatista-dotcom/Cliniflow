@@ -614,7 +614,7 @@ projeto. Ver `docs/DECISIONS.md` D-12.
 
 ---
 
-## 20. Webhook de verificação da Meta falha mesmo com URL certa: dot-notation nos query params ⚠️ EM ANDAMENTO
+## 20. Webhook de verificação da Meta falha mesmo com URL certa: dot-notation nos query params ✅ CORRIGIDO
 
 **Sintoma:** a Meta devolve "Não foi possível validar a URL de callback ou o token de
 verificação" ao clicar "Verificar e salvar", mesmo com a URL do n8n parecendo correta.
@@ -639,6 +639,6 @@ verificação" ao clicar "Verificar e salvar", mesmo com a URL do n8n parecendo 
 **Não faça:** não assuma que a URL de teste (`webhook-test`) serve para qualquer verificação
 feita fora do editor do n8n aberto na hora — ela só serve para teste manual ao vivo.
 
-**Status:** workflow temporário construído pelo usuário (`Meta WhatsApp - Verificação de
-Webhook (temporário)`), correção ainda não confirmada rodando — falta reverificar depois de
-ajustar URL/expressões.
+**Status:** corrigido e confirmado — a Meta validou o webhook depois dos ajustes acima
+(workflow `Meta WhatsApp - Verificação de Webhook (temporário)`, produção `/webhook/...`,
+Active, token `hub.verify_token` batendo dos dois lados).

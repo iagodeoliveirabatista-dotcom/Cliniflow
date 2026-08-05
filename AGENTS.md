@@ -36,15 +36,18 @@ Multi-clínica por `clinic_id`.
   (App ID `1653660183429533`), produto WhatsApp adicionado, número de teste gratuito mandou
   mensagem real para o número reserva do usuário — via o assistente da própria Meta, ainda não
   via n8n.
-- ⚠️ **Webhook de recebimento: em andamento, não confirmado funcionando ainda.** Workflow n8n
-  novo `Meta WhatsApp - Verificação de Webhook (temporário)`, isolado do fluxo Evolution (não
-  toca `ZAQ6I2CiBGh8swye`). Ver `ARMADILHAS.md` §20 antes de depurar — tem pegadinha de
-  URL de teste vs produção e de dot-notation nos parâmetros da Meta.
+- ✅ **Webhook de recebimento confirmado funcionando.** A Meta validou o handshake
+  `hub.challenge` contra o workflow n8n `Meta WhatsApp - Verificação de Webhook (temporário)`
+  (isolado do fluxo Evolution, não toca `ZAQ6I2CiBGh8swye`). Verificado ao vivo, não só
+  configurado. Ver `ARMADILHAS.md` §20 para a pegadinha que apareceu no caminho (já corrigida).
+  **Falta provar envio via n8n/API** — o envio só foi testado até agora pelo assistente da
+  própria Meta, não pelo seu próprio workflow.
 - ✅ **Acesso recuperado à BM que já tinha o número da clínica da tia** (criada por um gestor
   de tráfego antigo, portfólio `Grangeiro001`). **Decisão:** não migrar esse número — ver
   `docs/DECISIONS.md` D-14.
-- **Próximo passo aqui:** fechar a verificação do webhook, depois voltar ao spec de migração
-  (arquitetura: branch única com corte total, banco compartilhado exige mudanças aditivas).
+- **Próximo passo aqui:** System User + token permanente na BM (Fase 1.3 do plano de 04/08),
+  depois provar envio real via n8n/API. Design de migração (coexistência Evolution/Meta) segue
+  em aberto — brainstorming não fechou o spec ainda.
 
 ## Estado anterior (05/08/2026 — fim do dia)
 
