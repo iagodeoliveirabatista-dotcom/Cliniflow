@@ -582,3 +582,32 @@ placeholder (a recepção define o horário real ao aprovar o `solicitado`).
 **Status:** ✅ no banco, testada com paciente real (transação abortada).
 ⚠️ **O nó do n8n está com a troca SÓ NO RASCUNHO** — sem `publish_workflow`, produção
 continua fazendo `POST /rest/v1/consultas` e continua falhando. Ver §5d.
+
+## 19. Login com Google pode "perder" a clínica existente no primeiro acesso ⚠️ VERIFICAR NO PRIMEIRO LOGIN REAL
+
+**Contexto:** a conta da clínica (`iagodeoliveirabatista@gmail.com`) foi criada à mão no
+PASSO 0 do `docs/plano-auth-rls.md`, com provider `email` e `email_confirmed_at` preenchido
+— confirmado por query direta em `auth.users`/`auth.identities` em 29/07/2026.
+
+**O risco:** o onboarding (D-12) decide "clínica nova ou existente" checando só se
+`auth.uid()` já tem linha em `clinic_users`. Isso pressupõe que logar com Google usando o
+**mesmo e-mail** da conta antiga devolve o **mesmo `auth.uid()`**. O Supabase Auth faz esse
+link automático de identidade quando o e-mail já está confirmado — mas isso **não foi
+observado rodando**, só verificado por leitura de schema. Se por algum motivo o link
+automático não disparar (configuração de projeto, comportamento de versão do GoTrue), o
+primeiro login por Google cria um **novo** `auth.users` sem vínculo, cai no onboarding, e
+convida a "criar uma clínica" que já existe — o usuário acabaria com uma clínica vazia
+duplicada em vez de acessar os pacientes reais.
+
+**Como verificar (fazer isso ANTES de confiar no fluxo):** depois de configurar o provider
+Google no Supabase (passos B1-B3 de `docs/db/05-onboarding-google-oauth.sql`), o primeiro
+login deve ser com `iagodeoliveirabatista@gmail.com`. Se aparecer a tela "Cadastre sua
+clínica" em vez do CRM com os dados existentes, **pare** — não crie a clínica nova. Rode
+`SELECT id, email FROM auth.users;` e `SELECT * FROM public.clinic_users;`: se dois
+`auth.users.id` existirem para o mesmo e-mail, o link automático falhou e a solução é
+`supabase.auth.linkIdentity()` ou vincular manualmente (`UPDATE clinic_users SET user_id =
+<novo-id> WHERE user_id = <antigo-id>` e apagar o `auth.users` órfão), não recriar dados.
+
+**Status:** não corrigido porque não há nada a corrigir sem antes ver o comportamento real
+— é uma armadilha de infraestrutura de terceiro (Supabase Auth), não de código deste
+projeto. Ver `docs/DECISIONS.md` D-12.

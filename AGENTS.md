@@ -24,8 +24,9 @@ Multi-clínica por `clinic_id`.
 | **`REVOKE ... FROM PUBLIC` não basta** | O Supabase concede a `anon` por fora. São duas concessões — leia o `proacl` depois. §17 |
 | **Tabela nova nasce com RLS ligado e SEM policy** | Event trigger `ensure_rls`. Anon lê `[]` com HTTP 200. §13 |
 | **Não tire o TTL do buffer de debounce** | Sem ele, falha de envio gruda a conversa velha na nova. §12 |
+| **1º login por Google pode cair no onboarding em vez da clínica real** | Só teste com `iagodeoliveirabatista@gmail.com`; se aparecer "Cadastre sua clínica", PARE. §19 |
 
-## Estado atual (28/07/2026)
+## Estado atual (29/07/2026)
 
 - ✅ **Funciona (verificado):**
   - Supabase `mxvaufkqijdkapvtkvee` **ACTIVE_HEALTHY** (estava pausado; restaurado em 26/07).
@@ -89,6 +90,29 @@ Multi-clínica por `clinic_id`.
 - 🚫 **Removido de propósito:** notas internas privadas no CRM (decisão do usuário — ver
   `docs/DECISIONS.md` D-2). Não reintroduza sem antes corrigir o trigger (`ARMADILHAS.md` §2).
 
+### 🔑 Login com Google + onboarding self-service (29/07/2026) — código pronto, config externa pendente
+
+- ✅ **Banco:** migração `onboarding_clinica_google_oauth` aplicada. `clinics.evolution_instance`/
+  `evolution_apikey` agora nullable. RPC `public.registrar_clinica(p_nome)` criada,
+  `SECURITY DEFINER`, `EXECUTE` só para `authenticated` (confirmado via advisor — `anon` não
+  aparece na lista de quem pode chamar). **Testada de verdade**, não só lida: simulando o
+  `auth.uid()` da conta existente via `set_config('request.jwt.claims', ...)`, a RPC recusou
+  criar uma segunda clínica com a mensagem esperada, e nenhuma linha foi gravada. O caminho
+  "cria clínica nova" não pôde ser testado (só existe 1 usuário no projeto hoje).
+- ✅ **Frontend:** `LoginScreen` tem botão "Entrar com o Google"; novo componente
+  `OnboardingClinica`; `Root` busca `auth_clinic_id()` junto da sessão e decide entre
+  App/Onboarding/Login. JSX verificado com `@babel/preset-react` (transpila sem erro).
+  **Não testado no navegador** — depende dos passos externos abaixo para ter algo a testar.
+- ⛔ **Faltam 3 passos manuais fora do banco/código** (não automatizáveis por aqui): Google
+  Cloud Console (OAuth Client ID) → Supabase Providers (colar Client ID/Secret) → Supabase
+  Redirect URLs (adicionar a origem do CRM). Roteiro em `docs/db/05-onboarding-google-oauth.sql`.
+- ⚠️ **Ver `ARMADILHAS.md` §19 antes do primeiro login real.** A conta existente
+  (`iagodeoliveirabatista@gmail.com`) tem e-mail confirmado, então o Supabase deveria linkar a
+  identidade Google à mesma conta — mas isso não foi observado rodando. Se o primeiro login
+  mostrar "Cadastre sua clínica" em vez do CRM com os dados reais, **não crie a clínica** —
+  é sinal de que o link automático falhou.
+- Decisão registrada em `docs/DECISIONS.md` D-12 (reabre a D-6).
+
 ## 🕳️ Pontos cegos (auditoria 27/07 · revisada 28/07/2026)
 
 Nenhum destes gera erro — é por isso que estão aqui. **3 dos 5 já caíram**; os riscados
@@ -122,9 +146,11 @@ ficam registrados para ninguém reabrir a investigação do zero.
    comercial, ótimo — feche em `DECISIONS.md` e considere tirar o documento 22 do RAG.
    Se a IA deveria dar preço, é bug de chunking: quebrar a tabela em uma frase por
    procedimento resolve.
-2. **Decidir o Google OAuth** (`DECISIONS.md` D-OPEN-4). O botão de login é barato e aditivo;
-   o **autocadastro de clínica reverte a D-6** e abre escrita em `clinics`/`clinic_users`.
-   Separe as duas coisas antes de mandar alguém implementar.
+2. **Terminar a config externa do Google OAuth** (código e banco já prontos — `DECISIONS.md`
+   D-12). Falta: criar o OAuth Client ID no Google Cloud, colar Client ID/Secret no Supabase
+   → Providers, e registrar a origem do CRM em Redirect URLs. Roteiro em
+   `docs/db/05-onboarding-google-oauth.sql`. Depois, testar o primeiro login real com
+   `iagodeoliveirabatista@gmail.com` e conferir `ARMADILHAS.md` §19 antes de mais nada.
 3. **Envio travado em `sending`**: mensagem que falha nunca mais é reenviável. `ARMADILHAS.md` §5c.
 4. **LGPD além do RLS** — fechar o RLS resolve o art. 46, não a lei toda. Continuam
    inexistentes: aviso de privacidade na 1ª mensagem do bot, base legal para dado sensível
@@ -147,6 +173,7 @@ ficam registrados para ninguém reabrir a investigação do zero.
 | Decisões e o que foi rejeitado | `docs/DECISIONS.md` |
 | Schema, funções, triggers, RLS | `docs/db/` |
 | Login e fechamento do RLS | `docs/plano-auth-rls.md` (o **roteiro para executar** é `docs/db/04-fechamento-rls.sql`) |
+| Login com Google + onboarding de clínica | `docs/db/05-onboarding-google-oauth.sql` (passos externos pendentes) |
 | Como o sistema funciona (visão geral) | `DOCUMENTACAO.md` |
 | Histórico entre sessões de agentes | `SYNC_STATUS.md` |
 | Frontend do CRM | `cliniflow-export/` |

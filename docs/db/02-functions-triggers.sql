@@ -361,6 +361,51 @@ REVOKE EXECUTE ON FUNCTION public.criar_pre_agendamento(uuid,uuid,text,text) FRO
 GRANT  EXECUTE ON FUNCTION public.criar_pre_agendamento(uuid,uuid,text,text) TO anon, service_role;
 
 
+-- ============================================================
+-- ADICIONADO EM 29/07/2026 — onboarding self-service (D-OPEN-4, reabre D-6)
+-- Roteiro completo em docs/db/05-onboarding-google-oauth.sql
+-- ============================================================
+
+-- Cria a clínica + o vínculo em clinic_users numa transação. Nunca aceita
+-- clinic_id do cliente (a aresta afiada do D-OPEN-4: se aceitasse, o usuário
+-- digitaria o uuid de uma clínica existente e entraria na base dela).
+-- Recusa se a conta já tiver vínculo — uma clínica por conta (D-6).
+CREATE OR REPLACE FUNCTION public.registrar_clinica(p_nome text)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_clinic_id uuid;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'sem sessao autenticada';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM public.clinic_users WHERE user_id = auth.uid()) THEN
+    RAISE EXCEPTION 'usuario ja vinculado a uma clinica';
+  END IF;
+
+  IF btrim(coalesce(p_nome, '')) = '' THEN
+    RAISE EXCEPTION 'nome da clinica obrigatorio';
+  END IF;
+
+  INSERT INTO public.clinics (name)
+  VALUES (btrim(p_nome))
+  RETURNING id INTO v_clinic_id;
+
+  INSERT INTO public.clinic_users (user_id, clinic_id, papel)
+  VALUES (auth.uid(), v_clinic_id, 'admin');
+
+  RETURN v_clinic_id;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.registrar_clinica(text) FROM PUBLIC, anon;
+GRANT  EXECUTE ON FUNCTION public.registrar_clinica(text) TO authenticated;
+
+
 -- ── GRANTS CORRIGIDOS EM 28/07/2026 ─────────────────────────
 -- process_secretary_message retorna clinics.evolution_apikey. Com EXECUTE para
 -- anon, a chave pública do config.js extraía a API key da instância WhatsApp

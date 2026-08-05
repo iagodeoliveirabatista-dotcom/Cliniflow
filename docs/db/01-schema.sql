@@ -16,8 +16,8 @@ CREATE TABLE public.clinics (
     id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name                 text NOT NULL,
     cnpj                 text,
-    evolution_instance   text NOT NULL UNIQUE,
-    evolution_apikey     text NOT NULL,
+    evolution_instance   text UNIQUE,     -- NULL até alguém provisionar a Evolution (onboarding, D-OPEN-4)
+    evolution_apikey     text,            -- idem — clínica auto-cadastrada nasce sem isso
     rules_config         jsonb DEFAULT '{}'::jsonb,
     criado_em            timestamptz DEFAULT now(),
     telefone_notificacao text            -- usada pelo nó "AVISO SECRETÁRIA"

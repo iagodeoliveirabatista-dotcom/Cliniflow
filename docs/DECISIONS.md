@@ -40,35 +40,6 @@ justamente o alerta de que o n8n caiu.
 **Recomendação:** Evolution direto, gravando a linha no banco de qualquer forma para o
 painel não depender do push. **Status:** aguardando o usuário.
 
-### D-OPEN-4 — Login com Google + autocadastro de clínica
-**Contexto:** o usuário perguntou em 28/07/2026 se dá para ligar "Entrar com o Google" (OAuth)
-e um fluxo de onboarding que detecta `auth_clinic_id() = NULL` e oferece "Cadastre sua Clínica".
-
-⚠️ **A segunda metade colide de frente com a D-6**, que fechou: *"contas criadas pelo dono, pelo
-painel do Supabase — não construa autocadastro nem convite por e-mail"*. Por isso está aqui e
-não foi implementado.
-
-**As duas partes são separáveis, e isso importa:**
-
-| Parte | Custo | Risco |
-|---|---|---|
-| **Só o botão do Google** (login, sem cadastro) | ~20 linhas + 2 configs no console (Google Cloud e Supabase → Providers) | Baixo. É aditivo, não toca em policy nenhuma. Quem cria conta continua sendo o dono |
-| **Onboarding self-service** | ~1h | **Alto se feito errado.** Exige abrir caminho de escrita em `clinics` e `clinic_users` — hoje `clinics` tem RLS e zero policy, e é isso que mais protege o sistema |
-
-**A aresta afiada:** se o usuário puder escolher o `clinic_id` que insere em `clinic_users`, ele
-digita o uuid de uma clínica existente e entra na base de pacientes dela. A inserção **tem** que
-ser por RPC `SECURITY DEFINER` que gera o `clinic_id` no servidor, nunca aceita um vindo do
-cliente, e recusa se o usuário já tiver vínculo.
-
-**Dois detalhes práticos:** `redirectTo: window.location.origin` precisa estar na allowlist de
-Redirect URLs do Supabase e **muda quando publicar** (hoje é `localhost` via `servir-local.bat`);
-e uma clínica auto-cadastrada nasce sem `evolution_apikey`/`evolution_instance`, ou seja, uma
-casca que não atende ninguém até alguém provisionar a Evolution à mão.
-
-**Recomendação:** fazer só o botão do Google agora; deixar o onboarding para quando existir a
-2ª clínica — aí ele deixa de ser conveniência e vira produto, e a RPC blindada vale o esforço.
-**Status:** aguardando o usuário.
-
 ### D-OPEN-2 — A pasta `apify/` pertence a este projeto?
 `apify/blueoceansem-posts.json` e `captions-ranked.txt` não têm relação com o Cliniflow.
 Parecem de outro trabalho. Foram **mantidos** na limpeza de 26/07/2026 por precaução.
@@ -131,6 +102,9 @@ significado degrada de *"quem assumiu"* para *"se alguém assumiu"* — ainda al
 
 **Reabrir quando:** entrar a segunda clínica, ou quando a recepção tiver mais de uma pessoa e
 alguém perguntar "quem respondeu esse paciente?".
+
+**↳ Parte (b) REABERTA E REVERTIDA em 29/07/2026 — ver D-12.** O usuário optou por implementar
+autocadastro via Google agora, não esperar a 2ª clínica. Partes (a) e (c) continuam valendo.
 
 ---
 
@@ -210,6 +184,50 @@ recepção, ao aprovar o `solicitado`.
 não no horário desejado. Se a aba de agenda ordenar por `data_hora`, ele aparece "agora".
 **Confirme isso na primeira vez que um `solicitado` real cair na tela** — se incomodar, a
 alternativa é tornar `data_hora` nullable e a agenda tratar `solicitado` como lista separada.
+
+### D-12 — Login com Google + onboarding self-service, os dois juntos · 29/07/2026
+**Decisão:** implementar as duas partes do D-OPEN-4 de uma vez: o botão "Entrar com o Google"
+e o fluxo de onboarding ("Cadastre sua clínica") para quem loga sem `clinic_id` vinculado.
+**Reabre a parte (b) da D-6** ("sem autocadastro").
+
+**Por quê:** o usuário escolheu esse escopo explicitamente quando perguntado se queria só o
+botão (recomendação original do D-OPEN-4) ou as duas partes — preferiu não esperar a 2ª clínica.
+
+**O que foi feito (banco, migração `onboarding_clinica_google_oauth`):**
+- `clinics.evolution_instance` e `clinics.evolution_apikey` viraram nullable (UNIQUE permanece).
+- RPC `public.registrar_clinica(p_nome text)`, `SECURITY DEFINER`, `GRANT` só para
+  `authenticated` (verificado via advisor — `anon` não pode chamar). Gera o `clinic_id` no
+  servidor, recusa se `auth.uid()` já tiver linha em `clinic_users` — cobre a aresta afiada
+  descrita no D-OPEN-4 original (usuário não pode escolher nem reutilizar um `clinic_id`).
+  Definição comentada em `docs/db/02-functions-triggers.sql`; roteiro completo em
+  `docs/db/05-onboarding-google-oauth.sql`.
+
+**O que foi feito (frontend, `cliniflow-export/`):**
+- `supabase-client.js`: `signInWithGoogle()`, `getClinicId()` (chama `auth_clinic_id()` via
+  RPC), `registrarClinica(nome)` (chama a RPC acima).
+- `Cliniflow.html`: botão "Entrar com o Google" na `LoginScreen`; novo componente
+  `OnboardingClinica`; `Root` agora busca `clinicId` junto da sessão e mostra o onboarding
+  quando há sessão mas `clinicId` é `NULL`.
+- Correção ao texto que o usuário colou como referência: `signInWithOAuth` do supabase-js v2
+  espera `{ provider, options: { redirectTo } }` — `redirectTo` no nível raiz (como no exemplo)
+  é ignorado silenciosamente pela lib.
+
+**Pendente, fora do banco/código (não pode ser feito por aqui):**
+1. Google Cloud Console — criar OAuth Client ID, redirect URI
+   `https://mxvaufkqijdkapvtkvee.supabase.co/auth/v1/callback`.
+2. Supabase Dashboard → Authentication → Providers → Google — colar Client ID/Secret do passo 1.
+3. Supabase Dashboard → Authentication → URL Configuration → Redirect URLs — adicionar a origem
+   real do CRM (o código usa `redirectTo: window.location.origin`, que muda de `localhost` para
+   o domínio publicado).
+Sem os 3 passos, o botão aparece mas falha ao clicar (erro tratado, não trava a tela).
+
+**Consequência assumida:** uma clínica que se autocadastra nasce sem `evolution_apikey`/
+`evolution_instance` — uma casca que não atende ninguém até alguém provisionar a Evolution à
+mão. Isso é esperado, não um bug.
+
+**Não testado ainda:** o fluxo completo depende dos passos 1-3 acima, que exigem acesso a
+consoles externos. `registrar_clinica` foi verificado só por leitura de metadados
+(`pg_proc`/advisors), não por uma chamada real via RPC.
 
 ## 🚫 Rejeitadas (NÃO reintroduza)
 

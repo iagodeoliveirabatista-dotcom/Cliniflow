@@ -104,6 +104,42 @@
     return data.subscription;
   }
 
+  // OAuth redireciona a página inteira — não há resultado síncrono aqui.
+  // O onAuthStateChange acima é quem recebe a sessão, depois do redirectTo.
+  async function signInWithGoogle() {
+    const client = getClient();
+    if (!client) return { success: false, error: 'Supabase não configurado' };
+    const { error } = await client.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) return { success: false, error: traduzErroLogin(error) };
+    return { success: true };
+  }
+
+  // NULL = sessão autenticada sem clínica vinculada ainda (D-OPEN-4/onboarding).
+  async function getClinicId() {
+    const client = getClient();
+    if (!client) return null;
+    const { data, error } = await client.rpc('auth_clinic_id');
+    if (error) {
+      console.error('[Cliniflow] auth_clinic_id error:', error);
+      return null;
+    }
+    return data || null;
+  }
+
+  // Cria a clínica + vínculo via RPC SECURITY DEFINER (registrar_clinica).
+  // Nunca escreve em clinics/clinic_users direto — essas tabelas não têm
+  // policy de INSERT para authenticated de propósito.
+  async function registrarClinica(nome) {
+    const client = getClient();
+    if (!client) return { success: false, error: 'Supabase não configurado' };
+    const { data, error } = await client.rpc('registrar_clinica', { p_nome: nome });
+    if (error) return { success: false, error: 'Não foi possível cadastrar a clínica. Tente de novo.' };
+    return { success: true, clinicId: data };
+  }
+
   // sessoes_ativas.telefone é gravada pelo n8n ("Normalizar Dados v2") no formato
   // 55 + DDD + 9 + número (13 dígitos), enquanto patients.telefone guarda 11 dígitos.
   // Sem converter, todo .eq('telefone', ...) nessa tabela erra a linha.
@@ -771,8 +807,11 @@
     getCurrentUserId,
     getCurrentUserEmail,
     signIn,
+    signInWithGoogle,
     signOut,
     onAuthStateChange,
+    getClinicId,
+    registrarClinica,
 
     // Pacientes
     fetchPacientes,
