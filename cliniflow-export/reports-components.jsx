@@ -47,11 +47,11 @@ const pct = (a, b) => b === 0 ? 0 : Math.round(a / b * 100);
 function KpiCard({ label, value, sub, color, trend, icon }) {
   return (
     <div style={{
-      background:'#101010', border:'1px solid #1c1c1c', borderRadius:8,
+      background:'var(--supabase-bg-card)', border:'1px solid var(--supabase-border)', borderRadius:8,
       padding:'18px 20px', display:'flex', flexDirection:'column', gap:10,
     }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-        <span style={{ fontSize:11.5, fontWeight:600, color:'#3a3a3a',
+        <span style={{ fontSize:11.5, fontWeight:600, color:'var(--supabase-text-muted)',
           textTransform:'uppercase', letterSpacing:.8 }}>{label}</span>
         <div style={{
           width:30, height:30, borderRadius:7,
@@ -61,7 +61,7 @@ function KpiCard({ label, value, sub, color, trend, icon }) {
           <svg width="14" height="14" viewBox="0 0 24 24" fill={color}><path d={icon}/></svg>
         </div>
       </div>
-      <div style={{ fontSize:28, fontWeight:700, color:'#f0f0f0', letterSpacing:'-1px', lineHeight:1 }}>
+      <div style={{ fontSize:28, fontWeight:700, color:'var(--supabase-text)', letterSpacing:'-1px', lineHeight:1 }}>
         {value}
       </div>
       <div style={{ display:'flex', alignItems:'center', gap:8 }}>
@@ -74,7 +74,7 @@ function KpiCard({ label, value, sub, color, trend, icon }) {
             {trend >= 0 ? '↑' : '↓'} {Math.abs(trend)}%
           </span>
         )}
-        <span style={{ fontSize:11.5, color:'#444' }}>{sub}</span>
+        <span style={{ fontSize:11.5, color:'var(--supabase-text-muted)' }}>{sub}</span>
       </div>
     </div>
   );
@@ -101,9 +101,9 @@ function BarChart({ data, accent, mode }) {
             {/* Tooltip */}
             {isHov && (
               <div style={{
-                position:'absolute', marginTop:-46, background:'#1a1a1a',
-                border:'1px solid #2a2a2a', borderRadius:5, padding:'5px 8px',
-                fontSize:11, color:'#ccc', whiteSpace:'nowrap', zIndex:10, pointerEvents:'none',
+                position:'absolute', marginTop:-46, background:'var(--supabase-bg-hover)',
+                border:'1px solid var(--supabase-border)', borderRadius:5, padding:'5px 8px',
+                fontSize:11, color:'var(--supabase-text-light)', whiteSpace:'nowrap', zIndex:10, pointerEvents:'none',
               }}>
                 {total} sessões · {pct(main, total)}% comparec.
               </div>
@@ -113,7 +113,7 @@ function BarChart({ data, accent, mode }) {
               <div style={{
                 position:'absolute', bottom:0, left:0, right:0,
                 height:`${totalH}%`, borderRadius:'3px 3px 0 0',
-                background: '#1c1c1c',
+                background: 'var(--supabase-bg-hover)',
               }} />
               {/* Confirmed (foreground) */}
               <div style={{
@@ -123,7 +123,7 @@ function BarChart({ data, accent, mode }) {
                 transition:'background .1s, height .3s',
               }} />
             </div>
-            <span style={{ fontSize:9.5, color: isHov ? '#888' : '#333', whiteSpace:'nowrap' }}>
+            <span style={{ fontSize:9.5, color: isHov ? 'var(--supabase-text-muted)' : 'var(--supabase-icon-inactive)', whiteSpace:'nowrap' }}>
               {mode === 'month' ? d.mes : d.dia}
             </span>
           </div>
@@ -141,7 +141,7 @@ function Donut({ confirmados, cancelados, no_shows, pendentes, accent }) {
     { v: confirmados, color: accent,    label:'Confirmados' },
     { v: cancelados,  color: '#ef4444', label:'Cancelados'  },
     { v: no_shows,    color: '#f59e0b', label:'No-shows'    },
-    { v: pendentes,   color: '#333',    label:'Pendentes'   },
+    { v: pendentes,   color: 'var(--supabase-border)', label:'Pendentes' },
   ];
 
   // SVG donut using strokeDasharray
@@ -152,7 +152,7 @@ function Donut({ confirmados, cancelados, no_shows, pendentes, accent }) {
     <div style={{ display:'flex', alignItems:'center', gap:20 }}>
       <svg width="80" height="80" viewBox="0 0 80 80" style={{ flexShrink:0 }}>
         {/* Track */}
-        <circle cx="40" cy="40" r={R} fill="none" stroke="#1a1a1a" strokeWidth="10" />
+        <circle cx="40" cy="40" r={R} fill="none" stroke="var(--supabase-border)" strokeWidth="10" />
         {slices.filter(s => s.v > 0).map((s, i) => {
           const dash = (s.v / total) * C;
           const gap = C - dash;
@@ -168,17 +168,17 @@ function Donut({ confirmados, cancelados, no_shows, pendentes, accent }) {
           offset += s.v;
           return el;
         })}
-        <text x="40" y="38" textAnchor="middle" fill="#e0e0e0" fontSize="11" fontWeight="700"
+        <text x="40" y="38" textAnchor="middle" fill="var(--supabase-text-light)" fontSize="11" fontWeight="700"
           fontFamily="Inter,sans-serif">{pct(confirmados, total)}%</text>
-        <text x="40" y="49" textAnchor="middle" fill="#555" fontSize="8"
+        <text x="40" y="49" textAnchor="middle" fill="var(--supabase-text-muted)" fontSize="8"
           fontFamily="Inter,sans-serif">presença</text>
       </svg>
       <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
         {slices.filter(s => s.v > 0).map(s => (
           <div key={s.label} style={{ display:'flex', alignItems:'center', gap:7 }}>
             <span style={{ width:8, height:8, borderRadius:2, background:s.color, flexShrink:0 }} />
-            <span style={{ fontSize:11.5, color:'#888' }}>{s.label}</span>
-            <span style={{ fontSize:11.5, color:'#e0e0e0', fontWeight:600, marginLeft:'auto', paddingLeft:12 }}>{s.v}</span>
+            <span style={{ fontSize:11.5, color:'var(--supabase-text-muted)' }}>{s.label}</span>
+            <span style={{ fontSize:11.5, color:'var(--supabase-text-light)', fontWeight:600, marginLeft:'auto', paddingLeft:12 }}>{s.v}</span>
           </div>
         ))}
       </div>
@@ -191,7 +191,7 @@ function Donut({ confirmados, cancelados, no_shows, pendentes, accent }) {
 function RetentionTable({ data, accent }) {
   if (data.length === 0) {
     return (
-      <div style={{ padding: '24px 0', textAlign: 'center', color: '#3a3a3a', fontSize: 12.5 }}>
+      <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--supabase-text-muted)', fontSize: 12.5 }}>
         Nenhum paciente frequente ainda.
       </div>
     );
@@ -203,29 +203,29 @@ function RetentionTable({ data, accent }) {
         <div key={i} style={{
           display:'grid', gridTemplateColumns:'1fr 90px 80px 80px',
           alignItems:'center', gap:10,
-          padding:'8px 0', borderBottom:'1px solid #141414',
+          padding:'8px 0', borderBottom:'1px solid var(--supabase-border)',
         }}>
           <div style={{ display:'flex', alignItems:'center', gap:9, minWidth:0 }}>
             <div style={{
               width:7, borderRadius:2, height:7, flexShrink:0,
-              background: i < 3 ? accent : '#2a2a2a',
+              background: i < 3 ? accent : 'var(--supabase-border)',
             }} />
             <div style={{ minWidth:0 }}>
-              <div style={{ fontSize:12.5, color:'#d0d0d0', fontWeight:500,
+              <div style={{ fontSize:12.5, color:'var(--supabase-text-light)', fontWeight:500,
                 whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{p.nome}</div>
-              <div style={{ fontSize:10.5, color:'#3a3a3a' }}>{window.formatarTelefone ? window.formatarTelefone(p.telefone) : p.telefone}</div>
+              <div style={{ fontSize:10.5, color:'var(--supabase-text-muted)' }}>{window.formatarTelefone ? window.formatarTelefone(p.telefone) : p.telefone}</div>
             </div>
           </div>
           {/* Bar */}
-          <div style={{ height:4, background:'#1a1a1a', borderRadius:2, overflow:'hidden' }}>
+          <div style={{ height:4, background:'var(--supabase-bg-hover)', borderRadius:2, overflow:'hidden' }}>
             <div style={{
               height:'100%', borderRadius:2,
               width:`${Math.round(p.sessoes / max * 100)}%`,
               background: `${accent}bb`,
             }} />
           </div>
-          <span style={{ fontSize:12, color:'#888', textAlign:'right' }}>{p.sessoes} sessões</span>
-          <span style={{ fontSize:11, color:'#484848', textAlign:'right' }}>{p.ultima}</span>
+          <span style={{ fontSize:12, color:'var(--supabase-text-muted)', textAlign:'right' }}>{p.sessoes} sessões</span>
+          <span style={{ fontSize:11, color:'var(--supabase-text-muted)', textAlign:'right' }}>{p.ultima}</span>
         </div>
       ))}
     </div>
@@ -294,10 +294,10 @@ function ReportsView({ accent }) {
     <div style={{ flex:1, display:'flex', flexDirection:'column', minWidth:0, overflow:'hidden' }}>
 
       {/* ── Header ─────────────────────────────────────────────── */}
-      <div style={{ padding:'14px 20px 14px', borderBottom:'1px solid #191919', flexShrink:0,
+      <div style={{ padding:'14px 20px 14px', borderBottom:'1px solid var(--supabase-border)', flexShrink:0,
         display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <div style={{ display:'flex', alignItems:'center', gap:14 }}>
-          <h1 style={{ fontSize:15.5, fontWeight:600, color:'#e8e8e8', letterSpacing:'-.35px' }}>Relatórios</h1>
+          <h1 style={{ fontSize:15.5, fontWeight:600, color:'var(--supabase-text)', letterSpacing:'-.35px' }}>Relatórios</h1>
           {connected ? (
             <span style={{
               fontSize:10.5, padding:'3px 8px', borderRadius:4,
@@ -313,15 +313,15 @@ function ReportsView({ accent }) {
           )}
         </div>
         {/* Period selector */}
-        <div style={{ display:'flex', background:'#111', border:'1px solid #1f1f1f',
+        <div style={{ display:'flex', background:'var(--supabase-bg-input)', border:'1px solid var(--supabase-border)',
           borderRadius:6, padding:2, gap:1 }}>
           {PERIODS.map(p => {
             const active = p === period;
             return (
               <button key={p} onClick={() => setPeriod(p)} style={{
                 padding:'5px 11px', borderRadius:4, border:'none',
-                background: active ? '#222' : 'transparent',
-                color: active ? accent : '#484848',
+                background: active ? 'var(--supabase-bg-hover)' : 'transparent',
+                color: active ? accent : 'var(--supabase-text-muted)',
                 fontSize:11.5, fontWeight: active ? 500 : 400,
                 cursor:'pointer', transition:'all .12s', whiteSpace:'nowrap',
               }}>{p}</button>
@@ -365,20 +365,20 @@ function ReportsView({ accent }) {
         {/* Charts row */}
         <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:12, marginBottom:20 }}>
           {/* Monthly trend */}
-          <div style={{ background:'#101010', border:'1px solid #1c1c1c', borderRadius:8, padding:'18px 20px' }}>
+          <div style={{ background:'var(--supabase-bg-card)', border:'1px solid var(--supabase-border)', borderRadius:8, padding:'18px 20px' }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
-              <span style={{ fontSize:12.5, fontWeight:600, color:'#888' }}>Consultas por mês</span>
+              <span style={{ fontSize:12.5, fontWeight:600, color:'var(--supabase-text-muted)' }}>Consultas por mês</span>
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                 <LegendDot color={accent} label="Confirmados" />
-                <LegendDot color="#1c1c1c" label="Total" />
+                <LegendDot color="var(--supabase-bg-hover)" label="Total" />
               </div>
             </div>
             <BarChart data={monthly} accent={accent} mode="month" />
           </div>
 
           {/* Status breakdown */}
-          <div style={{ background:'#101010', border:'1px solid #1c1c1c', borderRadius:8, padding:'18px 20px' }}>
-            <span style={{ fontSize:12.5, fontWeight:600, color:'#888', display:'block', marginBottom:18 }}>
+          <div style={{ background:'var(--supabase-bg-card)', border:'1px solid var(--supabase-border)', borderRadius:8, padding:'18px 20px' }}>
+            <span style={{ fontSize:12.5, fontWeight:600, color:'var(--supabase-text-muted)', display:'block', marginBottom:18 }}>
               Distribuição de status
             </span>
             <Donut
@@ -394,16 +394,16 @@ function ReportsView({ accent }) {
         {/* Second row */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:20 }}>
           {/* Weekday distribution */}
-          <div style={{ background:'#101010', border:'1px solid #1c1c1c', borderRadius:8, padding:'18px 20px' }}>
+          <div style={{ background:'var(--supabase-bg-card)', border:'1px solid var(--supabase-border)', borderRadius:8, padding:'18px 20px' }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
-              <span style={{ fontSize:12.5, fontWeight:600, color:'#888' }}>Sessões por dia da semana</span>
+              <span style={{ fontSize:12.5, fontWeight:600, color:'var(--supabase-text-muted)' }}>Sessões por dia da semana</span>
             </div>
             <BarChart data={weekday} accent={accent} mode="week" />
           </div>
 
           {/* Revenue trend mini */}
-          <div style={{ background:'#101010', border:'1px solid #1c1c1c', borderRadius:8, padding:'18px 20px' }}>
-            <span style={{ fontSize:12.5, fontWeight:600, color:'#888', display:'block', marginBottom:16 }}>
+          <div style={{ background:'var(--supabase-bg-card)', border:'1px solid var(--supabase-border)', borderRadius:8, padding:'18px 20px' }}>
+            <span style={{ fontSize:12.5, fontWeight:600, color:'var(--supabase-text-muted)', display:'block', marginBottom:16 }}>
               Receita estimada — últimos 6 meses
             </span>
             <RevenueLine data={monthly} accent={accent} />
@@ -411,11 +411,11 @@ function ReportsView({ accent }) {
         </div>
 
         {/* Retention table */}
-        <div style={{ background:'#101010', border:'1px solid #1c1c1c', borderRadius:8, padding:'18px 20px' }}>
+        <div style={{ background:'var(--supabase-bg-card)', border:'1px solid var(--supabase-border)', borderRadius:8, padding:'18px 20px' }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
             <div>
-              <span style={{ fontSize:12.5, fontWeight:600, color:'#888' }}>Pacientes mais frequentes</span>
-              <span style={{ fontSize:11.5, color:'#333', marginLeft:10 }}>Retenção · retornaram ao menos 2x</span>
+              <span style={{ fontSize:12.5, fontWeight:600, color:'var(--supabase-text-muted)' }}>Pacientes mais frequentes</span>
+              <span style={{ fontSize:11.5, color:'var(--supabase-text-muted)', marginLeft:10 }}>Retenção · retornaram ao menos 2x</span>
             </div>
             <span style={{
               fontSize:10.5, padding:'3px 8px', borderRadius:4,
@@ -424,11 +424,11 @@ function ReportsView({ accent }) {
           </div>
           <div style={{
             display:'grid', gridTemplateColumns:'1fr 90px 80px 80px',
-            gap:10, padding:'0 0 8px', borderBottom:'1px solid #1a1a1a', marginBottom:4,
+            gap:10, padding:'0 0 8px', borderBottom:'1px solid var(--supabase-border)', marginBottom:4,
           }}>
             {['Paciente','Frequência','Sessões','Última'].map(h => (
               <span key={h} style={{
-                fontSize:10, fontWeight:600, color:'#333',
+                fontSize:10, fontWeight:600, color:'var(--supabase-text-muted)',
                 textTransform:'uppercase', letterSpacing:.7,
               }}>{h}</span>
             ))}
@@ -440,7 +440,7 @@ function ReportsView({ accent }) {
         {!connected && (
           <div style={{
             marginTop:16, padding:'14px 18px', borderRadius:8,
-            background:'#0c0c0c', border:'1px solid #191919',
+            background:'var(--supabase-bg-input)', border:'1px solid var(--supabase-border)',
             display:'flex', alignItems:'flex-start', gap:12,
           }}>
             <div style={{
@@ -451,14 +451,14 @@ function ReportsView({ accent }) {
               <svg width="13" height="13" viewBox="0 0 24 24" fill="#00d084"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
             </div>
             <div>
-              <div style={{ fontSize:12.5, fontWeight:600, color:'#888', marginBottom:4 }}>
+              <div style={{ fontSize:12.5, fontWeight:600, color:'var(--supabase-text-muted)', marginBottom:4 }}>
                 Modo demonstração — preencha o config.js para usar dados reais
               </div>
-              <div style={{ fontSize:11.5, color:'#444', lineHeight:1.6 }}>
+              <div style={{ fontSize:11.5, color:'var(--supabase-icon-inactive)', lineHeight:1.6 }}>
                 Insira a URL e anon key do Supabase em{' '}
-                <code style={{ background:'#181818', padding:'1px 5px', borderRadius:3, color:'#666', fontSize:10.5 }}>config.js</code>{' '}
+                <code style={{ background:'var(--supabase-bg-input)', padding:'1px 5px', borderRadius:3, color:'var(--supabase-text-muted)', fontSize:10.5 }}>config.js</code>{' '}
                 e execute o{' '}
-                <code style={{ background:'#181818', padding:'1px 5px', borderRadius:3, color:'#666', fontSize:10.5 }}>supabase-schema.sql</code>{' '}
+                <code style={{ background:'var(--supabase-bg-input)', padding:'1px 5px', borderRadius:3, color:'var(--supabase-text-muted)', fontSize:10.5 }}>supabase-schema.sql</code>{' '}
                 no SQL Editor do Supabase. Os gráficos carregarão dados reais automaticamente.
               </div>
             </div>
@@ -474,7 +474,7 @@ function LegendDot({ color, label }) {
   return (
     <div style={{ display:'flex', alignItems:'center', gap:5 }}>
       <span style={{ width:8, height:8, borderRadius:2, background:color, flexShrink:0 }} />
-      <span style={{ fontSize:11, color:'#444' }}>{label}</span>
+      <span style={{ fontSize:11, color:'var(--supabase-text-muted)' }}>{label}</span>
     </div>
   );
 }
@@ -506,14 +506,14 @@ function RevenueLine({ data, accent }) {
         {pts.map((p, i) => (
           <g key={i}>
             <circle cx={p.x} cy={p.y} r="3" fill={accent} />
-            <text x={p.x} y={h + 14} textAnchor="middle" fill="#383838"
+            <text x={p.x} y={h + 14} textAnchor="middle" fill="var(--supabase-text-muted)"
               fontSize="9" fontFamily="Inter,sans-serif">{p.mes.split(' ')[0]}</text>
           </g>
         ))}
       </svg>
       <div style={{
         display:'flex', justifyContent:'space-between', marginTop:2,
-        fontSize:11, color:'#888',
+        fontSize:11, color:'var(--supabase-text-muted)',
       }}>
         <span>{fmtBRL(data[0].receita)}</span>
         <span style={{ color: accent, fontWeight:600 }}>{fmtBRL(data[data.length-1].receita)}</span>
