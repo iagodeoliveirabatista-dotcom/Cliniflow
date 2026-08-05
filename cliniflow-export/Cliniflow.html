@@ -16,7 +16,7 @@
   <script src="supabase-client.js?v=11"></script>
 
   <script type="text/babel" src="tweaks-panel.jsx?v=5"></script>
-  <script type="text/babel" src="cliniflow-components.jsx?v=9"></script>
+  <script type="text/babel" src="cliniflow-components.jsx?v=10"></script>
   <script type="text/babel" src="patients-components.jsx?v=8"></script>
   <script type="text/babel" src="reports-components.jsx?v=5"></script>
   <script type="text/babel" src="automation-components.jsx?v=5"></script>
@@ -175,6 +175,7 @@
       const [newApptOpen, setNewApptOpen] = useState(false);
       const [newPatientOpen, setNewPatientOpen] = useState(false);
       const [editingPatient, setEditingPatient] = useState(null);
+      const [settingsOpen, setSettingsOpen] = useState(false);
       const [dbConnected, setDbConnected] = useState(false);
       const [currentMonday, setCurrentMonday] = useState(() => {
         const now = new Date();
@@ -190,6 +191,20 @@
       useEffect(() => {
         document.documentElement.setAttribute('data-theme', t.theme);
       }, [t.theme]);
+
+      // Preferências de aparência persistem entre sessões (o useTweaks sozinho
+      // não persiste — ele só notifica a ferramenta externa de edit-mode).
+      useEffect(() => {
+        try {
+          const saved = JSON.parse(localStorage.getItem('cliniflow_prefs') || 'null');
+          if (saved && (saved.theme || saved.accent)) setTweak(saved);
+        } catch (_) { /* prefs corrompidas: ignora e segue com o default */ }
+      }, []);
+      useEffect(() => {
+        try {
+          localStorage.setItem('cliniflow_prefs', JSON.stringify({ theme: t.theme, accent: t.accent }));
+        } catch (_) { /* storage cheio/bloqueado: preferência só não persiste */ }
+      }, [t.theme, t.accent]);
 
       // ── Load real data from Supabase on mount ─────────────────────────
       useEffect(() => {
@@ -369,7 +384,8 @@
 
       return (
         <div style={{ display:'flex', height:'100vh', overflow:'hidden', background:'var(--supabase-bg-studio)' }}>
-          <Sidebar accent={accent} currentPage={page} onNavigate={setPage} />
+          <Sidebar accent={accent} currentPage={page} onNavigate={setPage}
+            onOpenSettings={() => setSettingsOpen(true)} />
 
           {/* Main column */}
           <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', minWidth:0 }}>
@@ -476,6 +492,18 @@
             />
           )}
 
+          {/* ── Configurações (aberto pelo item da sidebar) ─────────── */}
+          {settingsOpen && (
+            <SettingsModal
+              theme={t.theme || 'dark'}
+              accentKey={t.accent}
+              onSetTheme={v => setTweak('theme', v)}
+              onSetAccent={v => setTweak('accent', v)}
+              accent={accent}
+              onClose={() => setSettingsOpen(false)}
+            />
+          )}
+
           {/* ── Tweaks ──────────────────────────────────────────────── */}
           <TweaksPanel title="Cliniflow Tweaks">
             <TweakSection label="Visualização" />
@@ -492,6 +520,75 @@
             <TweakToggle label="Compacto" value={t.compacto}
               onChange={v => setTweak('compacto', v)} />
           </TweaksPanel>
+        </div>
+      );
+    }
+
+    // ── Configurações: tema e cor de destaque ────────────────────────────
+    // Aberto pelo item "Configurações" da sidebar. Usa os mesmos tweaks
+    // (useTweaks) que o TweaksPanel — o painel externo continua funcionando.
+    function SettingsModal({ theme, accentKey, onSetTheme, onSetAccent, accent, onClose }) {
+      useEffect(() => {
+        const h = e => e.key === 'Escape' && onClose();
+        window.addEventListener('keydown', h);
+        return () => window.removeEventListener('keydown', h);
+      }, [onClose]);
+
+      const optBtn = (active) => ({
+        flex:1, padding:'8px 10px', borderRadius:6, cursor:'pointer',
+        background: active ? `${accent}18` : 'var(--supabase-bg-input)',
+        border: `1px solid ${active ? accent : 'var(--supabase-border)'}`,
+        color: active ? accent : 'var(--supabase-text-muted)',
+        fontSize:12.5, fontWeight: active ? 600 : 500,
+      });
+
+      return (
+        <div onClick={onClose} style={{
+          position:'fixed', inset:0, zIndex:1000,
+          background:'rgba(0,0,0,0.62)', backdropFilter:'blur(3px)',
+          display:'flex', alignItems:'center', justifyContent:'center',
+          animation:'fadeIn .2s var(--ease-premium)',
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width:360, maxWidth:'92vw', padding:24, borderRadius:12,
+            background:'var(--supabase-bg-card)',
+            border:'1px solid var(--supabase-border)',
+            boxShadow:'var(--shadow-lg)',
+            animation:'slideUp .25s var(--ease-premium)',
+            display:'flex', flexDirection:'column', gap:18,
+          }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <span style={{ fontSize:15, fontWeight:600, color:'var(--supabase-text)' }}>Configurações</span>
+              <button onClick={onClose} style={{
+                background:'none', border:'none', color:'var(--supabase-text-muted)', cursor:'pointer',
+                width:24, height:24, borderRadius:4, fontSize:18, lineHeight:'24px',
+              }}>×</button>
+            </div>
+
+            <div>
+              <div style={{ fontSize:11, fontWeight:600, color:'var(--supabase-text-muted)',
+                textTransform:'uppercase', letterSpacing:.7, marginBottom:8 }}>Tema</div>
+              <div style={{ display:'flex', gap:8 }}>
+                <button style={optBtn(theme === 'dark')} onClick={() => onSetTheme('dark')}>🌙 Escuro</button>
+                <button style={optBtn(theme === 'light')} onClick={() => onSetTheme('light')}>☀️ Claro</button>
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize:11, fontWeight:600, color:'var(--supabase-text-muted)',
+                textTransform:'uppercase', letterSpacing:.7, marginBottom:8 }}>Cor de destaque</div>
+              <div style={{ display:'flex', gap:8 }}>
+                {Object.entries(ACCENT_MAP).map(([key, hex]) => (
+                  <button key={key} title={key} onClick={() => onSetAccent(key)} style={{
+                    width:34, height:34, borderRadius:'50%', cursor:'pointer',
+                    background:hex,
+                    border: accentKey === key ? '2px solid var(--supabase-text)' : '2px solid transparent',
+                    outline: accentKey === key ? `2px solid ${hex}55` : 'none',
+                  }} />
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       );
     }
