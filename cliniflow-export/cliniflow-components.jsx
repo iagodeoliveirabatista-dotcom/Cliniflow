@@ -111,8 +111,8 @@ function WaIcon({ size=13 }) {
 function InfoRow({ label, value }) {
   return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
-      <span style={{ fontSize:12, color:'#4a4a4a', flexShrink:0 }}>{label}</span>
-      <span style={{ fontSize:12.5, color:'#aaa', textAlign:'right' }}>{value}</span>
+      <span style={{ fontSize:12, color:'var(--supabase-text-muted)', flexShrink:0 }}>{label}</span>
+      <span style={{ fontSize:12.5, color:'var(--supabase-text-light)', textAlign:'right' }}>{value}</span>
     </div>
   );
 }
@@ -517,8 +517,8 @@ function CalendarView({ appointments, selectedId, onSelect, accent, onMove, curr
       <div style={{
         display:'grid',
         gridTemplateColumns: `${GUTTER_W}px repeat(${visibleDays.length}, 1fr)`,
-        borderBottom:'1px solid #1c1c1c',
-        background:'#0a0a0a',
+        borderBottom:'1px solid var(--supabase-border)',
+        background:'var(--supabase-bg-studio)',
         flexShrink:0,
       }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -527,8 +527,8 @@ function CalendarView({ appointments, selectedId, onSelect, accent, onMove, curr
               title="Voltar à semana"
               style={{
                 width:28, height:28, borderRadius:6, cursor:'pointer',
-                background:'#141414', border:'1px solid #1f1f1f',
-                color:'#888', fontSize:14, lineHeight:1,
+                background:'var(--supabase-bg-input)', border:'1px solid var(--supabase-border)',
+                color:'var(--supabase-text-muted)', fontSize:14, lineHeight:1,
                 display:'flex', alignItems:'center', justifyContent:'center',
               }}>‹</button>
           )}
@@ -543,11 +543,11 @@ function CalendarView({ appointments, selectedId, onSelect, accent, onMove, curr
               style={{
                 padding: isZoomed ? '12px 0 14px' : '10px 0 11px',
                 textAlign:'center',
-                borderLeft:'1px solid #161616',
+                borderLeft:'1px solid var(--supabase-border)',
                 cursor:'pointer',
               }}>
               <div style={{ fontSize: isZoomed ? 12 : 10.5, fontWeight:600,
-                color: isToday ? accent : '#888',
+                color: isToday ? accent : 'var(--supabase-text-muted)',
                 letterSpacing:1, textTransform:'uppercase' }}>
                 {DAY_LABELS[d]}{isZoomed && `, ${dayDates[d]} de ${getMonthName(d)}`}
               </div>
@@ -556,7 +556,7 @@ function CalendarView({ appointments, selectedId, onSelect, accent, onMove, curr
                   display:'inline-flex', alignItems:'center', justifyContent:'center',
                   marginTop:4, width:24, height:24, borderRadius:'50%',
                   background: isToday ? accent : 'transparent',
-                  color: isToday ? 'rgba(0,0,0,0.85)' : '#888',
+                  color: isToday ? 'rgba(0,0,0,0.85)' : 'var(--supabase-text-muted)',
                   fontSize:13, fontWeight:600,
                 }}>{dayDates[d]}</div>
               )}
@@ -577,7 +577,7 @@ function CalendarView({ appointments, selectedId, onSelect, accent, onMove, curr
             {hours.map((h, i) => (
               <div key={h} style={{
                 position:'absolute', top: i * slotH - 7, right: 8,
-                fontSize:10.5, color:'#333', fontWeight:500,
+                fontSize:10.5, color:'var(--supabase-text-muted)', fontWeight:500,
                 letterSpacing:.3, textAlign:'right',
               }}>
                 {i === 0 ? '' : `${String(h).padStart(2,'0')}:00`}
@@ -603,14 +603,14 @@ function CalendarView({ appointments, selectedId, onSelect, accent, onMove, curr
                 {hours.map((_, i) => (
                   <div key={i} style={{
                     position:'absolute', left:0, right:0, top: i * slotH,
-                    borderTop:'1px solid #141414',
+                    borderTop:'1px solid var(--supabase-border)',
                   }} />
                 ))}
                 {/* Half-hour ticks */}
                 {hours.map((_, i) => (
                   <div key={`half-${i}`} style={{
                     position:'absolute', left:0, right:0, top: i * slotH + slotH/2,
-                    borderTop:'1px dashed #111',
+                    borderTop:'1px dashed var(--supabase-border)',
                   }} />
                 ))}
 
@@ -742,7 +742,7 @@ function CalEvent({ apt, dayStart, slotH, selected, dragging, onSelect, onPointe
       }}>
         <span style={{
           fontSize:11.5, fontWeight:600,
-          color: isSolicitado ? styleVal.text : dim ? '#555' : '#e6e6e6',
+          color: isSolicitado ? styleVal.text : dim ? 'var(--supabase-text-muted)' : 'var(--supabase-text-light)',
           whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
           textDecoration: dim ? 'line-through' : 'none',
           letterSpacing:'-.1px',
@@ -752,7 +752,7 @@ function CalEvent({ apt, dayStart, slotH, selected, dragging, onSelect, onPointe
       {!compact && (
         <div style={{
           fontSize:10.5,
-          color: isSolicitado ? `${styleVal.text}aa` : dim ? '#3a3a3a' : '#666',
+          color: isSolicitado ? `${styleVal.text}aa` : dim ? 'var(--supabase-icon-inactive)' : 'var(--supabase-text-muted)',
           whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
         }}>
           {apt.time} · {apt.type}
@@ -760,7 +760,7 @@ function CalEvent({ apt, dayStart, slotH, selected, dragging, onSelect, onPointe
       )}
       {compact && (
         <span style={{
-          fontSize:10.5, color: isSolicitado ? `${styleVal.text}aa` : '#555', flexShrink:0,
+          fontSize:10.5, color: isSolicitado ? `${styleVal.text}aa` : 'var(--supabase-text-muted)', flexShrink:0,
           whiteSpace:'nowrap',
         }}>{apt.time}</span>
       )}
@@ -1375,7 +1375,7 @@ function AtendimentosView({ accent }) {
       }}>
         {/* Filtros abas */}
         <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--supabase-border)', flexShrink: 0 }}>
-          <div style={{ display: 'flex', gap: 4, background: '#131313', padding: 2, borderRadius: 6 }}>
+          <div style={{ display: 'flex', gap: 4, background: 'var(--supabase-bg-input)', padding: 2, borderRadius: 6 }}>
             {[
               { id: 'nao_atribuidas', label: 'IA/Fila' },
               { id: 'minhas', label: 'Minhas' },
@@ -1386,8 +1386,8 @@ function AtendimentosView({ accent }) {
                 onClick={() => { setFiltro(tab.id); setSelectedId(null); }}
                 style={{
                   flex: 1, padding: '5px 0', border: 'none', borderRadius: 4,
-                  background: filtro === tab.id ? '#1e1e1e' : 'transparent',
-                  color: filtro === tab.id ? accent : '#555',
+                  background: filtro === tab.id ? 'var(--supabase-bg-card)' : 'transparent',
+                  color: filtro === tab.id ? accent : 'var(--supabase-text-muted)',
                   fontSize: 11.5, fontWeight: 500, cursor: 'pointer',
                   transition: 'all .1s'
                 }}
@@ -1400,9 +1400,9 @@ function AtendimentosView({ accent }) {
 
         {/* Lista de conversas */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
-          {loading && <div style={{ padding: 20, textAlign: 'center', color: '#444', fontSize: 12 }}>Carregando chats...</div>}
+          {loading && <div style={{ padding: 20, textAlign: 'center', color: 'var(--supabase-text-muted)', fontSize: 12 }}>Carregando chats...</div>}
           {!loading && displayConversas.length === 0 && (
-            <div style={{ padding: 40, textAlign: 'center', color: '#333', fontSize: 12 }}>
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--supabase-text-muted)', fontSize: 12 }}>
               Nenhum atendimento nesta fila
             </div>
           )}
@@ -1423,10 +1423,10 @@ function AtendimentosView({ accent }) {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#e0e0e0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 170 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--supabase-text-light)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 170 }}>
                     {p.nome || 'Paciente'}
                   </span>
-                  <span style={{ fontSize: 10, color: '#444', marginLeft: 'auto' }}>{hora}</span>
+                  <span style={{ fontSize: 10, color: 'var(--supabase-text-muted)', marginLeft: 'auto' }}>{hora}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{
@@ -1460,7 +1460,7 @@ function AtendimentosView({ accent }) {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Avatar initials={(selectedConversa.patient?.nome || 'P').split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')} size={26} color={accent} />
-                <span style={{ fontSize: 13.5, fontWeight: 600, color: '#e0e0e0' }}>
+                <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--supabase-text-light)' }}>
                   {selectedConversa.patient?.nome}
                 </span>
                 <span style={{
@@ -1476,7 +1476,7 @@ function AtendimentosView({ accent }) {
 
             {/* Balões de mensagens */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {loadingChat && <div style={{ textAlign: 'center', padding: 20, color: '#444' }}>Carregando conversa...</div>}
+              {loadingChat && <div style={{ textAlign: 'center', padding: 20, color: 'var(--supabase-text-muted)' }}>Carregando conversa...</div>}
               {!loadingChat && displayMensagens.map(msg => {
                 const isIncoming = msg.direcao === 'entrada';
                 const isBot = msg.tipo === 'auto';
@@ -1491,15 +1491,15 @@ function AtendimentosView({ accent }) {
                     }}
                   >
                     <div style={{
-                      background: isIncoming ? '#202020' : (isBot ? 'rgba(62,207,142,0.1)' : 'rgba(91,140,255,0.1)'),
-                      border: `1px solid ${isIncoming ? '#292929' : (isBot ? 'rgba(62,207,142,0.2)' : 'rgba(91,140,255,0.2)')}`,
+                      background: isIncoming ? 'var(--supabase-bg-card)' : (isBot ? 'rgba(62,207,142,0.1)' : 'rgba(91,140,255,0.1)'),
+                      border: `1px solid ${isIncoming ? 'var(--supabase-border)' : (isBot ? 'rgba(62,207,142,0.2)' : 'rgba(91,140,255,0.2)')}`,
                       borderRadius: 12, padding: '9px 13px',
-                      color: '#ddd', fontSize: 12.5, lineHeight: 1.5,
+                      color: 'var(--supabase-text-light)', fontSize: 12.5, lineHeight: 1.5,
                       whiteSpace: 'pre-wrap'
                     }}>
                       {msg.mensagem}
                     </div>
-                    <span style={{ fontSize: 9.5, color: '#3d3d3d', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: 9.5, color: 'var(--supabase-text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
                       {isBot && <span style={{ color: '#3ecf8e', fontWeight: 600 }}>🤖 IA</span>}
                       {!isBot && !isIncoming && <span style={{ color: '#5b8cff' }}>👤 Humano</span>}
                       {new Date(msg.enviado_em || msg.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
@@ -1521,9 +1521,9 @@ function AtendimentosView({ accent }) {
                     rows={2}
                     style={{
                       flex: 1, padding: '10px 12px', borderRadius: 8,
-                      background: '#161616',
+                      background: 'var(--supabase-bg-input)',
                       border: '1px solid var(--supabase-border)',
-                      color: '#e0e0e0', fontSize: 13, outline: 'none', resize: 'none',
+                      color: 'var(--supabase-text-light)', fontSize: 13, outline: 'none', resize: 'none',
                       fontFamily: 'inherit', lineHeight: 1.4
                     }}
                     onKeyDown={e => {
@@ -1553,7 +1553,7 @@ function AtendimentosView({ accent }) {
         ) : (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
             <span style={{ fontSize: 36, opacity: 0.15 }}>💬</span>
-            <span style={{ fontSize: 13, color: '#3a3a3a' }}>Selecione um chat para iniciar o atendimento</span>
+            <span style={{ fontSize: 13, color: 'var(--supabase-text-muted)' }}>Selecione um chat para iniciar o atendimento</span>
           </div>
         )}
       </div>
@@ -1566,32 +1566,32 @@ function AtendimentosView({ accent }) {
         }}>
           {/* Dados Gerais */}
           <div>
-            <span style={{ fontSize: 10, fontWeight: 600, color: '#3a3a3a', textTransform: 'uppercase', letterSpacing: .8 }}>Paciente</span>
-            <div style={{ fontSize: 13.5, fontWeight: 600, color: '#ebebeb', marginTop: 4 }}>{selectedConversa.patient?.nome}</div>
-            <div style={{ fontSize: 11.5, color: '#555', marginTop: 2 }}>
+            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--supabase-text-muted)', textTransform: 'uppercase', letterSpacing: .8 }}>Paciente</span>
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--supabase-text-light)', marginTop: 4 }}>{selectedConversa.patient?.nome}</div>
+            <div style={{ fontSize: 11.5, color: 'var(--supabase-text-muted)', marginTop: 2 }}>
               {selectedConversa.patient?.telefone ? window.formatarTelefone ? window.formatarTelefone(selectedConversa.patient.telefone) : selectedConversa.patient.telefone : '—'}
             </div>
           </div>
 
-          <hr style={{ border: 'none', borderTop: '1px solid #181818' }} />
+          <hr style={{ border: 'none', borderTop: '1px solid var(--supabase-border)' }} />
 
           {/* Controle IA */}
           <div>
-            <span style={{ display: 'block', fontSize: 10, fontWeight: 600, color: '#3a3a3a', textTransform: 'uppercase', letterSpacing: .8, marginBottom: 8 }}>
+            <span style={{ display: 'block', fontSize: 10, fontWeight: 600, color: 'var(--supabase-text-muted)', textTransform: 'uppercase', letterSpacing: .8, marginBottom: 8 }}>
               Controle do Agente IA
             </span>
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '10px 12px', borderRadius: 6, background: '#131313', border: '1px solid #1d1d1d'
+              padding: '10px 12px', borderRadius: 6, background: 'var(--supabase-bg-input)', border: '1px solid var(--supabase-border)'
             }}>
-              <span style={{ fontSize: 12, color: '#888', fontWeight: 500 }}>
+              <span style={{ fontSize: 12, color: 'var(--supabase-text-muted)', fontWeight: 500 }}>
                 {selectedConversa.patient?.bot_pausado ? '🤖 IA Pausada' : '🤖 IA Ativa'}
               </span>
               <button
                 onClick={togglePausaBot}
                 style={{
                   position: 'relative', width: 34, height: 18, border: 0, borderRadius: 999,
-                  background: !selectedConversa.patient?.bot_pausado ? accent : 'rgba(255,255,255,0.08)',
+                  background: !selectedConversa.patient?.bot_pausado ? accent : 'var(--supabase-border)',
                   cursor: 'pointer', padding: 0, transition: 'background .15s'
                 }}
               >
@@ -1602,18 +1602,18 @@ function AtendimentosView({ accent }) {
                 }} />
               </button>
             </div>
-            <p style={{ fontSize: 10.5, color: '#444', marginTop: 6, lineHeight: 1.4 }}>
+            <p style={{ fontSize: 10.5, color: 'var(--supabase-icon-inactive)', marginTop: 6, lineHeight: 1.4 }}>
               {!selectedConversa.patient?.bot_pausado 
                 ? 'A IA responderá o paciente automaticamente caso ele faça perguntas ou queira reagendar.'
                 : 'A IA está silenciada. Somente respostas manuais enviadas por atendentes serão disparadas.'}
             </p>
           </div>
 
-          <hr style={{ border: 'none', borderTop: '1px solid #181818' }} />
+          <hr style={{ border: 'none', borderTop: '1px solid var(--supabase-border)' }} />
 
           {/* Atribuição & Ações */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <span style={{ fontSize: 10, fontWeight: 600, color: '#3a3a3a', textTransform: 'uppercase', letterSpacing: .8, marginBottom: 2 }}>
+            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--supabase-text-muted)', textTransform: 'uppercase', letterSpacing: .8, marginBottom: 2 }}>
               Ações de Fila
             </span>
             
