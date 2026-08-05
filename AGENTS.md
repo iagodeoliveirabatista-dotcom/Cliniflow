@@ -26,7 +26,36 @@ Multi-clínica por `clinic_id`.
 | **Não tire o TTL do buffer de debounce** | Sem ele, falha de envio gruda a conversa velha na nova. §12 |
 | **1º login por Google pode cair no onboarding em vez da clínica real** | Só teste com `iagodeoliveirabatista@gmail.com`; se aparecer "Cadastre sua clínica", PARE. §19 |
 
-## Estado atual (05/08/2026)
+## Estado atual (05/08/2026 — fim do dia)
+
+- ✅ **Projeto "tema claro + motion + drag-and-drop" CONCLUÍDO** (spec
+  `docs/superpowers/specs/2026-08-05-ui-tema-claro-e-motion-design.md`, plano
+  `docs/superpowers/plans/2026-08-05-ui-tema-claro-e-motion.md`, 7 tarefas, commits
+  `977d163..` até o fechamento):
+  - **Tema claro utilizável nas 5 telas autenticadas.** ~300 cores hex fixas traduzidas para
+    tokens (`--supabase-*`) em `cliniflow-components.jsx`, `patients-components.jsx`,
+    `reports-components.jsx`, `automation-components.jsx`. Novos tokens: `--supabase-bg-hover`,
+    `--supabase-bg-input`, `--supabase-icon-inactive`. Vocabulário de mapeamento: `bg-studio`
+    para painel recuado, `bg-card` para superfície elevada, `bg-hover` só para hover real,
+    `border` para divisores E trilhas sem borda (toggle, track de gráfico).
+  - **⚠️ ARMADILHA para próximos agentes:** várias cores são consumidas por concatenação
+    `${cor}18`/`cor+'70'` (hex+alfa) — essas NUNCA podem virar `var(...)`; quebra silenciosa,
+    sem erro de console. Sempre grep por `` `${ `` antes de tokenizar qualquer cor nesses
+    arquivos. `getStatusStyle()` devolve hex literal de propósito.
+  - **Drag-and-drop da Agenda reescrito** com ponteiro customizado (estilo Google Calendar):
+    limiar de 4px, card fantasma seguindo o cursor, slot de destino ao vivo, animação de
+    encaixe, Esc cancela. `onMove(id, day, min)` inalterado. Testado por PointerEvents
+    sintéticos contra o DOM real (5 cenários) na Task 3 e re-smoke-testado na Task 7.
+  - **Motion:** fadeIn na troca lista/calendário/kanban, nas abas de Automações e easing
+    unificado (`--ease-premium`) no Modal.
+  - **Verificação:** manual via cópia demo isolada (config vazio), `getComputedStyle` nos dois
+    temas, zero erros de console. Screenshot indisponível na sessão — verificação foi por
+    DOM/computed style. **Vale uma olhada humana rápida nos dois temas antes de usar o claro
+    em produção.** Achados menores deixados registrados no ledger `.git/sdd/progress.md`
+    (listeners de drag sem cleanup se o componente desmontar no meio do arraste; hit-test do
+    slot só limita eixo X).
+
+## Estado anterior (05/08/2026, manhã)
 
 - 🚀 **Amanhã (06/08) é o primeiro deploy em clínicas reais** (da irmã e da tia do usuário),
   ainda 100% em cima da Evolution API. Migração para Meta WhatsApp Cloud API foi

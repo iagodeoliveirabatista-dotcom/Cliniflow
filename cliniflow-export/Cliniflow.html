@@ -394,17 +394,23 @@
                 />
                 <div style={{ flex:1, overflow:'hidden', display:'flex', minHeight:0 }}>
                   {t.layout === 'lista' && (
-                    <ListView appointments={filteredList} selectedId={selectedId}
-                      onSelect={setSelectedId} accent={accent} />
+                    <div key="lista" style={{ flex:1, display:'flex', minWidth:0, minHeight:0, overflow:'hidden', animation:'fadeIn .2s var(--ease-premium)' }}>
+                      <ListView appointments={filteredList} selectedId={selectedId}
+                        onSelect={setSelectedId} accent={accent} />
+                    </div>
                   )}
                   {t.layout === 'calendário' && (
-                    <CalendarView appointments={appts} selectedId={selectedId}
-                      onSelect={setSelectedId} accent={accent} onMove={moveAppt}
-                      currentMonday={currentMonday} />
+                    <div key="calendario" style={{ flex:1, display:'flex', minWidth:0, minHeight:0, overflow:'hidden', animation:'fadeIn .2s var(--ease-premium)' }}>
+                      <CalendarView appointments={appts} selectedId={selectedId}
+                        onSelect={setSelectedId} accent={accent} onMove={moveAppt}
+                        currentMonday={currentMonday} />
+                    </div>
                   )}
                   {t.layout === 'kanban' && (
-                    <KanbanView appointments={appts} selectedId={selectedId}
-                      onSelect={setSelectedId} accent={accent} />
+                    <div key="kanban" style={{ flex:1, display:'flex', minWidth:0, minHeight:0, overflow:'hidden', animation:'fadeIn .2s var(--ease-premium)' }}>
+                      <KanbanView appointments={appts} selectedId={selectedId}
+                        onSelect={setSelectedId} accent={accent} />
+                    </div>
                   )}
                   {selected && (
                     <DetailPanel appointment={selected} onClose={() => setSelectedId(null)}
