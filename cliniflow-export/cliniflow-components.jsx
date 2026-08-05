@@ -3,7 +3,7 @@
 // Exports to window: APPOINTMENTS, STATUS_CFG, Avatar, Badge, WaIcon,
 //   Sidebar, ListView, CalendarView, KanbanView, DetailPanel
 
-const { useState } = React;
+const { useState, useRef } = React;
 
 // ─── MOCK DATA ───────────────────────────────────────────────────────────────
 
@@ -376,6 +376,8 @@ function CalendarView({ appointments, selectedId, onSelect, accent, onMove, curr
 
   const [dragId, setDragId] = useState(null);
   const [hoverSlot, setHoverSlot] = useState(null); // { day, minute }
+  const [dragPos, setDragPos] = useState(null);     // { x, y } — posição do cursor durante o arraste
+  const dayColRefs = useRef([]);                    // uma ref por dia visível, na mesma ordem de visibleDays
   const [zoomedDay, setZoomedDay] = useState(null);  // null = week, 0–4 = day view
 
   const visibleDays = zoomedDay == null ? DAY_LABELS.map((_, i) => i) : [zoomedDay];
@@ -440,47 +442,71 @@ function CalendarView({ appointments, selectedId, onSelect, accent, onMove, curr
     return -1;
   })();
 
-  // Drag handlers ────────────────────────────────────────────────────────────
-  const onDragStart = (e, id) => {
-    setDragId(id);
-    e.dataTransfer.effectAllowed = 'move';
-    // Custom transparent drag image so the ghost slot does the work
-    const ghost = document.createElement('div');
-    ghost.style.opacity = '0';
-    document.body.appendChild(ghost);
-    e.dataTransfer.setDragImage(ghost, 0, 0);
-    setTimeout(() => document.body.removeChild(ghost), 0);
-  };
-
-  const computeSlotFromEvent = (e, dayIdx, colRef) => {
-    const rect = colRef.getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    let minute = dayStart + Math.round(y / slotH * 60);
-    minute = Math.round(minute / 15) * 15;          // snap to 15 min
-    minute = Math.max(dayStart, Math.min(HOUR_END * 60 - 15, minute));
-    return { day: dayIdx, minute };
-  };
-
-  const onDragOverCol = (e, dayIdx) => {
-    if (dragId == null) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    const slot = computeSlotFromEvent(e, dayIdx, e.currentTarget);
-    if (!hoverSlot || hoverSlot.day !== slot.day || hoverSlot.minute !== slot.minute) {
-      setHoverSlot(slot);
+  // Drag handlers (ponteiro customizado) ──────────────────────────────────────
+  // Descobre, a partir de um ponto de tela (clientX/clientY), qual coluna de
+  // dia está sob o cursor e qual horário (arredondado a 15min) corresponde.
+  const computeSlotFromPoint = (clientX, clientY) => {
+    for (let i = 0; i < visibleDays.length; i++) {
+      const col = dayColRefs.current[i];
+      if (!col) continue;
+      const rect = col.getBoundingClientRect();
+      if (clientX >= rect.left && clientX < rect.right) {
+        const y = clientY - rect.top;
+        let minute = dayStart + Math.round(y / slotH * 60);
+        minute = Math.round(minute / 15) * 15;
+        minute = Math.max(dayStart, Math.min(HOUR_END * 60 - 15, minute));
+        return { day: visibleDays[i], minute };
+      }
     }
+    return null;
   };
 
-  const onDrop = (e, dayIdx) => {
-    if (dragId == null) return;
+  const onEventPointerDown = (e, id) => {
+    if (e.button !== 0) return; // só arrasta com o botão esquerdo
     e.preventDefault();
-    const slot = computeSlotFromEvent(e, dayIdx, e.currentTarget);
-    onMove && onMove(dragId, slot.day, fromMin(slot.minute));
-    setDragId(null);
-    setHoverSlot(null);
-  };
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let started = false; // só vira "arraste" depois de passar o limiar de 4px
 
-  const onDragEnd = () => { setDragId(null); setHoverSlot(null); };
+    const onPointerMove = (ev) => {
+      if (!started) {
+        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 4) return;
+        started = true;
+        setDragId(id);
+      }
+      setDragPos({ x: ev.clientX, y: ev.clientY });
+      setHoverSlot(computeSlotFromPoint(ev.clientX, ev.clientY));
+    };
+
+    const cleanup = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+
+    const onPointerUp = (ev) => {
+      cleanup();
+      if (started) {
+        const slot = computeSlotFromPoint(ev.clientX, ev.clientY);
+        if (slot) onMove && onMove(id, slot.day, fromMin(slot.minute));
+      }
+      setDragId(null);
+      setHoverSlot(null);
+      setDragPos(null);
+    };
+
+    const onKeyDown = (ev) => {
+      if (ev.key !== 'Escape') return;
+      cleanup();
+      setDragId(null);
+      setHoverSlot(null);
+      setDragPos(null);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('keydown', onKeyDown);
+  };
 
   const totalH = (HOUR_END - HOUR_START) * slotH;
 
@@ -560,18 +586,16 @@ function CalendarView({ appointments, selectedId, onSelect, accent, onMove, curr
           </div>
 
           {/* Day columns */}
-          {visibleDays.map(dayIdx => {
+          {visibleDays.map((dayIdx, i) => {
             const isToday = dayIdx === todayCol;
             return (
               <div
                 key={dayIdx}
-                onDragOver={e => onDragOverCol(e, dayIdx)}
-                onDrop={e => onDrop(e, dayIdx)}
-                onDragLeave={() => { /* keep last hover until drop or end */ }}
+                ref={el => { dayColRefs.current[i] = el; }}
                 style={{
                   position:'relative',
                   height: totalH,
-                  borderLeft:'1px solid #161616',
+                  borderLeft:'1px solid var(--supabase-border)',
                   background: isToday ? 'rgba(255,255,255,0.012)' : 'transparent',
                 }}
               >
@@ -637,20 +661,38 @@ function CalendarView({ appointments, selectedId, onSelect, accent, onMove, curr
                     selected={apt.id === selectedId}
                     dragging={apt.id === dragId}
                     onSelect={() => onSelect(apt.id === selectedId ? null : apt.id)}
-                    onDragStart={e => onDragStart(e, apt.id)}
-                    onDragEnd={onDragEnd}
+                    onPointerDown={e => onEventPointerDown(e, apt.id)}
                   />
                 ))}
               </div>
             );
           })}
+
+          {/* Fantasma flutuante do evento sendo arrastado — segue o cursor */}
+          {dragId != null && dragPos && (() => {
+            const dragApt = appointments.find(a => a.id === dragId);
+            if (!dragApt) return null;
+            return (
+              <div style={{
+                position:'fixed', left: dragPos.x + 14, top: dragPos.y + 14,
+                maxWidth:200, padding:'6px 10px', borderRadius:6,
+                background:'var(--supabase-bg-card)', border:'1px solid var(--supabase-brand)',
+                boxShadow:'var(--shadow-lg)', transform:'scale(1.02)',
+                pointerEvents:'none', zIndex:1000,
+                fontSize:12, fontWeight:600, color:'var(--supabase-text)',
+                whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+              }}>
+                {dragApt.patient} · {hoverSlot ? fromMin(hoverSlot.minute) : dragApt.time}
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>
   );
 }
 
-function CalEvent({ apt, dayStart, slotH, selected, dragging, onSelect, onDragStart, onDragEnd }) {
+function CalEvent({ apt, dayStart, slotH, selected, dragging, onSelect, onPointerDown }) {
   const [hov, setHov] = useState(false);
   const s = STATUS_CFG[apt.status] || { color: '#9ca3af', bg: 'rgba(156,163,175,0.10)' };
   const sh = slotH || SLOT_H;
@@ -668,9 +710,7 @@ function CalEvent({ apt, dayStart, slotH, selected, dragging, onSelect, onDragSt
 
   return (
     <div
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
+      onPointerDown={onPointerDown}
       onClick={onSelect}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
@@ -680,15 +720,15 @@ function CalEvent({ apt, dayStart, slotH, selected, dragging, onSelect, onDragSt
         height,
         left:  `calc(${leftPct}% + 2px)`,
         width: `calc(${widthPct}% - 4px)`,
-        background: selected || hov ? (isSolicitado ? `${styleVal.text}26` : `${s.color}26`) : (isSolicitado ? styleVal.bg : dim ? '#161616' : `${s.color}14`),
-        border: isSolicitado 
+        background: selected || hov ? (isSolicitado ? `${styleVal.text}26` : `${s.color}26`) : (isSolicitado ? styleVal.bg : dim ? 'var(--supabase-bg-hover)' : `${s.color}14`),
+        border: isSolicitado
           ? (selected ? `solid 2px ${styleVal.text}` : hov ? `dashed 2px ${styleVal.text}` : styleVal.border)
-          : `1px solid ${selected ? s.color+'70' : hov ? s.color+'44' : dim ? '#222' : s.color+'2a'}`,
-        borderLeft: isSolicitado ? undefined : `3px solid ${dim ? '#2e2e2e' : s.color}`,
+          : `1px solid ${selected ? s.color+'70' : hov ? s.color+'44' : dim ? 'var(--supabase-border)' : s.color+'2a'}`,
+        borderLeft: isSolicitado ? undefined : `3px solid ${dim ? 'var(--supabase-border)' : s.color}`,
         borderRadius:5,
         padding: compact ? '2px 6px' : '4px 7px 5px',
         cursor: dragging ? 'grabbing' : 'grab',
-        transition: dragging ? 'none' : 'background .12s, border-color .12s, box-shadow .12s',
+        transition: dragging ? 'none' : 'top .25s var(--ease-premium), left .25s var(--ease-premium), background .12s, border-color .12s, box-shadow .12s',
         opacity: dragging ? .35 : dim ? .55 : 1,
         boxShadow: hov && !dim ? `0 4px 14px -6px ${isSolicitado ? styleVal.text : s.color}55` : 'none',
         overflow:'hidden',
