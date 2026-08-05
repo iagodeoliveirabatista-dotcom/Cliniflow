@@ -26,9 +26,9 @@ Multi-clínica por `clinic_id`.
 | **Não tire o TTL do buffer de debounce** | Sem ele, falha de envio gruda a conversa velha na nova. §12 |
 | **1º login por Google pode cair no onboarding em vez da clínica real** | Só teste com `iagodeoliveirabatista@gmail.com`; se aparecer "Cadastre sua clínica", PARE. §19 |
 
-## Estado atual (04/08/2026)
+## Estado atual (05/08/2026)
 
-- 🚀 **Amanhã (05/08) é o primeiro deploy em clínicas reais** (da irmã e da tia do usuário),
+- 🚀 **Amanhã (06/08) é o primeiro deploy em clínicas reais** (da irmã e da tia do usuário),
   ainda 100% em cima da Evolution API. Migração para Meta WhatsApp Cloud API foi
   deliberadamente adiada — ver `DECISIONS.md` D-13 (a Cloud API exige template aprovado para
   mensagem fora da janela de 24h, o que quebraria `disparar-lembretes` sem reprojeto).

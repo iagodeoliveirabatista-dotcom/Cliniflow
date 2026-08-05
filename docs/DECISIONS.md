@@ -49,7 +49,7 @@ Parecem de outro trabalho. Foram **mantidos** na limpeza de 26/07/2026 por preca
 
 ## 🟢 Tomadas
 
-### D-13 — Migração Evolution API → Meta WhatsApp Cloud API fica para depois, não hoje · 04/08/2026
+### D-13 — Migração Evolution API → Meta WhatsApp Cloud API fica para depois, não hoje · 05/08/2026
 **Decisão:** o lançamento de amanhã (clínicas da irmã e da tia do usuário) sobe com a Evolution
 API, como está hoje, provada ponta a ponta. A migração para a API oficial da Meta vira um
 projeto separado, sem pressa de deploy.
