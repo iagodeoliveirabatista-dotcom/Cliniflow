@@ -49,6 +49,25 @@ Parecem de outro trabalho. Foram **mantidos** na limpeza de 26/07/2026 por preca
 
 ## 🟢 Tomadas
 
+### D-14 — Migração Meta: número novo dedicado, não migrar o número existente da clínica da tia · 05/08/2026
+**Decisão:** o canal Meta Cloud API da clínica da tia vai usar um **chip/número novo**,
+registrado na mesma WABA (`Clínica Integrada Dra Anaruthe Grangeiro`, BM `Grangeiro001`) que já
+existe. O número atual, hoje ativo no aplicativo comum do WhatsApp Business, **não é tocado** —
+continua sendo usado manualmente como está.
+
+**Por quê:** migrar o número existente do app comum para Cloud API desativaria o WhatsApp
+Business App naquele celular (um número não fica nos dois ao mesmo tempo) — risco demais para
+decidir sob pressão de teste. Um número novo desacopla completamente o teste/lançamento do canal
+Meta de qualquer impacto no atendimento manual que já funciona.
+
+**Consequência prática:** a arquitetura deixa de ser "trocar o número da clínica" e passa a ser
+"a clínica ganha um segundo número, dedicado ao bot". Isso ajusta a Task 2.1 do plano de 04/08
+(`docs/superpowers/plans/2026-08-04-migracao-meta-whatsapp-cloud-api.md`) — `meta_phone_number_id`
+aponta para um número novo, não para uma migração do `evolution_instance` existente.
+
+**Reabrir quando:** se um dia fizer sentido consolidar num único número, isso volta a ser uma
+migração de número dentro da própria Meta — não depende mais deste projeto.
+
 ### D-13 — Migração Evolution API → Meta WhatsApp Cloud API fica para depois, não hoje · 05/08/2026
 **Decisão:** o lançamento de amanhã (clínicas da irmã e da tia do usuário) sobe com a Evolution
 API, como está hoje, provada ponta a ponta. A migração para a API oficial da Meta vira um

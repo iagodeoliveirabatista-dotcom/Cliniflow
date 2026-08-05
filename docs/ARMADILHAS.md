@@ -611,3 +611,34 @@ clínica" em vez do CRM com os dados existentes, **pare** — não crie a clíni
 **Status:** não corrigido porque não há nada a corrigir sem antes ver o comportamento real
 — é uma armadilha de infraestrutura de terceiro (Supabase Auth), não de código deste
 projeto. Ver `docs/DECISIONS.md` D-12.
+
+---
+
+## 20. Webhook de verificação da Meta falha mesmo com URL certa: dot-notation nos query params ⚠️ EM ANDAMENTO
+
+**Sintoma:** a Meta devolve "Não foi possível validar a URL de callback ou o token de
+verificação" ao clicar "Verificar e salvar", mesmo com a URL do n8n parecendo correta.
+
+**Causa (duas, não uma):**
+1. A URL testada era `.../webhook-test/...` — a rota de teste do n8n só escuta enquanto o
+   workflow está aberto no editor em modo "Listen for test event". Fora disso, falha
+   silenciosamente. A rota que fica sempre no ar é `.../webhook/...`, com o workflow **Active**.
+2. A Meta manda `hub.mode`, `hub.verify_token`, `hub.challenge` como **chaves literais com
+   ponto** na query string — não como objeto aninhado. Em n8n/Express isso significa que
+   `{{$json.query.hub.verify_token}}` **não existe** (retorna vazio, sem erro visível). É
+   obrigatório usar colchete: `{{$json.query['hub.verify_token']}}`.
+
+**Correção:**
+- URL de callback = `/webhook/<path>`, workflow **Active**.
+- Nó Webhook: `Respond` = "Using Respond to Webhook Node", método `GET`.
+- Comparação do token via colchete, nunca via ponto.
+- Resposta final: nó `Respond to Webhook` com body = `{{$json.query['hub.challenge']}}`
+  (texto puro, `Content-Type: text/plain`, status 200) — se vier como JSON
+  `{"challenge": "..."}`, a Meta rejeita.
+
+**Não faça:** não assuma que a URL de teste (`webhook-test`) serve para qualquer verificação
+feita fora do editor do n8n aberto na hora — ela só serve para teste manual ao vivo.
+
+**Status:** workflow temporário construído pelo usuário (`Meta WhatsApp - Verificação de
+Webhook (temporário)`), correção ainda não confirmada rodando — falta reverificar depois de
+ajustar URL/expressões.

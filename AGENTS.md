@@ -26,7 +26,27 @@ Multi-clínica por `clinic_id`.
 | **Não tire o TTL do buffer de debounce** | Sem ele, falha de envio gruda a conversa velha na nova. §12 |
 | **1º login por Google pode cair no onboarding em vez da clínica real** | Só teste com `iagodeoliveirabatista@gmail.com`; se aparecer "Cadastre sua clínica", PARE. §19 |
 
-## Estado atual (05/08/2026 — fim do dia)
+## Estado atual (05/08/2026 — exploração da migração Meta)
+
+- 🚧 **Migração Evolution → Meta WhatsApp Cloud API: ainda em design, nada em produção.**
+  Branch `meta-api-migration` existe mas está obsoleta (idêntica ao master); o plano de 04/08
+  (`docs/superpowers/plans/2026-08-04-migracao-meta-whatsapp-cloud-api.md`) segue não commitado,
+  será revisado e a branch recriada quando o spec fechar.
+- ✅ **Checkpoint 1 (parcial) — envio provado.** App Meta for Developers `Agente_Wpp` criado
+  (App ID `1653660183429533`), produto WhatsApp adicionado, número de teste gratuito mandou
+  mensagem real para o número reserva do usuário — via o assistente da própria Meta, ainda não
+  via n8n.
+- ⚠️ **Webhook de recebimento: em andamento, não confirmado funcionando ainda.** Workflow n8n
+  novo `Meta WhatsApp - Verificação de Webhook (temporário)`, isolado do fluxo Evolution (não
+  toca `ZAQ6I2CiBGh8swye`). Ver `ARMADILHAS.md` §20 antes de depurar — tem pegadinha de
+  URL de teste vs produção e de dot-notation nos parâmetros da Meta.
+- ✅ **Acesso recuperado à BM que já tinha o número da clínica da tia** (criada por um gestor
+  de tráfego antigo, portfólio `Grangeiro001`). **Decisão:** não migrar esse número — ver
+  `docs/DECISIONS.md` D-14.
+- **Próximo passo aqui:** fechar a verificação do webhook, depois voltar ao spec de migração
+  (arquitetura: branch única com corte total, banco compartilhado exige mudanças aditivas).
+
+## Estado anterior (05/08/2026 — fim do dia)
 
 - ✅ **Projeto "tema claro + motion + drag-and-drop" CONCLUÍDO** (spec
   `docs/superpowers/specs/2026-08-05-ui-tema-claro-e-motion-design.md`, plano
