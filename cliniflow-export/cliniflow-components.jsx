@@ -52,13 +52,23 @@ const getStatusStyle = (status) => {
     solicitado: 'solicitado'
   }[status] || status;
 
-  switch (normalized) {
-    case 'confirmado': return { bg: '#d1fae5', border: 'solid 1px #10b981', text: '#065f46' };
-    case 'cancelado': return { bg: '#fee2e2', border: 'solid 1px #ef4444', text: '#991b1b' };
-    case 'remarcado': return { bg: '#fef3c7', border: 'solid 1px #f59e0b', text: '#92400e' };
-    case 'solicitado': return { bg: '#f3e8ff', border: 'dashed 2px #a855f7', text: '#6b21a8' }; // Roxo pontilhado
-    default: return { bg: '#f3f4f6', border: 'solid 1px #9ca3af', text: '#374151' }; // Pendente
-  }
+  // Um tom médio + alfa, no mesmo estilo do STATUS_CFG — funciona em fundo
+  // claro e escuro sem precisar de token por tema (ver Global Constraints
+  // sobre o padrão `${cor}NN` usado por Avatar/KanbanView downstream).
+  const TONS = {
+    confirmado: '#10b981',
+    cancelado:  '#ef4444',
+    remarcado:  '#f59e0b',
+    solicitado: '#a855f7',
+    pendente:   '#9ca3af',
+  };
+  const c = TONS[normalized] || TONS.pendente;
+  const isDashed = normalized === 'solicitado';
+  return {
+    bg: `${c}1f`,
+    border: `${isDashed ? 'dashed 2px' : 'solid 1px'} ${c}`,
+    text: c,
+  };
 };
 
 // ─── MICRO COMPONENTS ────────────────────────────────────────────────────────
@@ -191,12 +201,12 @@ function ProfileFooter() {
     <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', marginTop:2, borderTop:'1px solid #191919' }}>
       <div style={{
         width:26, height:26, borderRadius:'50%', flexShrink:0,
-        background:'#1e1e1e', border:'1px solid #2a2a2a',
+        background:'var(--supabase-bg-card)', border:'1px solid var(--supabase-border)',
         display:'flex', alignItems:'center', justifyContent:'center',
-        fontSize:10, fontWeight:600, color:'#666',
+        fontSize:10, fontWeight:600, color:'var(--supabase-text-muted)',
       }}>{iniciais}</div>
       <div style={{ minWidth:0 }}>
-        <div style={{ fontSize:12, fontWeight:500, color:'#bbb', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+        <div style={{ fontSize:12, fontWeight:500, color:'var(--supabase-text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
           {email || 'Modo demonstração'}
         </div>
         {email && (
@@ -205,7 +215,7 @@ function ProfileFooter() {
             onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
             style={{
               padding:0, border:'none', background:'none',
-              fontSize:10.5, color: hov ? '#888' : '#3d3d3d',
+              fontSize:10.5, color: hov ? 'var(--supabase-text-muted)' : 'var(--supabase-icon-inactive)',
               cursor:'pointer', transition:'color .12s',
             }}>
             Sair
@@ -225,13 +235,13 @@ function SidebarItem({ item, active, accent, onClick }) {
       style={{
         display:'flex', alignItems:'center', gap:9,
         padding:'7px 10px', borderRadius:'var(--radius-studio)',
-        background: active ? `${accent}14` : hov ? 'var(--supabase-bg-card)' : 'transparent',
-        color: active ? accent : hov ? '#888' : '#4a4a4a',
+        background: active ? `${accent}14` : hov ? 'var(--supabase-bg-hover)' : 'transparent',
+        color: active ? accent : hov ? 'var(--supabase-text-muted)' : 'var(--supabase-icon-inactive)',
         fontSize:13.5, fontWeight: active ? 500 : 400,
         cursor:'pointer', transition:'all .12s', userSelect:'none',
       }}
     >
-      <svg width="15" height="15" viewBox="0 0 24 24" fill={active ? accent : hov ? '#666' : '#3a3a3a'} style={{flexShrink:0}}>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill={active ? accent : hov ? 'var(--supabase-text-muted)' : 'var(--supabase-icon-inactive)'} style={{flexShrink:0}}>
         <path d={item.d}/>
       </svg>
       {item.label}
@@ -251,7 +261,7 @@ function ListView({ appointments, selectedId, onSelect, accent }) {
       <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center' }}>
         <div style={{ textAlign:'center' }}>
           <div style={{ fontSize:32, marginBottom:10, opacity:.3 }}>📋</div>
-          <div style={{ fontSize:13, color:'#3a3a3a' }}>Nenhuma consulta nesta categoria</div>
+          <div style={{ fontSize:13, color:'var(--supabase-text-muted)' }}>Nenhuma consulta nesta categoria</div>
         </div>
       </div>
     );
@@ -292,23 +302,23 @@ function AppRow({ apt, isSelected, onClick, accent, isLast }) {
         opacity: dim ? .55 : 1,
       }}
     >
-      <div style={{ width:46, fontSize:12, fontWeight:500, color:'#555', flexShrink:0 }}>{apt.time}</div>
+      <div style={{ width:46, fontSize:12, fontWeight:500, color:'var(--supabase-text-muted)', flexShrink:0 }}>{apt.time}</div>
       <Avatar initials={apt.initials} size={28} color={isSolicitado ? st.text : s.color} />
       <div style={{ flex:1, minWidth:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:5 }}>
           <span style={{
-            fontSize:13.5, fontWeight:500, color: isSolicitado ? st.text : '#e0e0e0',
+            fontSize:13.5, fontWeight:500, color: isSolicitado ? st.text : 'var(--supabase-text-light)',
             whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
             textDecoration: dim ? 'line-through' : 'none',
           }}>{apt.patient}</span>
           {apt.wa && <WaIcon size={12} />}
         </div>
-        <div style={{ fontSize:11.5, color:'#484848', marginTop:1.5,
+        <div style={{ fontSize:11.5, color:'var(--supabase-text-muted)', marginTop:1.5,
           whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
           {apt.type} · {apt.doctor}
         </div>
       </div>
-      <div style={{ fontSize:11, color:'#393939', flexShrink:0 }}>{apt.dur}min</div>
+      <div style={{ fontSize:11, color:'var(--supabase-text-muted)', flexShrink:0 }}>{apt.dur}min</div>
       <div style={{ flexShrink:0 }}><Badge status={apt.status} /></div>
     </div>
   );
@@ -743,8 +753,8 @@ function KanbanView({ appointments, selectedId, onSelect, accent }) {
               display:'flex', alignItems:'center', gap:7, flexShrink:0 }}>
               <span style={{ width:7, height:7, borderRadius:'50%', background:col.color, flexShrink:0 }} />
               <span style={{ fontSize:12, fontWeight:600, color:col.color, letterSpacing:.2 }}>{col.label}</span>
-              <span style={{ marginLeft:'auto', fontSize:11, color:'#3a3a3a',
-                background:'#191919', padding:'1px 7px', borderRadius:8 }}>{items.length}</span>
+              <span style={{ marginLeft:'auto', fontSize:11, color:'var(--supabase-text-muted)',
+                background:'var(--supabase-bg-input)', padding:'1px 7px', borderRadius:8 }}>{items.length}</span>
             </div>
             {/* Cards */}
             <div style={{ flex:1, overflowY:'auto', padding:'10px 10px', display:'flex', flexDirection:'column', gap:7 }}>
@@ -760,14 +770,14 @@ function KanbanView({ appointments, selectedId, onSelect, accent }) {
                     }}
                   >
                     <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:5 }}>
-                      <span style={{ fontSize:13, fontWeight:500, color:'#ddd', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:130 }}>{apt.patient}</span>
+                      <span style={{ fontSize:13, fontWeight:500, color:'var(--supabase-text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:130 }}>{apt.patient}</span>
                       {apt.wa && <WaIcon size={12} />}
                     </div>
-                    <div style={{ fontSize:11.5, color:'#484848', marginBottom:7, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{apt.type}</div>
+                    <div style={{ fontSize:11.5, color:'var(--supabase-text-muted)', marginBottom:7, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{apt.type}</div>
                     <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                      <span style={{ fontSize:11, color:'#555', background:'#1c1c1c',
-                        padding:'2px 7px', borderRadius:4, border:'1px solid #222' }}>{apt.time}</span>
-                      <span style={{ fontSize:11, color:'#444',
+                      <span style={{ fontSize:11, color:'var(--supabase-text-muted)', background:'var(--supabase-bg-hover)',
+                        padding:'2px 7px', borderRadius:4, border:'1px solid var(--supabase-border)' }}>{apt.time}</span>
+                      <span style={{ fontSize:11, color:'var(--supabase-text-muted)',
                         whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
                         {apt.doctor.split(' ').slice(0,2).join(' ')}
                       </span>
@@ -776,7 +786,7 @@ function KanbanView({ appointments, selectedId, onSelect, accent }) {
                 );
               })}
               {items.length === 0 && (
-                <div style={{ textAlign:'center', padding:'24px 0', color:'#2a2a2a', fontSize:12 }}>Nenhuma</div>
+                <div style={{ textAlign:'center', padding:'24px 0', color:'var(--supabase-text-muted)', fontSize:12 }}>Nenhuma</div>
               )}
             </div>
           </div>
@@ -851,9 +861,9 @@ function DetailPanel({ appointment: apt, onClose, accent, onUpdateStatus, onDele
       {/* Header */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
         padding:'13px 16px', borderBottom:'1px solid var(--supabase-border)', flexShrink:0 }}>
-        <span style={{ fontSize:12.5, fontWeight:500, color:'#888' }}>Detalhes da consulta</span>
+        <span style={{ fontSize:12.5, fontWeight:500, color:'var(--supabase-text-muted)' }}>Detalhes da consulta</span>
         <button onClick={onClose} style={{
-          background:'none', border:'none', color:'#444', cursor:'pointer',
+          background:'none', border:'none', color:'var(--supabase-text-muted)', cursor:'pointer',
           width:22, height:22, borderRadius:4, fontSize:17, lineHeight:'22px',
           display:'flex', alignItems:'center', justifyContent:'center',
           transition:'all .12s',
@@ -861,12 +871,12 @@ function DetailPanel({ appointment: apt, onClose, accent, onUpdateStatus, onDele
       </div>
 
       {/* Patient */}
-      <div style={{ padding:'16px', borderBottom:'1px solid #181818' }}>
+      <div style={{ padding:'16px', borderBottom:'1px solid var(--supabase-border)' }}>
         <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
           <Avatar initials={apt.initials} size={44} color={s.color} />
           <div>
-            <div style={{ fontSize:15, fontWeight:600, color:'#ebebeb' }}>{apt.patient}</div>
-            <div style={{ fontSize:12, color:'#484848', marginTop:2 }}>{apt.age} anos</div>
+            <div style={{ fontSize:15, fontWeight:600, color:'var(--supabase-text-light)' }}>{apt.patient}</div>
+            <div style={{ fontSize:12, color:'var(--supabase-text-muted)', marginTop:2 }}>{apt.age} anos</div>
           </div>
           <div style={{ marginLeft:'auto' }}><Badge status={apt.status} /></div>
         </div>
@@ -878,16 +888,16 @@ function DetailPanel({ appointment: apt, onClose, accent, onUpdateStatus, onDele
       </div>
 
       {/* Appointment */}
-      <div style={{ padding:'14px 16px', borderBottom:'1px solid #181818' }}>
-        <div style={{ fontSize:10.5, fontWeight:600, color:'#333', textTransform:'uppercase', letterSpacing:.9, marginBottom:10 }}>Consulta de hoje</div>
+      <div style={{ padding:'14px 16px', borderBottom:'1px solid var(--supabase-border)' }}>
+        <div style={{ fontSize:10.5, fontWeight:600, color:'var(--supabase-text-muted)', textTransform:'uppercase', letterSpacing:.9, marginBottom:10 }}>Consulta de hoje</div>
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           <InfoRow label="Horário" value={`${apt.time} · ${apt.dur} min`} />
           <InfoRow label="Tipo" value={apt.type} />
           <InfoRow label="Médico(a)" value={apt.doctor} />
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
-            <span style={{ fontSize:12, color:'#4a4a4a', flexShrink:0 }}>Preço</span>
+            <span style={{ fontSize:12, color:'var(--supabase-text-muted)', flexShrink:0 }}>Preço</span>
             <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-              <span style={{ fontSize:11.5, color:'#444' }}>R$</span>
+              <span style={{ fontSize:11.5, color:'var(--supabase-text-muted)' }}>R$</span>
               <input
                 type="number"
                 step="0.01"
@@ -898,11 +908,11 @@ function DetailPanel({ appointment: apt, onClose, accent, onUpdateStatus, onDele
                 onKeyDown={handlePrecoKeyDown}
                 placeholder="0.00"
                 style={{
-                  width:80, background:'#161616', border:'1px solid #242424',
-                  borderRadius:5, color:'#e0e0e0', fontSize:12, textAlign: 'right',
+                  width:80, background:'var(--supabase-bg-input)', border:'1px solid var(--supabase-border)',
+                  borderRadius:5, color:'var(--supabase-text-light)', fontSize:12, textAlign: 'right',
                   padding:'3px 6px', outline:'none', transition:'border-color .12s',
                 }}
-                onFocus={e => e.target.style.borderColor = '#444'}
+                onFocus={e => e.target.style.borderColor = 'var(--supabase-text-muted)'}
               />
             </div>
           </div>
@@ -910,7 +920,7 @@ function DetailPanel({ appointment: apt, onClose, accent, onUpdateStatus, onDele
       </div>
 
       {/* WhatsApp */}
-      <div style={{ padding:'14px 16px', borderBottom:'1px solid #181818' }}>
+      <div style={{ padding:'14px 16px', borderBottom:'1px solid var(--supabase-border)' }}>
         {apt.wa ? (
           <button onClick={sendWa} style={{
             width:'100%', padding:'9px 14px', borderRadius:6, cursor: waState === 'sent' ? 'default' : 'pointer',
@@ -924,15 +934,15 @@ function DetailPanel({ appointment: apt, onClose, accent, onUpdateStatus, onDele
             {waState === 'sending' ? 'Enviando…' : waState === 'sent' ? 'Lembrete enviado ✓' : 'Enviar lembrete WhatsApp'}
           </button>
         ) : (
-          <div style={{ fontSize:12, color:'#333', textAlign:'center', padding:'8px',
-            background:'#141414', borderRadius:6, border:'1px solid #1e1e1e' }}>
+          <div style={{ fontSize:12, color:'var(--supabase-text-muted)', textAlign:'center', padding:'8px',
+            background:'var(--supabase-bg-input)', borderRadius:6, border:'1px solid var(--supabase-border)' }}>
             WhatsApp não cadastrado
           </div>
         )}
       </div>
 
       {/* Actions */}
-      <div style={{ padding:'14px 16px', borderBottom:'1px solid #181818', display:'flex', flexDirection:'column', gap:8 }}>
+      <div style={{ padding:'14px 16px', borderBottom:'1px solid var(--supabase-border)', display:'flex', flexDirection:'column', gap:8 }}>
         {selectedConsulta.status === 'solicitado' ? (
           <div style={{ padding: 12, background: 'rgba(168, 85, 247, 0.08)', borderRadius: 8 }}>
             <p style={{ margin: '0 0 10px 0', fontSize: 13, color: '#a855f7' }}>
@@ -1004,7 +1014,7 @@ function DetailPanel({ appointment: apt, onClose, accent, onUpdateStatus, onDele
 
       {/* History */}
       <div style={{ padding:'14px 16px' }}>
-        <div style={{ fontSize:10.5, fontWeight:600, color:'#333', textTransform:'uppercase', letterSpacing:.9, marginBottom:12 }}>Histórico</div>
+        <div style={{ fontSize:10.5, fontWeight:600, color:'var(--supabase-text-muted)', textTransform:'uppercase', letterSpacing:.9, marginBottom:12 }}>Histórico</div>
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
           {[
             { date:'15 mar 2026', label:'Consulta de rotina', ok:true },
@@ -1012,10 +1022,10 @@ function DetailPanel({ appointment: apt, onClose, accent, onUpdateStatus, onDele
             { date:'04 nov 2025', label:'Retorno clínico', ok:true },
           ].map((h,i) => (
             <div key={i} style={{ display:'flex', gap:10, alignItems:'flex-start' }}>
-              <div style={{ width:6, height:6, borderRadius:'50%', background:'#2a2a2a', flexShrink:0, marginTop:5 }} />
+              <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--supabase-border)', flexShrink:0, marginTop:5 }} />
               <div>
-                <div style={{ fontSize:11, color:'#3a3a3a' }}>{h.date}</div>
-                <div style={{ fontSize:12, color:'#666' }}>{h.label}</div>
+                <div style={{ fontSize:11, color:'var(--supabase-text-muted)' }}>{h.date}</div>
+                <div style={{ fontSize:12, color:'var(--supabase-text-muted)' }}>{h.label}</div>
               </div>
               <Badge status="confirmed" />
             </div>
