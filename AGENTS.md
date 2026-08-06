@@ -23,11 +23,56 @@ Multi-clínica por `clinic_id`.
 | **Tabela fechada ≠ dado protegido** | View/função `SECURITY DEFINER` passa por cima do RLS. `clinics` estava "fechada" e vazava a `evolution_apikey`. §16 |
 | **`REVOKE ... FROM PUBLIC` não basta** | O Supabase concede a `anon` por fora. São duas concessões — leia o `proacl` depois. §17 |
 | **Mudar o `RETURNS TABLE` de uma RPC reabre o ACL dela** | Exige `DROP`+`CREATE`, e isso apaga os REVOKEs. Reaplique no mesmo script. §23 |
+| **Webhook da Meta reenvia a própria mensagem do bot** | `statuses[]` no mesmo endpoint. Sem filtrar, o bot responde a si mesmo em loop. §24 |
 | **Tabela nova nasce com RLS ligado e SEM policy** | Event trigger `ensure_rls`. Anon lê `[]` com HTTP 200. §13 |
 | **Não tire o TTL do buffer de debounce** | Sem ele, falha de envio gruda a conversa velha na nova. §12 |
 | **1º login por Google pode cair no onboarding em vez da clínica real** | Só teste com `iagodeoliveirabatista@gmail.com`; se aparecer "Cadastre sua clínica", PARE. §19 |
 
-## Estado atual (06/08/2026, tarde — spec e plano da migração Meta escritos)
+## Estado atual (06/08/2026, noite — workflow migrado para Meta, EM PRODUÇÃO)
+
+- ✅ **O workflow principal não fala mais com a Evolution.** `ZAQ6I2CiBGh8swye` (renomeado pelo usuário
+  para `Project Clinica - Migração para Meta`) foi **transformado no lugar**, não duplicado — o usuário
+  decidiu assim e revisou a D-22. Publicado e **conferido na `activeVersion`**: zero nós chamando
+  `easypanel`/`evolution_apikey`, 7 nós chamando `graph.facebook.com`.
+- ✅ **Por que transformar no lugar foi seguro:** `mensagem_logs` tem **zero mensagens nos últimos 7
+  dias** (última em 28/07) e o usuário confirmou que nenhum paciente usa o bot ainda. Isso derrubou a
+  necessidade da cerimônia de corte com rollback (D-15/Task 8) — não havia o que derrubar.
+- **O que mudou (12 nós):** `Webhook` (POST `/meta-whatsapp-inbound`, sem basicAuth) · novo
+  `Meta - Verificacao (GET)` + `Meta - Responde Challenge` (handshake §20) · `FILTRO ANTI-LOOP` e
+  `Normalizar Dados v2` reescritos para o payload da Meta · `Busca Clinica` agora filtra por
+  `meta_phone_number_id` · e os **7** nós de envio (`Envia Resposta do Agent`, `MSG - CONFIRM`,
+  `MSG - CANCEL`, `MSG - REMARCAÇÃO`, `MSG EDUCADA`, `AVISO SECRETÁRIA`, `ENCAMINHAR MENSAGEM`).
+- ⚠️ **Armadilha nova e séria: `ARMADILHAS.md` §24.** A Meta reenvia a própria mensagem do bot como
+  `statuses[]` no mesmo webhook. Sem filtrar, o bot responde a si mesmo em loop. Tratado no
+  `FILTRO ANTI-LOOP` e testado.
+- ✅ **Verificado, não só aplicado:** `node --check` nos dois nós Code + **13 testes funcionais** rodando
+  payloads reais da Meta pelos dois nós (texto passa · `statuses` bloqueia · payload sem `entry`
+  bloqueia · áudio vira marcador · legenda de imagem · número sem 9º dígito vira 13 · contrato de saída
+  completo). Todos passaram.
+- 🔧 **Números da Meta, resolvido por consulta à Graph API (não por suposição):**
+  - Usar: WABA `1869932994448266` (`I2B Workflows`) → número **`1294131403774736`** = +55 88 8169-8181,
+    **VERIFIED**.
+  - **NÃO** usar `1333235713195741` — é o número de teste da Meta (+1 555…), apesar de ter sido ele o
+    usado no teste de ontem. O usuário achava que era um número I2B; não é.
+  - WABA `1380929087338465` (segunda `I2B Workflows`) está **vazia**, criada por engano. Ignorável.
+- ⚠️ **Templates: os aprovados estão na WABA errada.** `confirmacao_horas_antes` e
+  `confirmao_no_dia_anterior` estão APROVADOS na WABA **de teste da Meta** — inúteis, porque template é
+  por WABA. Na WABA I2B, `consulta_amanha` e `confirmao_horas_antes` seguem **PENDING**. Além disso
+  `consulta_amanha` está cadastrado com idioma **`en`** mas o texto é português — provável rejeição.
+- ⛔ **Pendente do usuário para funcionar de ponta a ponta:** (1) configurar o webhook no painel da Meta
+  — URL `https://n8n.iagobatista.cloud/webhook/meta-whatsapp-inbound`, verify token
+  `cliniflow_meta_2026_i2b`, assinar **só** o campo `messages` (§24); (2) gravar o
+  `meta_access_token` na clínica de teste `7936105a-b198-419f-bad7-a65e2e60725b` (os dois IDs já estão
+  lá). **Nada foi testado contra a Meta de verdade ainda** — só contra payloads simulados.
+- 🔴 **Token exposto:** o workflow `Teste http` guarda um token de usuário de sistema em texto puro num
+  nó Set. Recomendado revogar e gerar outro. O valor entrou no histórico de uma sessão de agente.
+- **Ainda com Evolution (fora do workflow principal):** `Cliniflow - Enviar Mensagem CRM`
+  (`snHQtmgTKLgQEpqk`, envio manual da recepção), Edge Function `enviar-whatsapp` (lembretes, depende de
+  template) e `status-evolution` (widget do CRM). São os próximos alvos.
+- **Nota menor:** `Cria Paciente` grava `origem_lead` = `instancia`, que agora é o `phone_number_id`
+  numérico em vez de um nome legível. Nenhuma lógica depende disso — decidir depois se vale trocar.
+
+## Estado anterior (06/08/2026, tarde — spec e plano da migração Meta escritos)
 
 - ✅ **Spec formal escrito:** `docs/superpowers/specs/2026-08-06-migracao-meta-whatsapp-cloud-api-design.md`.
   Consolida D-13 a D-18, o que já foi provado (App, webhook, envio via HTTP Request) e fecha a

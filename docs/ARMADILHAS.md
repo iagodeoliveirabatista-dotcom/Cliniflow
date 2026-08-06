@@ -732,3 +732,39 @@ fica de pé sem nenhum sintoma.
 
 **Ocorrido em:** 06/08/2026, Task 1 da migração Meta. Pego antes de aplicar; ACL conferido depois
 (`postgres | service_role`) e confirmado pelo advisor.
+
+---
+
+## 24. O webhook da Meta reenvia SUA PRÓPRIA mensagem — sem filtrar `statuses`, o bot entra em loop
+
+**Sintoma:** o bot responde o paciente, e então responde a si mesmo, e de novo, e de novo. Rajada de
+mensagens até alguém desativar o workflow. Cada volta gasta token de LLM e queima reputação do número.
+
+**Causa:** a Cloud API **notifica no mesmo webhook** dois tipos de evento completamente diferentes:
+
+| Campo em `entry[].changes[].value` | O que é |
+|---|---|
+| `messages[]` | mensagem que **o paciente** mandou — é isto que deve acordar o bot |
+| `statuses[]` | recibo (`sent`/`delivered`/`read`) de mensagem que **nós** mandamos |
+
+Toda resposta que o bot envia gera pelo menos 2-3 callbacks de `statuses`. Se o filtro de entrada não
+distinguir, cada resposta do bot vira uma "mensagem nova" que dispara o bot outra vez.
+
+**Isto não tem equivalente na Evolution.** Lá o anti-loop era `IsFromMe === true`, um campo booleano na
+própria mensagem. Na Meta a informação não está num campo — está em **qual chave existe no payload**.
+Quem migra procurando por `fromMe` não acha e conclui que não precisa de anti-loop.
+
+**Correção (no `FILTRO ANTI-LOOP`, primeira validação):**
+```js
+if (value.statuses && !value.messages) {
+  return [];   // recibo de entrega, não é mensagem de paciente
+}
+```
+
+**Como confirmar antes de ir pro ar:** mande um payload de `statuses` pelo nó e verifique que ele
+devolve `[]`. Testado em 06/08/2026 com 4 cenários (texto passa, `statuses` bloqueia, payload sem
+`entry` bloqueia, notificação sem mensagem bloqueia).
+
+**Não faça:** não assine o campo `message_status` no painel da Meta achando que é opcional pra
+observabilidade — ele chega no mesmo webhook e é justamente o que causa o loop. Assine só `messages`
+enquanto não houver tratamento próprio para recibo.
