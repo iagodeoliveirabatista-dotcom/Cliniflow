@@ -49,6 +49,37 @@ Parecem de outro trabalho. Foram **mantidos** na limpeza de 26/07/2026 por preca
 
 ## 🟢 Tomadas
 
+### D-21 — Nome do workflow n8n de produção do canal Meta · 06/08/2026
+**Decisão:** o workflow de produção que recebe/processa mensagens via Meta Cloud API se chama
+`Meta WhatsApp - Producao`.
+**Por quê:** confirmado pelo usuário, segue o padrão de nome já usado nos workflows temporários
+(`Meta WhatsApp - Verificação de Webhook (temporário)`, `Meta WhatsApp - Teste de Envio (temporário)`).
+**Consequência prática:** nenhuma além de nomenclatura — usado nas Tasks 3/8 do plano de implementação.
+
+### D-20 — Remover o código da Evolution assim que o corte for confirmado funcionando, sem período de segurança estendido · 06/08/2026
+**Decisão:** assim que o corte de produção (D-15) for confirmado funcionando, remover os nós/config da
+Evolution dos workflows n8n, em vez de deixá-los desligados por um tempo como plano B.
+**Por quê:** decisão explícita do usuário (06/08/2026) — o objetivo declarado é "não vai existir mais
+Evolution no meu sistema". Não é para ficar como fallback permanente nem temporário longo.
+**Consequência prática:** o rollback rápido (reativar um workflow desligado) só existe **antes** dessa
+limpeza. Depois de removido, reverter significa reconstruir a integração Evolution, não reativar algo
+pronto — o que aumenta o peso dos testes isolados (Task 7 do plano) antes do corte. Colunas
+`evolution_instance`/`evolution_apikey` em `clinics` não são derrubadas automaticamente por esta decisão
+(`DROP COLUMN` é destrutivo/irreversível sem backup) — a remoção delas, se quiser, é uma limpeza
+separada e deliberada, não parte do corte em si.
+
+### D-19 — Sem coluna de canal por clínica: migração é substituição direta, não alternância permanente · 06/08/2026
+**Decisão:** não criar `clinics.canal_whatsapp` (proposta original do spec, seção 3.2). O corte
+continua sendo a nível de workflow/infra (ativar Meta, desativar Evolution), não um campo lido por
+execução para escolher canal por clínica.
+**Por quê:** o usuário confirmou que a Evolution deixará de existir no sistema — o objetivo não é
+coexistência de longo prazo entre dois provedores, é substituição completa. Um seletor de canal
+permanente resolveria um problema (rodar múltiplos provedores ao mesmo tempo) que não existe aqui.
+**Consequência prática:** o outbound não ganha um `Switch`/`If` por canal — o nó de envio é
+substituído diretamente (Evolution → Meta) no dia do corte (Task 8 do plano), não convive com os dois
+lados ativos. **Reabrir quando:** se um dia fizer sentido rodar clínicas em provedores diferentes ao
+mesmo tempo (não é o cenário de hoje, uma clínica só), essa decisão volta à mesa.
+
 ### D-15 — Coexistência Evolution/Meta: número/workflow isolado até corte único, sem tráfego real simultâneo · 06/08/2026
 **Decisão:** validar o canal Meta inteiramente isolado (número de teste dedicado, workflow separado da
 produção), sem nenhum paciente real passando por ele antes do corte. No dia do corte, desliga-se o bot

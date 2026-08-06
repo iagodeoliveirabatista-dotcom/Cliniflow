@@ -26,7 +26,49 @@ Multi-clínica por `clinic_id`.
 | **Não tire o TTL do buffer de debounce** | Sem ele, falha de envio gruda a conversa velha na nova. §12 |
 | **1º login por Google pode cair no onboarding em vez da clínica real** | Só teste com `iagodeoliveirabatista@gmail.com`; se aparecer "Cadastre sua clínica", PARE. §19 |
 
-## Estado atual (06/08/2026 — prova de envio via Graph API confirmada; design de coexistência fechado)
+## Estado atual (06/08/2026, tarde — spec e plano da migração Meta escritos)
+
+- ✅ **Spec formal escrito:** `docs/superpowers/specs/2026-08-06-migracao-meta-whatsapp-cloud-api-design.md`.
+  Consolida D-13 a D-18, o que já foi provado (App, webhook, envio via HTTP Request) e fecha a
+  arquitetura alvo: colunas `meta_access_token`/`meta_phone_number_id`/`meta_waba_id` em `clinics`
+  (D-17/D-18), fluxo inbound/outbound, branch de template para lembretes fora da janela de 24h (D-16).
+- ✅ **Plano de implementação escrito:** `docs/superpowers/plans/2026-08-06-migracao-meta-whatsapp-cloud-api.md`.
+  8 tarefas, a primeira (Task 0) é **bloqueante**: confirmar com o usuário 3 decisões abertas antes de
+  qualquer código — (1) criar `clinics.canal_whatsapp` para o corte por clínica, (2) path do webhook de
+  produção, (3) nome do workflow n8n de produção. Task 8 (corte real) exige autorização explícita do
+  usuário no momento, não é executada automaticamente mesmo com o resto pronto.
+- ✅ **Prazo confirmado como não-rígido** pelo usuário (06/08/2026) — o corte só acontece quando o
+  template estiver aprovado **e** o teste ponta a ponta passar. O "até amanhã" citado abaixo não é mais
+  o alvo.
+- ✅ **Template de lembrete já submetido pelo usuário à aprovação da Meta** (06/08/2026) — dependência
+  externa mais lenta, já em andamento, fora do controle deste projeto quanto ao tempo.
+- ✅ **Task 0 do plano resolvida nesta sessão** — decisões D-19 (sem `clinics.canal_whatsapp`,
+  substituição direta), D-20 (Evolution removida do código assim que o corte funcionar, sem fallback
+  estendido) e D-21 (workflow de produção `Meta WhatsApp - Producao`) registradas em `DECISIONS.md`.
+  Falta só o path do webhook — usuário entrega junto da URL própria da Meta (previsto 07/08/2026).
+- ✅ **Spec e plano verificados contra o banco/n8n reais (MCP), não só contra a documentação:**
+  achados que corrigiram o plano original —
+  - `process_secretary_message` (RPC usada pelo envio manual do CRM) tem `RETURNS TABLE` explícito
+    sem os campos Meta — precisa ser recriada, não basta adicionar coluna em `clinics` (spec §3.1).
+  - Inbound identifica a clínica filtrando por `evolution_instance`; o equivalente Meta é
+    `meta_phone_number_id` do payload, não um campo simétrico por acaso (spec §3.3).
+  - O webhook de produção do `Evo-Go` usa `authentication: basicAuth` — o webhook Meta **não** deve
+    copiar isso (autenticação é o handshake `hub.verify_token`).
+  - ⚠️ **Os workflows temporários `Meta WhatsApp - Verificação de Webhook (temporário)` e
+    `Meta WhatsApp - Teste de Envio (temporário)` não aparecem mais pelo nome no n8n** (`search_workflows`
+    sem filtro lista só 5 workflows). Existe um `Teste http` (`Zv2sEDDE1uQkt5s0`, inativo,
+    `availableInMCP: false`) que pode ser um dos dois renomeado — não confirmado, precisa o usuário
+    habilitar acesso MCP nesse workflow antes de uma sessão futura conseguir ler o conteúdo. Se ele não
+    existir mais, reconstruir a partir de `ARMADILHAS.md` §20/§21 (documentado campo a campo).
+- **Nesta sessão:** escopo combinado com o usuário foi spec+plano (documentação) + resolver as decisões
+  da Task 0 — nenhum código, banco ou branch foi tocado (só leitura via MCP para verificar o plano).
+  Branch `meta-api-migration` continua obsoleta (Task 2 do plano cobre recriá-la, com confirmação do
+  usuário antes de descartar a antiga).
+- **Próximo passo aqui:** Task 1 do plano (migração de banco — colunas `meta_*` em `clinics` +
+  extensão de `process_secretary_message`), quando o usuário autorizar a próxima sessão de implementação.
+  Path do webhook (pendente) só bloqueia a Task 3.
+
+## Estado anterior (06/08/2026, manhã — prova de envio via Graph API confirmada; design de coexistência fechado)
 
 - ✅ **Fase 1.3 concluída: envio real via n8n/API provado** (faltava desde a sessão de 05/08). Workflow
   `Meta WhatsApp - Teste de Envio (temporário)` (isolado, não toca produção): nó HTTP Request chamando
