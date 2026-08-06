@@ -26,7 +26,41 @@ Multi-clínica por `clinic_id`.
 | **Não tire o TTL do buffer de debounce** | Sem ele, falha de envio gruda a conversa velha na nova. §12 |
 | **1º login por Google pode cair no onboarding em vez da clínica real** | Só teste com `iagodeoliveirabatista@gmail.com`; se aparecer "Cadastre sua clínica", PARE. §19 |
 
-## Estado atual (05/08/2026 — exploração da migração Meta)
+## Estado atual (06/08/2026 — prova de envio via Graph API confirmada; design de coexistência fechado)
+
+- ✅ **Fase 1.3 concluída: envio real via n8n/API provado** (faltava desde a sessão de 05/08). Workflow
+  `Meta WhatsApp - Teste de Envio (temporário)` (isolado, não toca produção): nó HTTP Request chamando
+  `POST /{phone-number-id}/messages` da Graph API com token de usuário do sistema, respondeu com
+  `messages[0].id` real (`wamid...`). Não é mais só via assistente da Meta — é via workflow próprio.
+- ⚠️ **Correção de fato:** as "clínicas da irmã e da tia" citadas no `Estado anterior (05/08, manhã)` e em
+  `DECISIONS.md` D-13 **são a mesma clínica**, não duas. Não reabra a busca por uma segunda clínica.
+- ⚠️ **Correção de fato:** o App `Agente_Wpp` e o número de teste do Meta vivem numa BM **pessoal do
+  usuário** (não a Grangeiro001). A Grangeiro001 é dona só do número **atual/manual** da clínica
+  (D-14) — ver `ARMADILHAS.md` §22: token de usuário de sistema não atravessa BM sozinho.
+- ✅ **Design da coexistência Evolution/Meta fechado** (retomado do brainstorming que travou em 05/08):
+  testar tudo isolado no número/workflow novo, corte único no dia, sem tráfego real de paciente passando
+  pelos dois canais ao mesmo tempo. Ver `DECISIONS.md` D-15.
+- ✅ **Decisão sobre lembretes fora da janela de 24h** (motivo original do adiamento em D-13): vão ser
+  submetidos templates para aprovação da Meta como parte do trabalho, não fica em aberto. Ver D-16.
+- ✅ **Decisão sobre multi-tenant:** envio via nó **HTTP Request** (não o nó oficial "WhatsApp" do n8n,
+  que amarra a credencial no editor e quebraria multi-tenant), com token/phone-number-id vindos de
+  colunas novas em `clinics` (`meta_access_token`, `meta_phone_number_id`, `meta_waba_id`), lidas por
+  execução — mesmo padrão que já existe pra `evolution_apikey`/`evolution_instance`. Ver D-17.
+- ✅ **Decisão sobre isolamento de token entre clínicas:** por ora, token compartilhado entre clínicas
+  (mais simples, proporcional ao tamanho atual), mas guardado **por clínica** no banco desde já, pra não
+  exigir migração de dado se isolar por clínica depois. Ver D-18.
+- 🚧 **Usuário pediu migrar o Cliniflow inteiro pra infraestrutura Meta "pronto pra rodar até amanhã"
+  (07/08/2026).** Sinalizado como prazo muito apertado pro escopo: aprovação de template é dependência
+  externa (não controlamos o tempo da Meta), tem reescrita de workflow inteiro e teste ponta a ponta
+  antes de arriscar mensagem real de paciente. Usuário disse que vai tratar/planejar isso na próxima
+  interação — **não comece a implementar migração total sem antes fechar o spec e o plano.**
+- **Próximo passo aqui:** escrever o spec formal (`docs/superpowers/specs/`) e o plano
+  (`docs/superpowers/plans/`) com as decisões acima. Depois: submeter template(s) de lembrete pra
+  aprovação Meta (início já, é a dependência mais lenta) e recriar a branch `meta-api-migration` a
+  partir do master atual (a existente hoje é obsoleta). Nenhum código foi tocado nesta sessão — só
+  configuração manual na plataforma da Meta (feita pelo usuário) e documentação.
+
+## Estado anterior (05/08/2026 — exploração da migração Meta)
 
 - 🚧 **Migração Evolution → Meta WhatsApp Cloud API: ainda em design, nada em produção.**
   Branch `meta-api-migration` existe mas está obsoleta (idêntica ao master); o plano de 04/08

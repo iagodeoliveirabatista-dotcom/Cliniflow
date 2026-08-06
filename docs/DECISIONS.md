@@ -49,6 +49,59 @@ Parecem de outro trabalho. Foram **mantidos** na limpeza de 26/07/2026 por preca
 
 ## 🟢 Tomadas
 
+### D-15 — Coexistência Evolution/Meta: número/workflow isolado até corte único, sem tráfego real simultâneo · 06/08/2026
+**Decisão:** validar o canal Meta inteiramente isolado (número de teste dedicado, workflow separado da
+produção), sem nenhum paciente real passando por ele antes do corte. No dia do corte, desliga-se o bot
+na Evolution e liga-se o do Meta de uma vez só, para essa clínica.
+
+**Por quê:** descartadas as outras duas abordagens levantadas no brainstorming — rodar os dois em
+paralelo com pacientes reais (exigiria guardar por paciente qual canal atende, reabrindo a necessidade
+de uma flag já descartada) e ambiente espelhado totalmente separado (infraestrutura duplicada sem
+necessidade, quebra o padrão de uma instância só do projeto). Com uma clínica só, rollout gradual não
+compensa o custo.
+
+**Consequência prática:** o corte "sem flag" (regra já registrada pra branch `meta-api-migration`) só
+faz sentido porque nunca existe um momento em que uma mensagem real precisa escolher entre os dois
+canais.
+
+### D-16 — Lembretes no Meta: submeter templates para aprovação, não deixar em aberto · 06/08/2026
+**Decisão:** como parte deste trabalho, submeter ao menos um template de lembrete de consulta para
+aprovação no Business Manager, e trocar `disparar-lembretes` para chamar esse template (em vez de texto
+livre) quando a mensagem for fora da janela de 24h.
+
+**Por quê:** esse requisito da Cloud API foi exatamente o motivo do adiamento em D-13. Sem essa decisão,
+a migração ficaria bloqueada de novo na mesma parede.
+
+**Consequência prática:** a aprovação de template é externa (a Meta revisa) e pode demorar — entra no
+cronograma como dependência de terceiro, não como tarefa de tempo fixo.
+
+### D-17 — Envio ao Meta via nó HTTP Request + colunas em `clinics`, não o nó oficial "WhatsApp" do n8n · 06/08/2026
+**Decisão:** montar as chamadas à Graph API com o nó genérico **HTTP Request**, puxando
+`meta_access_token`/`meta_phone_number_id` de colunas novas (nullable) em `clinics`, lidas por execução
+via expressão — não usar o nó nativo "WhatsApp account" do n8n.
+
+**Por quê:** a credencial do nó oficial é fixa, escolhida no editor — não muda por linha/clínica em
+tempo de execução. Isso quebraria o multi-tenant na primeira clínica nova: seria preciso editar o
+workflow a cada clínica. O HTTP Request com dado vindo do banco segue o padrão que já existe hoje pra
+`evolution_apikey`/`evolution_instance`.
+
+**Consequência prática:** mais setup manual no nó (comparado ao nó oficial), zero retrabalho quando a
+segunda clínica precisar do canal Meta.
+
+### D-18 — Token do Meta: compartilhado entre clínicas por ora, mas já guardado por clínica no banco · 06/08/2026
+**Decisão:** por enquanto, um único usuário do sistema/token da Meta pode ser reaproveitado entre
+clínicas (mais simples de configurar), mas o valor efetivo é sempre lido de uma coluna **por clínica**
+em `clinics`, nunca de uma credencial fixa do n8n.
+
+**Por quê:** um token de usuário do sistema só age nos ativos (WABAs) explicitamente atribuídos a ele —
+não é global. Isolar um token por clínica (usuário de sistema dentro da própria BM de cada clínica) é
+mais seguro, mas dá mais trabalho de configuração por clínica nova. Proporcional ao tamanho atual (uma
+clínica), mesmo raciocínio de custo/benefício já usado em D-6.
+
+**Consequência prática:** guardar o token por clínica desde já evita migração de dado se um dia isolar
+tokens de verdade. **Reabrir quando:** a plataforma tiver clínicas com BM própria e não quiser depender
+de compartilhar ativo com a BM do operador.
+
 ### D-14 — Migração Meta: número novo dedicado, não migrar o número existente da clínica da tia · 05/08/2026
 **Decisão:** o canal Meta Cloud API da clínica da tia vai usar um **chip/número novo**,
 registrado na mesma WABA (`Clínica Integrada Dra Anaruthe Grangeiro`, BM `Grangeiro001`) que já
@@ -69,6 +122,9 @@ aponta para um número novo, não para uma migração do `evolution_instance` ex
 migração de número dentro da própria Meta — não depende mais deste projeto.
 
 ### D-13 — Migração Evolution API → Meta WhatsApp Cloud API fica para depois, não hoje · 05/08/2026
+**↳ Correção (06/08/2026):** "clínica da irmã" e "clínica da tia", citadas aqui e no `AGENTS.md`
+(Estado anterior 05/08, manhã), são **a mesma clínica** — não duas. Não planeje assumindo duas clínicas
+distintas nesse deploy.
 **Decisão:** o lançamento de amanhã (clínicas da irmã e da tia do usuário) sobe com a Evolution
 API, como está hoje, provada ponta a ponta. A migração para a API oficial da Meta vira um
 projeto separado, sem pressa de deploy.

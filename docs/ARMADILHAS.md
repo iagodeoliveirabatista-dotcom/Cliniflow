@@ -642,3 +642,51 @@ feita fora do editor do n8n aberto na hora — ela só serve para teste manual a
 **Status:** corrigido e confirmado — a Meta validou o webhook depois dos ajustes acima
 (workflow `Meta WhatsApp - Verificação de Webhook (temporário)`, produção `/webhook/...`,
 Active, token `hub.verify_token` batendo dos dois lados).
+
+---
+
+## 21. Nó HTTP Request do n8n: dois erros de expressão ao montar a chamada pra Graph API da Meta ✅ CORRIGIDO NO TESTE
+
+**Sintoma:** a chamada pra Meta falha (401 ou 400), mesmo com token e URL certos.
+
+**Causa (duas, no mesmo nó):**
+1. **`=` duplicado dentro de um campo já em modo expressão.** O `=` no começo do campo (`jsonBody`, por
+   exemplo) já diz "isto é uma expressão". Um `=` de novo *dentro* do texto, na frente de um `{{ }}`,
+   não é sintaxe válida — vira caractere literal no resultado.
+   `"to": "={{$json.destinatario}}"` gera `"to": "=5588..."` (com um `=` sobrando), não o número puro.
+2. **Nome e valor do header trocados.** O header de autenticação precisa se chamar `Authorization`, com
+   valor `Bearer <token>` (os dois juntos, um espaço no meio). Um header chamado literalmente `Bearer`
+   com o token puro como valor não autentica nada — a Meta não reconhece esse header.
+
+**Correção:**
+- Dentro de um campo já marcado como expressão, use só `{{ $json.campo }}` — sem `=` extra na frente.
+- Header: Name = `Authorization`; Value = `=Bearer {{ $json.meta_access_token }}`.
+
+**Ocorrido em:** 06/08/2026, workflow de teste de envio via Graph API. Corrigido antes do teste real dar
+certo — ficou provado funcionando com `messages[0].id` retornado.
+
+---
+
+## 22. Usuário de sistema da Meta só abre a porta dos ativos atribuídos a ele — não é global entre BMs ⚠️ ATIVO
+
+**Sintoma:** um token de usuário de sistema funciona pra um número/WABA, mas dá erro de permissão pra
+outro — mesmo tendo sido gerado "certo".
+
+**Causa:** o token não é uma chave mestra. Ele só age nos ativos (Apps, WABAs) explicitamente atribuídos
+àquele usuário de sistema, dentro da BM onde ele foi criado. Se o App e o WABA de teste vivem numa BM
+(ex: BM pessoal do usuário) e outro WABA vive em **outra** BM (ex: Grangeiro001, dona do número
+atual/manual da clínica — D-14), o mesmo token **não** alcança esse segundo WABA sem alguém compartilhar
+o ativo entre as BMs, ou sem criar um usuário de sistema novo direto na outra BM.
+
+**Armadilha extra, no mesmo fluxo:** a tela de "Contas do WhatsApp" no Business Settings mostra um **ID
+da conta (WABA ID)** — visualmente parecido com o **ID do número de telefone**, mas são valores
+diferentes, usados em lugares diferentes. O WABA ID não entra na URL da chamada de envio
+(`/{phone-number-id}/messages`); o phone-number-id só aparece dentro do **App** → WhatsApp →
+Configuração da API.
+
+**Como confirmar:** antes de assumir que um token vale pra um WABA, confira em Business Settings →
+Usuários do sistema → aquele usuário → quais ativos estão atribuídos a ele. Se o WABA que você quer usar
+não estiver na lista, o token não alcança.
+
+**Ocorrido em:** 06/08/2026, ao configurar o teste de envio — App/número de teste na BM pessoal do
+usuário, número real da clínica em Grangeiro001.
