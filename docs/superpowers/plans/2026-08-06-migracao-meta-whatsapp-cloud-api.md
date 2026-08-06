@@ -107,27 +107,32 @@ Expected: as 3 colunas, todas nullable, sem default.
 
 A branch existente é obsoleta (diverge do master antes do fechamento de RLS e do tema claro — confirmado em 06/08/2026 via `git diff master meta-api-migration --stat`, que mostra a branch tentando *remover* trabalho que já está no master).
 
-- [ ] **Step 1:** Confirmar com o usuário antes de descartar a branch antiga (é uma operação que reescreve histórico de uma branch — pedir autorização explícita, não só assumir).
-- [ ] **Step 2:** Deletar a branch local obsoleta e recriar a partir do master atual: `git branch -D meta-api-migration && git checkout -b meta-api-migration master`.
-- [ ] **Step 3:** Todo trabalho das Tasks 3-7 acontece nesta branch, não em `master`, até o corte (Task 8) estar pronto para merge.
+- [x] **Step 1:** Confirmado com o usuário em 06/08/2026.
+- [x] **Step 2:** Branch recriada a partir do master (`ba06632`).
+- [x] **Step 3:** Trabalho das Tasks 3-7 acontece nesta branch.
+
+**Achado no caminho:** a branch antiga estava presa a um **worktree** (`Cliniflow-meta-api`), por isso `git branch -D` falhava com `cannot delete branch used by worktree`. O worktree foi removido (`git worktree remove --force`). Dentro dele estava o plano de 04/08 não commitado que o `AGENTS.md` dava como perdido — descartado por decisão do usuário, por usar a arquitetura `canal_whatsapp` rejeitada em D-19.
 
 ---
 
 ## Task 3: Workflow n8n de recebimento (inbound) em produção
 
-**Files:** n8n — workflow novo (nasce do temporário `Meta WhatsApp - Verificação de Webhook (temporário)`)
+**Files:** n8n — workflow `Meta WhatsApp - Producao`, criado por **Duplicate do `Evo-Go` na UI** (D-22)
 
 **Interfaces:**
 - Consumes: payload de webhook da Meta (formato `entry[].changes[].value.messages[]` — confirmar contra a documentação oficial da Graph API antes de escrever o nó de normalização, não assumir de memória).
 - Produces: mesmo formato interno que `Centraliza Dados`/debounce/AI Agent do workflow `Evo-Go` já esperam — para não duplicar a lógica de RAG/debounce/detector de silêncio.
 
-- [ ] **Step 1: Criar o workflow novo** (`Meta WhatsApp - Producao`, D-21). **Path do webhook: pendente** (Task 0/Step 4 — o usuário entrega a URL própria da Meta, previsto 07/08/2026). Até lá, pode adiantar o resto do workflow com um path provisório e trocar depois — trocar o path de um webhook n8n não afeta os outros nós. Reaproveitar a configuração de handshake já provada no temporário (`ARMADILHAS.md` §20: `Respond to Webhook`, `{{$json.query['hub.challenge']}}`, `Content-Type: text/plain`).
+**⚠️ Correção ao Step 4 da Task 0:** o path do webhook **não** é entregue pela Meta — é escolha nossa (é a URL do n8n que a Meta chama, não o contrário). Esclarecido com o usuário em 06/08/2026. **A Task 3 nunca esteve bloqueada.**
+
+- [ ] **Step 0 (PRIMEIRO DE TODOS — antes de qualquer ativação): desativar os gatilhos que vieram junto na duplicata.** O `Evo-Go` tem **três** pontos de entrada independentes e a cópia traz os três: `Webhook` (mensagem via Evolution), `Google Drive Trigger` (ingestão do RAG) e `Error Trigger` (grava em `logs_erro`). Se a cópia for ativada com os dois últimos vivos, **todo documento novo no Drive é ingerido duas vezes** no RAG (embeddings duplicados, piorando a recuperação já torta do §15) e todo erro vira duas linhas em `logs_erro`. Use `setNodeDisabled` em `Google Drive Trigger` e `Error Trigger`. Ver D-22.
+- [ ] **Step 1: Trocar o gatilho de entrada.** O `Webhook` herdado usa `authentication: "basicAuth"` e path `conta-pessoal` — os dois errados para a Meta. Path sugerido: `meta-whatsapp-inbound` (escolha nossa, ver correção acima). Config de handshake conforme `ARMADILHAS.md` §20: método `GET` aceito, `Respond` = "Using Respond to Webhook Node", resposta `{{$json.query['hub.challenge']}}` em `text/plain`, **sem** `basicAuth`.
 - [ ] **Step 2: Nó de normalização** — mapear o payload da Meta para o formato que `Normalizar Dados v2` produz hoje (telefone, texto, nome do contato). **Não assumir simetria total com a Evolution** — o payload da Meta é estruturalmente diferente (array `entry`/`changes`, não um objeto plano).
 
   **Achado ao ler o `Evo-Go` de verdade (06/08/2026):** o nó `Busca Clinica` de lá identifica a clínica filtrando `clinics` por `evolution_instance = {{ Normalizar Dados v2.instancia }}` — o equivalente Meta filtra por **`meta_phone_number_id`**, lido de `entry[].changes[].value.metadata.phone_number_id` no payload recebido (esse campo identifica pra qual número da clínica a mensagem chegou, papel equivalente ao `instancia` da Evolution).
 
   **Também confirmado:** o `Webhook` de produção do `Evo-Go` usa `authentication: "basicAuth"`. **Não copiar esse padrão** para o webhook Meta — a Meta não envia credenciais básicas, a autenticação do lado dela é o handshake `hub.verify_token` (§20); o webhook de produção Meta fica sem `basicAuth`.
-- [ ] **Step 3: Reaproveitar debounce + AI Agent + RAG** — via `Execute Workflow` chamando o workflow principal a partir do ponto certo, OU duplicando os nós dentro do novo workflow. **Decidir isso é uma escolha de arquitetura que precisa ser explícita nesta tarefa** (trade-off: `Execute Workflow` evita duplicação mas acopla os dois workflows; duplicar nós é mais simples de isolar mas duplica manutenção). Documentar a escolha no commit.
+- [x] **Step 3: Reaproveitar debounce + AI Agent + RAG** — **RESOLVIDO por D-22 (06/08/2026): duplicata da UI.** Os nós vêm junto com credenciais e sub-nós preservados, nada a reconstruir nem acoplar. Descartadas as duas opções originais: `Execute Workflow` exigiria adicionar um trigger novo ao `Evo-Go` **em produção** (viola o isolamento do D-15), e reconstruir por código exigiria reconectar credencial em ~60 nós à mão. A "duplicação de manutenção" não é custo real porque o `Evo-Go` perde a parte de WhatsApp no corte (D-20).
 - [ ] **Step 4: `validate_workflow`**, corrigir erros/avisos (consultar skill `n8n-validation-expert` para diferenciar falso-positivo de erro real).
 - [ ] **Step 5: Publicar** (workflow fica `Active` mas isolado — nenhuma clínica em produção aponta pra ele até a Task 8).
 - [ ] **Step 6: Teste isolado** — mandar mensagem do número de teste Meta, confirmar que chega em `mensagem_logs` com os campos certos e que o AI Agent responde (sem paciente real envolvido).
@@ -203,6 +208,8 @@ Quando o usuário autorizar:
 - [ ] **Step 3:** ativar `Meta WhatsApp - Producao` (recebimento), se ainda não estava.
 - [ ] **Step 4:** observar `mensagem_logs`/`logs_erro` nas primeiras interações reais — ficar de prontidão, não só disparar e sair. **Este é o único momento de rollback barato** (reverter Steps 1-3): depois do Step 5, não é mais.
 - [ ] **Step 5 (só depois do Step 4 confirmar que está funcionando — D-20):** remover os nós/config específicos da Evolution dos workflows de outbound e o trigger de recebimento desativado. Não deixar "desligado só por via das dúvidas" — é para tirar mesmo.
+
+  **⚠️ NÃO DELETE O `Evo-Go` INTEIRO (achado de 06/08/2026, D-22).** Ele hospeda três fluxos independentes, e só um é de WhatsApp: `Webhook`→Evolution (esse morre), mas também `Google Drive Trigger`→ingestão do RAG e `Error Trigger`→`logs_erro` (esses dois **não têm substituto em lugar nenhum**). Deletar o workflow mata a ingestão da base de conhecimento e a gravação de erros em silêncio — nada acusa, o RAG só vai parando de receber documento novo. O caminho correto é **stripar** o `Evo-Go`: remover só o ramo do `Webhook`/Evolution e renomeá-lo para algo como `Cliniflow - RAG e Erros`. Conferir depois que o `Google Drive Trigger` continua `Active` e que um erro de teste ainda cai em `logs_erro`.
 - [ ] **Step 6 (rollback, só possível antes do Step 5):** reverter os Steps 1-3 e reativar o trigger Evolution. Documentar o que quebrou em `docs/ARMADILHAS.md` antes de tentar de novo.
 
 Depois do corte: merge de `meta-api-migration` para `master`, atualizar `AGENTS.md` ("Estado atual" + IDs úteis com o novo workflow), e mover qualquer pendência restante da seção 7 do spec para 🟢 Tomadas em `docs/DECISIONS.md`. Avaliar separadamente (não faz parte do corte em si, é limpeza posterior) se vale remover `evolution_instance`/`evolution_apikey` de `clinics` — `DROP COLUMN` é irreversível sem backup, então essa é uma decisão própria, não automática.

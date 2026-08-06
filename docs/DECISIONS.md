@@ -49,6 +49,31 @@ Parecem de outro trabalho. Foram **mantidos** na limpeza de 26/07/2026 por preca
 
 ## 🟢 Tomadas
 
+### D-22 — `Meta WhatsApp - Producao` nasce de uma duplicata do `Evo-Go`, não de reconstrução · 06/08/2026
+**Decisão:** o workflow de produção do canal Meta é criado pela função **Duplicate da interface do
+n8n** sobre o `Evo-Go` (`ZAQ6I2CiBGh8swye`), e depois modificado cirurgicamente via MCP — não é
+reconstruído nó a nó a partir de código.
+
+**Por quê:** o `Evo-Go` tem 69 nós, e a duplicata da UI preserva **credenciais e sub-nós**
+(AI Agent, modelo Gemini, memória Postgres, vector store). Reconstruir por código exigiria
+reconectar credencial em cada nó Supabase/Gemini à mão — muito mais trabalho e muito mais chance
+de divergir em silêncio do que já está provado funcionando (execução 79158/79160). É o mesmo
+raciocínio do D-4 e do R-1: neste projeto não se reconstrói workflow, modifica-se o vivo.
+
+**Descoberta que motivou a decisão:** o `Evo-Go` **não é só o bot de WhatsApp**. Tem três pontos de
+entrada independentes: `Webhook` (mensagem do paciente via Evolution), `Google Drive Trigger`
+(ingestão de documento no RAG) e `Error Trigger` (grava em `logs_erro`). Só o primeiro tem a ver
+com a migração.
+
+**Consequência prática (dupla, as duas perigosas se esquecidas):**
+1. **Na duplicata:** o `Google Drive Trigger` e o `Error Trigger` vêm junto. Se a cópia for ativada
+   sem desativá-los, todo documento novo no Drive é ingerido **duas vezes** no RAG (embeddings
+   duplicados, piorando a recuperação já torta do §15) e todo erro vira duas linhas em `logs_erro`.
+   Desativar os dois é o **primeiro** passo depois de duplicar, antes de qualquer ativação.
+2. **No corte (D-20):** o `Evo-Go` **não pode simplesmente ser deletado** quando a Evolution sair —
+   a ingestão do RAG e o log de erro moram nele. O caminho é ele sobreviver **stripado**, só com
+   esses dois fluxos, renomeado para algo como `Cliniflow - RAG e Erros`. Isso entra na Task 8.
+
 ### D-21 — Nome do workflow n8n de produção do canal Meta · 06/08/2026
 **Decisão:** o workflow de produção que recebe/processa mensagens via Meta Cloud API se chama
 `Meta WhatsApp - Producao`.
