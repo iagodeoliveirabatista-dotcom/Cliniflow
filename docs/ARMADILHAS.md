@@ -690,3 +690,45 @@ não estiver na lista, o token não alcança.
 
 **Ocorrido em:** 06/08/2026, ao configurar o teste de envio — App/número de teste na BM pessoal do
 usuário, número real da clínica em Grangeiro001.
+
+---
+
+## 23. Mudar o `RETURNS TABLE` de uma função REABRE o ACL dela em silêncio ⚠️ LEIA ANTES DE MEXER EM RPC
+
+**Sintoma:** você adiciona uma coluna ao retorno de uma RPC, tudo funciona, nenhum erro em lugar
+nenhum — e a função volta a ser chamável pela **chave anon pública**, entregando credenciais.
+
+**Causa (dois passos encadeados):**
+1. O Postgres **recusa** `CREATE OR REPLACE` quando o `RETURNS TABLE` muda:
+   `cannot change return type of existing function`. A única saída é `DROP FUNCTION` + `CREATE`.
+2. Uma função **recém-criada nasce com privilégios default** — `PUBLIC` ganha `EXECUTE`, e o
+   `ALTER DEFAULT PRIVILEGES` do Supabase concede a `anon`/`authenticated` por cima (§17).
+   Ou seja: **o DROP joga fora todo `REVOKE` que já tinha sido aplicado àquela função.**
+
+Concretamente, em 06/08/2026 `process_secretary_message` precisou ganhar `meta_access_token` e
+`meta_phone_number_id` no retorno. Sem reaplicar os REVOKEs, a cadeia inteira do §16 voltaria a
+funcionar — e agora entregando **o token da Meta** junto com a `evolution_apikey`.
+
+**Correção (no MESMO script da migração, nunca "depois"):**
+```sql
+DROP FUNCTION public.minha_funcao(uuid);
+CREATE FUNCTION public.minha_funcao(uuid) RETURNS TABLE(...) ... ;
+REVOKE ALL ON FUNCTION public.minha_funcao(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.minha_funcao(uuid) FROM anon, authenticated;
+```
+
+**Como confirmar (o `Success` não é evidência de nada — §17):**
+```sql
+select proname, coalesce(array_to_string(proacl,' | '),'SEM ACL = PUBLIC PODE!') from pg_proc p
+join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and proname='<funcao>';
+```
+Só considere fechado quando sobrar `postgres=X/postgres | service_role=X/postgres` — sem `anon`
+e sem o `=X` solto (que é o `PUBLIC`). O `get_advisors` do Supabase é uma segunda checagem boa:
+a função **não pode** aparecer em `anon_security_definer_function_executable`.
+
+**Não faça:** não separe o `DROP/CREATE` do `REVOKE` em migrações diferentes. Entre as duas, a
+função fica publicamente executável — e se a segunda migração falhar ou for esquecida, o vazamento
+fica de pé sem nenhum sintoma.
+
+**Ocorrido em:** 06/08/2026, Task 1 da migração Meta. Pego antes de aplicar; ACL conferido depois
+(`postgres | service_role`) e confirmado pelo advisor.

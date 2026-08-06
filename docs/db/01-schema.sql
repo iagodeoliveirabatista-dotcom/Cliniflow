@@ -20,7 +20,14 @@ CREATE TABLE public.clinics (
     evolution_apikey     text,            -- idem — clínica auto-cadastrada nasce sem isso
     rules_config         jsonb DEFAULT '{}'::jsonb,
     criado_em            timestamptz DEFAULT now(),
-    telefone_notificacao text            -- usada pelo nó "AVISO SECRETÁRIA"
+    telefone_notificacao text,           -- usada pelo nó "AVISO SECRETÁRIA"
+    -- Migração Meta WhatsApp Cloud API (06/08/2026, D-17/D-18). Nullable pelo mesmo
+    -- motivo das colunas evolution_*: clínica sem Meta configurado segue funcionando.
+    -- NÃO existe coluna de canal — D-19 rejeitou seletor por clínica (é substituição
+    -- direta, não coexistência permanente entre provedores).
+    meta_access_token    text,           -- token do usuário de sistema (D-18: compartilhado hoje, guardado por clínica)
+    meta_phone_number_id text,           -- ID do NÚMERO (App → WhatsApp → Config. da API). NÃO é o WABA ID — ver ARMADILHAS.md §22
+    meta_waba_id         text            -- ID da WhatsApp Business Account (templates; não entra na URL de envio)
 );
 
 

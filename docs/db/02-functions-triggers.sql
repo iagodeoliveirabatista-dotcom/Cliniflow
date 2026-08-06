@@ -76,8 +76,15 @@ $function$;
 -- ── 3. TRAVA ATÔMICA DE ENVIO PELO CRM ──────────────────────
 -- Chamada pelo workflow n8n "Cliniflow - Enviar Mensagem CRM".
 -- Impede envio duplicado: só devolve a linha se conseguir travar em 'sending'.
+-- ⚠️ Ao mudar o RETURNS TABLE desta função, o Postgres RECUSA `CREATE OR REPLACE`
+--    ("cannot change return type of existing function") — exige DROP + CREATE.
+--    E recriar a função a devolve com privilégios DEFAULT: PUBLIC ganha EXECUTE e o
+--    ALTER DEFAULT PRIVILEGES do Supabase concede a anon/authenticated. Isso reabre o
+--    vazamento fechado em 28/07 (ARMADILHAS.md §16) — agora com meta_access_token junto.
+--    SEMPRE reaplique os REVOKEs do rodapé desta seção e LEIA o proacl depois (§17).
 CREATE OR REPLACE FUNCTION public.process_secretary_message(p_message_id uuid)
- RETURNS TABLE(telefone text, mensagem text, evolution_apikey text, evolution_instance text)
+ RETURNS TABLE(telefone text, mensagem text, evolution_apikey text, evolution_instance text,
+               meta_access_token text, meta_phone_number_id text)
  LANGUAGE plpgsql
  SECURITY DEFINER
 AS $function$
@@ -103,13 +110,21 @@ BEGIN
         m.telefone,
         m.mensagem,
         c.evolution_apikey,
-        c.evolution_instance
+        c.evolution_instance,
+        c.meta_access_token,
+        c.meta_phone_number_id
     FROM public.mensagem_logs m
     JOIN public.conversations conv ON m.conversation_id = conv.id
     JOIN public.clinics c ON conv.clinic_id = c.id
     WHERE m.id = v_locked_id;
 END;
 $function$;
+
+-- ACL fechado (28/07, mantido na migração Meta de 06/08). São DUAS concessões
+-- independentes — revogar de uma não revoga da outra (ARMADILHAS.md §17):
+REVOKE ALL ON FUNCTION public.process_secretary_message(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.process_secretary_message(uuid) FROM anon, authenticated;
+-- Verificado em 06/08/2026 lendo o proacl: postgres=X/postgres | service_role=X/postgres
 
 
 -- ── 4. DISPARO pg_net PARA O n8n ────────────────────────────
