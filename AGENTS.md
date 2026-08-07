@@ -63,12 +63,21 @@ Multi-clínica por `clinic_id`.
 
 ### 🎯 Próximos passos (pedidos do usuário em 07/08, para a próxima sessão)
 
-1. **Plano de login para a tia (dona da clínica).** ⚠️ **Ambíguo — perguntar antes de implementar.**
-   O usuário disse "logar usando o telefone da minha tia". Pode significar (a) ela usar o CRM pelo
-   celular — mas o CRM é **desktop-only**, isso seria projeto de responsividade; (b) criar uma conta
-   para ela — o que **reabre a D-6** (um login compartilhado por clínica); ou (c) login por telefone/
-   OTP, que não existe hoje. **Não presuma.** Lembrar também que os 3 passos externos do Google OAuth
-   (D-12) seguem pendentes.
+1. **Criar uma conta de login própria para a tia (dona da clínica).** Esclarecido com o usuário em
+   07/08/2026 — **não** é CRM no celular nem login por SMS; é uma conta de acesso para ela.
+   ⚠️ **Isto REABRE a D-6**, que decidiu explicitamente "um login compartilhado por clínica, não por
+   pessoa". Antes de implementar, fechar com o usuário:
+   - Duas contas na **mesma** clínica (`clinic_users` já suporta: PK é `user_id`, então basta uma
+     segunda linha com o mesmo `clinic_id`). O RLS por `auth_clinic_id()` já funciona para isso.
+   - Se ela tiver conta própria, `assignee_id` volta a significar **"quem assumiu"** de verdade — o
+     que muda a conversa do item 2 abaixo ("Atribuir a Mim" deixa de ser inútil e passa a fazer
+     sentido). **Decidir os dois juntos, não em separado.**
+   - `mensagem_logs.sender_id` é sempre NULL hoje (consequência assumida da D-6). Com duas pessoas,
+     vale gravar quem escreveu.
+   - Caminho de criação: pelo painel do Supabase (como foi feito o PASSO 0) **ou** pelo Google OAuth —
+     mas os **3 passos externos da D-12 seguem pendentes** (Google Cloud Console → Supabase Providers
+     → Redirect URLs). Sem eles o botão "Entrar com o Google" aparece e falha.
+   - ⚠️ Ler a **§19** antes do primeiro login dela, e a **§28** (não criar clínica pelo onboarding).
 2. **Simplificar a aba Atendimentos.** O usuário quer menos botões e função mais clara. Hoje o painel
    tem: toggle IA Ativa/Pausada, "🙋‍♂️ Atribuir a Mim", "✓ Marcar como Resolvida"/"Reabrir".
    **Candidato óbvio ao corte:** "Atribuir a Mim" — com uma conta só por clínica (D-6), ele não
