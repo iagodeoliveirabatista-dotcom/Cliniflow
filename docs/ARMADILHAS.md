@@ -768,3 +768,64 @@ devolve `[]`. Testado em 06/08/2026 com 4 cenários (texto passa, `statuses` blo
 **Não faça:** não assine o campo `message_status` no painel da Meta achando que é opcional pra
 observabilidade — ele chega no mesmo webhook e é justamente o que causa o loop. Assine só `messages`
 enquanto não houver tratamento próprio para recibo.
+
+---
+
+## 25. Nó Supabase que não acha nada MATA o ramo — o `If` seguinte nunca roda ⚠️ ATIVO
+
+**Sintoma:** a execução aparece **`success`** no n8n, mas simplesmente para no meio. O nó mostra
+*"No output data returned"*. O `If` logo depois — que existe justamente para tratar o caso "não
+achou" — nunca executa, e o caminho `false` dele fica inalcançável. Nada em `logs_erro`, nada no
+`detectar_silencio()` (a execução foi um sucesso, afinal).
+
+**Causa:** um nó Supabase `get` que não encontra linha devolve **zero itens**, e o n8n encerra aquele
+ramo quando um nó não emite item. Não é erro — é o comportamento padrão. A opção que muda isso é
+`alwaysOutputData` (aba *Settings* do nó): com ela ligada, o nó emite um item **vazio** `{}`, o `If`
+roda, `$json.id` é `undefined`, e o caminho `false` finalmente é alcançado.
+
+**O detalhe que engana:** neste workflow os autores **sabiam disso** — `Busca Clinica` e
+`Busca Paciente` estão com `alwaysOutputData: true`. Só `Busca Conversa Ativa` ficou de fora. Então
+quem olha o workflow vê o padrão certo em dois lugares e não desconfia do terceiro.
+
+**Por que demorou a aparecer:** só quebra na combinação "paciente **existe** mas **não tem** conversa
+aberta". Paciente novo vai pelo ramo `Cria Paciente` → `Cria Conversa`; paciente com conversa aberta
+segue normal. O vão só aparece quando a tabela `conversations` é limpa e o `patients` não.
+
+**Ocorrido em:** 07/08/2026, primeiro teste real do canal Meta. `conversations` estava vazia e o
+paciente de 27/06 (sobra da Evolution) ainda existia. Execução `82608`, `success`, morreu em
+`Busca Conversa Ativa`.
+
+**Correção:** ligar **Always Output Data** no nó → salvar → **publicar**.
+⚠️ Isso **não é aplicável pelo MCP** — `alwaysOutputData` é irmão de `parameters`, não filho, e
+nenhuma operação do `update_workflow` alcança. É mudança manual pela UI. Ver §5f.
+
+**Ao criar nó de busca novo:** decida conscientemente. Se existe um `If` depois tratando "não achou",
+o `alwaysOutputData` é **obrigatório**, senão esse `If` é decorativo.
+
+---
+
+## 26. `Busca Paciente` casa só por telefone — sem `clinic_id`, o multi-tenant vaza ⚠️ ABERTO
+
+**Sintoma:** (ainda não ocorreu com dado real — hoje só existe uma clínica em produção)
+Uma clínica enxerga o paciente — e o histórico de conversa — de outra clínica.
+
+**Causa:** o nó `Busca Paciente` do workflow principal filtra `patients` **apenas** por telefone:
+```
+keyName: "telefone"   keyValue: {{ ...telefone_whatsapp.replace(/\D/g,'').slice(-11) }}
+```
+Não há condição de `clinic_id`. Como `patients.telefone` não é único por clínica, o primeiro paciente
+com aquele telefone é retornado — independente de a qual clínica pertence. Dali em diante o fluxo usa
+esse `patient_id` para achar conversa, gravar mensagem e alimentar a memória do AI Agent.
+
+**Visto na prática em 07/08/2026:** mensagem enviada ao número da clínica de **teste**
+(`7936105a-…`) encontrou o paciente `52c34c91-…`, criado em 27/06 na era Evolution, com
+`clinic_id: NULL` e `origem_lead: "Teste-Wpp_B"`. Nenhuma barreira impediu o cruzamento.
+
+**Por que o RLS não salva:** o nó usa credencial de serviço, não a chave anon — RLS não se aplica.
+O isolamento aqui depende do **filtro da query**, não da política do banco.
+
+**Correção:** adicionar segunda condição ao nó (`clinic_id` = `{{ $('Busca Clinica').first().json.id }}`)
+e conferir o mesmo em `Cria Paciente`/`Busca Conversa Ativa`. **Fazer isso antes da segunda clínica
+entrar** — depois, os dados já estarão cruzados e a correção vira limpeza de dado, não só de código.
+
+**Status:** ABERTO. Registrado em 07/08/2026, fora do escopo da migração Meta.
