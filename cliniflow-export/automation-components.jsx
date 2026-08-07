@@ -32,7 +32,6 @@ function AutomationView({ accent }) {
   const [configs, setConfigs] = useStateA([]);
   const [logs, setLogs] = useStateA([]);
   const [loading, setLoading] = useStateA(true);
-  const [evoStatus, setEvoStatus] = useStateA(null); // null | { connected: true/false }
   const [saude, setSaude] = useStateA([]); // erros agrupados por assinatura
   const [saving, setSaving] = useStateA(false);
   const [toast, setToast] = useStateA(null);
@@ -56,10 +55,6 @@ function AutomationView({ accent }) {
     if (logsRes.data) setLogs(logsRes.data);
     if (saudeRes.data) setSaude(saudeRes.data);
     setLoading(false);
-
-    // Check Evolution API status
-    const evoRes = await window.SupabaseService.verificarStatusEvo();
-    setEvoStatus(evoRes.success ? evoRes.data : { connected: false });
   }, []);
 
   const showToast = (msg, type) => {
@@ -114,18 +109,6 @@ function AutomationView({ accent }) {
                 fontWeight: 600, letterSpacing: .3,
               }}>Modo demonstração</span>
             )}
-            {isConnected && evoStatus && (
-              <span style={{
-                fontSize: 10.5, padding: '3px 8px', borderRadius: 4,
-                display: 'flex', alignItems: 'center', gap: 5,
-                background: evoStatus.connected ? 'rgba(0,208,132,0.12)' : 'rgba(239,68,68,0.12)',
-                color: evoStatus.connected ? '#00d084' : '#ef4444',
-                fontWeight: 600,
-              }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: evoStatus.connected ? '#00d084' : '#ef4444' }} />
-                {evoStatus.connected ? 'Bot online' : 'Bot offline'}
-              </span>
-            )}
           </div>
         </div>
 
@@ -169,7 +152,7 @@ function AutomationView({ accent }) {
           <HistoricoTab logs={displayLogs} accent={accent} onRefresh={loadData} loading={loading} />
         )}
         {tab === 'status' && (
-          <StatusTab accent={accent} evoStatus={evoStatus} logs={displayLogs} saude={saude} isConnected={isConnected} />
+          <StatusTab accent={accent} logs={displayLogs} saude={saude} isConnected={isConnected} />
         )}
       </div>
 
@@ -216,7 +199,7 @@ function LembretesTab({ configs, accent, onSave, saving, isConnected }) {
           </div>
           <div style={{ fontSize: 11.5, color: 'var(--supabase-icon-inactive)', lineHeight: 1.6 }}>
             O Cliniflow salva a configuração no Supabase. O n8n lê essas configurações no horário programado,
-            busca as consultas do dia seguinte, e envia os lembretes via Evolution API.
+            busca as consultas do dia seguinte, e envia os lembretes via WhatsApp Cloud API (Meta).
             Variáveis disponíveis: <code style={{ background: 'var(--supabase-bg-input)', padding: '1px 5px', borderRadius: 3, color: 'var(--supabase-text-muted)', fontSize: 10.5 }}>
             {'{nome}'} {'{primeiro_nome}'} {'{data}'} {'{hora}'} {'{medico}'} {'{tipo}'}
             </code>
@@ -530,7 +513,7 @@ function MensagemRow({ log, accent }) {
 
 // ─── STATUS TAB ──────────────────────────────────────────────────────────────
 
-function StatusTab({ accent, evoStatus, logs, saude, isConnected }) {
+function StatusTab({ accent, logs, saude, isConnected }) {
   const today = new Date().toDateString();
   const msgHoje = logs.filter(l => new Date(l.enviado_em).toDateString() === today);
   const enviados = msgHoje.filter(l => l.direcao === 'saida').length;
@@ -540,37 +523,6 @@ function StatusTab({ accent, evoStatus, logs, saude, isConnected }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, animation: 'fadeIn .2s var(--ease-premium)' }}>
-      {/* Connection status */}
-      <div style={{
-        background: 'var(--supabase-bg-studio)', border: '1px solid var(--supabase-border)', borderRadius: 8, padding: '20px',
-      }}>
-        <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--supabase-text-muted)', marginBottom: 16 }}>Conexão Evolution API</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{
-            width: 48, height: 48, borderRadius: 12,
-            background: evoStatus?.connected ? 'rgba(0,208,132,0.12)' : 'rgba(239,68,68,0.12)',
-            border: `1px solid ${evoStatus?.connected ? 'rgba(0,208,132,0.25)' : 'rgba(239,68,68,0.25)'}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill={evoStatus?.connected ? '#00d084' : '#ef4444'}>
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
-            </svg>
-          </div>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: evoStatus?.connected ? '#00d084' : '#ef4444' }}>
-              {evoStatus?.connected ? 'Conectado' : isConnected ? 'Desconectado' : 'Não configurado'}
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--supabase-text-muted)', marginTop: 2 }}>
-              {evoStatus?.connected
-                ? 'O bot está recebendo e enviando mensagens normalmente'
-                : isConnected
-                  ? 'Verifique se a instância da Evolution API está ativa no n8n'
-                  : 'Configure a URL do n8n no config.js para conectar'}
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Saúde do sistema — erros agrupados por assinatura */}
       <SaudeSistemaCard saude={saude} isConnected={isConnected} />
 

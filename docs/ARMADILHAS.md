@@ -829,3 +829,83 @@ e conferir o mesmo em `Cria Paciente`/`Busca Conversa Ativa`. **Fazer isso antes
 entrar** — depois, os dados já estarão cruzados e a correção vira limpeza de dado, não só de código.
 
 **Status:** ABERTO. Registrado em 07/08/2026, fora do escopo da migração Meta.
+
+---
+
+## 27. `DROP COLUMN` não avisa que quebrou uma função — e a sonda ingênua diz que está tudo bem
+
+**Sintoma:** você remove uma coluna que "não é mais usada". Nenhum erro. Dias depois, um recurso
+específico para de funcionar — e só ele.
+
+**Causa:** o corpo de uma função `plpgsql` **não é validado no `CREATE`**, e muito menos quando uma
+coluna que ele usa é removida depois. O Postgres só resolve os nomes de coluna **na hora de executar
+aquela linha**. Então `DROP COLUMN` passa limpo, e a função só estoura (`42703`) quando alguém a
+chama pelo caminho que toca a coluna morta.
+
+**Ocorrido em 07/08/2026:** o usuário removeu `clinics.evolution_instance` (limpeza pós-migração
+Meta). A `process_secretary_message` continuava com `SELECT ... c.evolution_instance` no `RETURN
+QUERY`. Resultado: **todo envio manual do CRM quebraria**, e nada acusava.
+
+**A armadilha dentro da armadilha — a sonda que mente:**
+```sql
+-- ❌ ISTO DIZ "FUNCIONA" MESMO COM A FUNÇÃO QUEBRADA
+SELECT * FROM public.process_secretary_message('00000000-0000-0000-0000-000000000000');
+```
+Com um UUID inexistente a trava não pega, a função faz `RETURN` **antes** do `RETURN QUERY`, e a
+linha defeituosa nunca é alcançada. A sonda passa. A função está quebrada.
+
+**Sonda correta — force o caminho real e aborte no fim:**
+```sql
+DO $$
+DECLARE r record; v text; alvo uuid;
+BEGIN
+  SELECT id INTO alvo FROM public.mensagem_logs
+   WHERE evo_message_id IS NULL AND status <> 'sending' LIMIT 1;
+  BEGIN
+    SELECT * INTO r FROM public.process_secretary_message(alvo);   -- caminho REAL
+    v := 'OK';
+  EXCEPTION WHEN others THEN v := 'QUEBRADA -> '||SQLSTATE||' : '||SQLERRM; END;
+  RAISE EXCEPTION 'SONDA -> %', v;   -- aborta: a trava 'sending' é revertida
+END $$;
+```
+
+**Antes de qualquer `DROP COLUMN`, ache quem depende:**
+```sql
+SELECT proname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+WHERE n.nspname='public' AND pg_get_functiondef(p.oid) ILIKE '%nome_da_coluna%';
+```
+Views, triggers e RLS policies também precisam ser conferidos — nenhum deles é validado no drop.
+
+---
+
+## 28. Apagar uma clínica desloga o usuário sem avisar (CASCADE em `clinic_users`)
+
+**Sintoma:** o login continua funcionando, mas o CRM abre na tela **"Cadastre sua clínica"** em vez
+dos dados reais. Parece que o Auth quebrou.
+
+**Causa:** `clinic_users.clinic_id` tem `ON DELETE CASCADE`. Apagar a linha em `clinics` apaga junto
+o vínculo conta ↔ clínica. `auth_clinic_id()` passa a devolver `NULL`, e o `Root` do CRM interpreta
+isso como "usuário novo, sem clínica" e mostra o onboarding.
+
+**O estrago se você seguir o fluxo:** clicar em "Cadastre sua clínica" cria uma clínica **nova e
+vazia**, vinculada ao seu login — enquanto o número do WhatsApp continua apontando para a clínica que
+tem os dados. Você fica olhando uma clínica vazia e achando que perdeu tudo. É o mesmo desfecho
+descrito na §19, por outro caminho.
+
+**Ocorrido em:** 07/08/2026, ao consolidar duas clínicas em uma depois da migração Meta.
+
+**Correção (não recrie nada pelo onboarding):**
+```sql
+INSERT INTO public.clinic_users (user_id, clinic_id, nome, papel)
+VALUES ('<auth.users.id>', '<clinics.id que TEM os dados>', '<nome>', 'admin')
+ON CONFLICT (user_id) DO UPDATE SET clinic_id = EXCLUDED.clinic_id;
+```
+
+**Como confirmar que voltou** — chame a função que o CRM realmente usa, não a tabela:
+```sql
+SELECT set_config('request.jwt.claims','{"sub":"<user_id>","role":"authenticated"}', true);
+SELECT public.auth_clinic_id();   -- tem que devolver a clínica certa, não NULL
+```
+
+**Ao apagar clínica:** confira antes `SELECT * FROM clinic_users WHERE clinic_id = '<id>'` e
+replaneje o vínculo **junto** com o delete, na mesma transação.
