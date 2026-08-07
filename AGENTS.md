@@ -32,7 +32,71 @@ Multi-clínica por `clinic_id`.
 | **Não tire o TTL do buffer de debounce** | Sem ele, falha de envio gruda a conversa velha na nova. §12 |
 | **1º login por Google pode cair no onboarding em vez da clínica real** | Só teste com `iagodeoliveirabatista@gmail.com`; se aparecer "Cadastre sua clínica", PARE. §19 |
 
-## Estado atual (06/08/2026, noite — workflow migrado para Meta, EM PRODUÇÃO)
+## Estado atual (07/08/2026, madrugada — MIGRAÇÃO META CONCLUÍDA E PROVADA PONTA A PONTA)
+
+- 🎉 **O canal Meta funciona de verdade.** Mensagem real do WhatsApp pessoal do usuário → número
+  I2B (+55 88 8169-8181) → webhook → debounce → AI Agent → resposta entregue. Execução **82615**
+  (04:28:39 → 04:29:02, 22s). `mensagem_logs` tem entrada e saída com `status='sent'`.
+- ✅ **Anti-loop provado em produção:** logo após a resposta, as execuções 82616 e 82617 (30ms cada)
+  são a Meta devolvendo os recibos da nossa própria mensagem — as duas foram cortadas pelo filtro.
+  Sem isso o bot teria respondido a si mesmo (§24).
+- ✅ **Zero Evolution nos dois workflows.** O principal (`ZAQ6I2CiBGh8swye`) e o de envio manual do CRM
+  (`snHQtmgTKLgQEpqk` — nó agora `Enviar via Meta (Graph API)`) foram migrados, publicados e
+  conferidos na `activeVersion`. Isso cobre os **dois** caminhos de saída, porque lembretes
+  (`pg_cron` → `disparar-lembretes` → `enviar-whatsapp`) passam pelo mesmo webhook do CRM.
+- ✅ **Indicador "Bot online/offline" removido do CRM** a pedido do usuário (badge, cartão
+  "Conexão Evolution API", estado e a função `verificarStatusEvo()` que ficou sem chamador).
+- ⚠️ **Duas quebras silenciosas causadas por limpeza manual do usuário, achadas e corrigidas:**
+  - Ele removeu `clinics.evolution_instance`, mas `process_secretary_message` ainda fazia `SELECT`
+    dessa coluna → **todo envio pelo CRM falharia**. `plpgsql` só valida na execução, então nada
+    acusou. Ver §27 — inclui a sonda que **mente** (UUID inexistente diz "FUNCIONA").
+  - Ele apagou a clínica antiga e o `CASCADE` em `clinic_users` levou junto o vínculo do login →
+    o CRM abriria em "Cadastre sua clínica". Religado e verificado via `auth_clinic_id()`. Ver §28.
+- **Estado do banco hoje:** UMA clínica (`7936105a-…`, **"Clinica Anaruthe"**, renomeada da antiga
+  "Cliniflow - Teste Meta") com as credenciais Meta e o login vinculado. A clínica `baac9449` foi
+  apagada pelo usuário.
+- **Números da Meta:** WABA `1869932994448266` (`I2B Workflows`) → phone_number_id
+  **`1294131403774736`** (+55 88 8169-8181, VERIFIED). O `1333235713195741` é o número de teste da
+  **Meta** (+1 555) e manda webhook para o app da própria Meta, não para o nosso — nunca funcionaria.
+- **Webhook:** `https://n8n.iagobatista.cloud/webhook/meta-whatsapp-inbound`, verify token
+  `cliniflow_meta_2026_i2b`, campo `messages` assinado (⚠️ **não assine `message_status`** — §24).
+
+### 🎯 Próximos passos (pedidos do usuário em 07/08, para a próxima sessão)
+
+1. **Plano de login para a tia (dona da clínica).** ⚠️ **Ambíguo — perguntar antes de implementar.**
+   O usuário disse "logar usando o telefone da minha tia". Pode significar (a) ela usar o CRM pelo
+   celular — mas o CRM é **desktop-only**, isso seria projeto de responsividade; (b) criar uma conta
+   para ela — o que **reabre a D-6** (um login compartilhado por clínica); ou (c) login por telefone/
+   OTP, que não existe hoje. **Não presuma.** Lembrar também que os 3 passos externos do Google OAuth
+   (D-12) seguem pendentes.
+2. **Simplificar a aba Atendimentos.** O usuário quer menos botões e função mais clara. Hoje o painel
+   tem: toggle IA Ativa/Pausada, "🙋‍♂️ Atribuir a Mim", "✓ Marcar como Resolvida"/"Reabrir".
+   **Candidato óbvio ao corte:** "Atribuir a Mim" — com uma conta só por clínica (D-6), ele não
+   distingue ninguém; a própria D-6 já registra que `assignee_id` degradou para "se alguém assumiu".
+3. **Tema claro sem contraste** — o usuário revisou visualmente (a olhada humana que a sessão de 05/08
+   deixou pendente) e disse "parece só um branquelo". Diagnóstico medido:
+
+   | par | claro | escuro |
+   |---|---|---|
+   | borda contra painel recuado | **1.13:1** | 1.41:1 |
+   | card vs painel recuado | **1.09:1** | 1.15:1 |
+
+   As três camadas do tema claro (`--supabase-bg-main #fbfcfd`, `bg-studio #f4f5f7`, `bg-card
+   #ffffff`) estão praticamente no mesmo tom, e `--supabase-border #e6e8eb` some sobre elas.
+   **Não é simetria com o escuro:** borda mais clara sobre fundo escuro cria contorno que o olho lê;
+   borda quase branca sobre branco não. O tema claro precisa de **mais** separação, não da mesma.
+
+### Pendências menores (não bloqueiam nada)
+
+- Edge Function `status-evolution`: sem chamador **e** quebrada (lê coluna removida). Apagar.
+- `clinics.evolution_apikey`: coluna ainda existe, toda NULL. `DROP` é irreversível — decisão do dono.
+- Workflow `Teste http` (`Zv2sEDDE1uQkt5s0`): token antigo em texto puro, descartável.
+- `Busca Paciente` sem `clinic_id` (§26) — **corrigir antes da segunda clínica**.
+- Templates `consulta_amanha` e `confirmao_horas_antes`: PENDING na WABA I2B. O `consulta_amanha` está
+  com idioma **`en`** e texto em português — corrigir enquanto está na fila, senão perde a vez.
+- Mensagem de entrada fica em `status='pending'` para sempre (ponto cego antigo, cosmético).
+
+## Estado anterior (06/08/2026, noite — workflow migrado para Meta, EM PRODUÇÃO)
 
 - ✅ **O workflow principal não fala mais com a Evolution.** `ZAQ6I2CiBGh8swye` (renomeado pelo usuário
   para `Project Clinica - Migração para Meta`) foi **transformado no lugar**, não duplicado — o usuário
