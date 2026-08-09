@@ -909,3 +909,41 @@ SELECT public.auth_clinic_id();   -- tem que devolver a clínica certa, não NUL
 
 **Ao apagar clínica:** confira antes `SELECT * FROM clinic_users WHERE clinic_id = '<id>'` e
 replaneje o vínculo **junto** com o delete, na mesma transação.
+
+## 29. O toggle "IA Pausada" do CRM não pausava nada
+
+**Sintoma:** secretária desliga "IA Pausada" no painel Atendimentos (grava
+`patients.bot_pausado = true`, confirmado na tela: "A IA está silenciada"), mas o bot
+continua respondendo o paciente em tempo real. Achado ao vivo em 09/08/2026, pego em
+produção com um paciente real no meio da conversa.
+
+**Causa:** `patients.bot_pausado` **nunca era lido em lugar nenhum do workflow n8n**
+(`ZAQ6I2CiBGh8swye`) — zero ocorrências no JSON do workflow. O único gate real era
+`sessoes_ativas.atendimento_humano`, checado só dentro do nó `Valida Expiração`, e só
+quando **já existe uma linha** em `sessoes_ativas` para aquele telefone. Sem sessão ativa
+(patient novo no ciclo, ou sessão já expirada/limpa pelo `Cleanup de Sessão`), o código cai
+em `if (!row || !row.expira_em) return sessao_status: "NAO_ENCONTRADA"` — e o nó `Status da
+sessão?` (Switch) tem uma regra explícita que roteia `NAO_ENCONTRADA` **direto pro AI
+Agent**, sem checar `bot_pausado` em nenhum ponto do caminho.
+
+**Por que não dava erro:** o Switch não tem fallback — item que não bate em nenhuma regra
+é descartado em silêncio (é assim que `ATIVA_HUMANA` já funcionava, corretamente, de
+propósito). `NAO_ENCONTRADA` bate numa regra própria que manda pro AI Agent, então nunca
+foi descartado. Execução aparecia como `success`.
+
+**Correção:** `Valida Expiração` agora lê `$('Busca Paciente').first().json.bot_pausado`
+**antes** de qualquer outra checagem. Se `true`, devolve `sessao_status: "BOT_PAUSADO"` —
+não bate em nenhuma regra do Switch (nem "Validada", nem "Expirou", nem "NAO_ENCONTRADA"),
+então é descartado do mesmo jeito que `ATIVA_HUMANA`. Cobre os dois casos: com sessão ativa
+e sem sessão. `Busca Paciente` já tem `alwaysOutputData: true`, então `.first()` não quebra
+pra paciente que ainda não existe em `patients` (`bot_pausado` vem `undefined`, tratado como
+"não pausado").
+
+**Mitigação imediata aplicada no incidente:** inserida à mão uma linha em `sessoes_ativas`
+com `atendimento_humano = true` pro telefone da conversa em andamento, pra conter o bot
+enquanto a correção no n8n era publicada.
+
+**Se reabrir:** ao adicionar qualquer campo de controle novo no `patients` (ex: um futuro
+"pausar por N horas"), lembre que **nenhum campo de `patients` é lido pelo n8n por padrão**
+— precisa ser explicitamente buscado via `$('Busca Paciente')` e checado onde o gate real
+mora (`Valida Expiração`), não assumido só porque o CRM grava a coluna.

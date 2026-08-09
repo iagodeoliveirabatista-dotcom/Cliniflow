@@ -32,7 +32,44 @@ Multi-clínica por `clinic_id`.
 | **Não tire o TTL do buffer de debounce** | Sem ele, falha de envio gruda a conversa velha na nova. §12 |
 | **1º login por Google pode cair no onboarding em vez da clínica real** | Só teste com `iagodeoliveirabatista@gmail.com`; se aparecer "Cadastre sua clínica", PARE. §19 |
 
-## Estado atual (07/08/2026, madrugada — MIGRAÇÃO META CONCLUÍDA E PROVADA PONTA A PONTA)
+## Estado atual (09/08/2026 — bug crítico do toggle "IA Pausada" corrigido em produção)
+
+- 🐛→✅ **Bug crítico achado e corrigido ao vivo, com paciente real em conversa:** o toggle
+  "IA Pausada" do CRM (`patients.bot_pausado`) nunca era lido pelo n8n — o bot continuava
+  respondendo mesmo com o toggle desligado. Causa e correção completas em
+  `docs/ARMADILHAS.md` §29. Corrigido no nó `Valida Expiração`, publicado e conferido na
+  `activeVersion` (`a6288890-aebe-458b-a6db-613235ffe3b1`). Mitigação imediata: linha manual
+  em `sessoes_ativas` pro telefone `5588981458633` (paciente "iago de oliveira" nos dados de
+  teste) com `atendimento_humano=true` por 24h, pra conter a conversa em andamento antes da
+  correção definitiva. **Pendência:** nenhum teste de ponta a ponta rodou depois da correção
+  — o próximo agente deve confirmar com uma conversa real que o toggle agora silencia o bot.
+
+## Estado atual (09/08/2026 — bug do placeholder corrigido, tom do bot ajustado)
+
+- 🐛→✅ **Bug achado e corrigido nesta sessão:** o `systemMessage` do nó `AI Agent`
+  (`ZAQ6I2CiBGh8swye`) tinha `"Você é a assistente virtual de atendimento da [NOME DA
+  CLÍNICA]"` como texto **estático** — nunca foi substituído. Nenhum teste anterior pegou
+  isso porque a única mensagem real (07/08, execução 82615) foi uma saudação curta que não
+  chegou nessa frase. Trocado por `{{ $('Busca Clinica').first().json.name }}` (o node
+  `Busca Clinica` já roda antes do `AI Agent` no fluxo, e essa mesma referência já era usada
+  em `Envia Resposta do Agent`). **Publicado e conferido na `activeVersion`**
+  (`a2493700-388b-42ea-9d02-61d7e59b162b`) — não fica só no rascunho.
+- ✅ **Tom do prompt ajustado a pedido do usuário** (opção escolhida: só tom/vocabulário, sem
+  relaxar as regras de conversão). Adicionada regra 7 pedindo pra variar a linguagem em vez
+  de repetir sempre a mesma frase-modelo ("Perfeito!", "Entendo perfeitamente!"), e os
+  exemplos das 4 fases reescritos com tom mais natural/menos "script de vendas". Regras
+  estruturais mantidas de propósito (1 parágrafo, pergunta obrigatória no fim de toda
+  mensagem, CTA de escolha forçada, proibido justificar) — o usuário decidiu não mexer
+  nelas por ora.
+- ⛔ **Decisão do usuário: NÃO tornar a personalidade do bot configurável por clínica agora**
+  (rejeitaria mover `[IDENTIDADE E PAPEL]`/regras para `clinics.rules_config`, que existe no
+  schema mas está vazio `{}`). Foco é só a clínica de amanhã. Se um 2º negócio entrar depois,
+  isso volta à mesa — ver a pergunta feita ao usuário nesta sessão antes de reabrir sozinho.
+- **Ainda não confirmado pelo usuário:** status atual de `consulta_amanha` e
+  `confirmao_horas_antes` na WABA I2B (estavam `PENDING` em 07/08). Bloqueia lembretes fora
+  da janela de 24h. Não dá pra consultar isso pelo MCP disponível nesta sessão.
+
+## Estado anterior (07/08/2026, madrugada — MIGRAÇÃO META CONCLUÍDA E PROVADA PONTA A PONTA)
 
 - 🎉 **O canal Meta funciona de verdade.** Mensagem real do WhatsApp pessoal do usuário → número
   I2B (+55 88 8169-8181) → webhook → debounce → AI Agent → resposta entregue. Execução **82615**
