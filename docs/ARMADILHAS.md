@@ -977,3 +977,109 @@ na `activeVersion` `54133dd0-da3f-4a9d-ad0a-706ac22f0e16`.
 
 **Ainda não verificado com execução real pós-correção** — ver `AGENTS.md`, próximo passo
 obrigatório antes de confiar nisso em produção.
+
+**Atualização (mesmo dia, teste real revelou uma 2ª camada do mesmo bug):** com a correção
+acima já publicada, uma nova conversa de teste mostrou a IA chamando a tool de verdade
+(`ai.agent.tool_calls.completed: 1`, com os parâmetros certos) — mas `consultas` continuou
+vazia. A tool em si (`criar_pre_agendamento`, um Custom Code Tool) estava quebrada:
+- O `jsCode` inteiro estava envolto em `{{ \`...\` }}` — isso faz o n8n tratar o campo como
+  uma **expressão** (que resolve para uma string, com os `${...}` internos avaliados por
+  fora), não como código a ser executado de verdade. O resultado é blocos `{ { "texto que
+  parece código" } }` que nunca rodam como JS real — o `return` fica preso dentro de uma
+  template string, nunca é um `return` de verdade.
+- Mesmo corrigindo isso, o código dependia de `this.helpers.httpRequest`, que **não existe**
+  no sandbox do Custom Code Tool (`n8n-code-tool` skill, tabela de capacidades — só o Code
+  node normal tem `$helpers`). Confirmado que a chamada HTTP nunca disparou de verdade:
+  `consultas` nunca recebeu nada, nem uma vez, desde que o recurso existe.
+
+**Correção definitiva:** o nó foi recriado como `@n8n/n8n-nodes-langchain.toolHttpRequest`
+(HTTP Request Tool — o nó oficialmente suportado para "tool de IA que chama uma API"), com
+os campos da IA vindo via `$fromAI('campo', 'descrição', 'string')` e os dados de contexto
+(`patient_id`/`clinic_id`) vindo de `$('Centraliza Dados')`, do mesmo jeito que os outros
+nós HTTP deste workflow já fazem. Publicado na `activeVersion` `1067f7e7-ecd2-4ddc-91c3-93f3c9919b0d`.
+
+**Se reabrir:** `n8n-nodes-base.httpRequest` comum **não pode** ser ligado como `ai_tool` —
+o n8n recusa a conexão (`Invalid connection: ... its node type does not produce an
+'ai_tool' output`). Tem que ser um nó com sufixo "Tool" (`toolHttpRequest`,
+`toolCode`, `toolCalculator`, etc.). E dentro do `toolCode`, nunca chame API externa — é
+sandbox puro, sem `$helpers`, sem `$input`, sem `$node`. Ver a skill `n8n-code-tool` antes
+de mexer em qualquer Custom Code Tool.
+
+**Ainda não verificado com execução real pós-2ª-correção.**
+
+## 31. Lembrete de consulta nunca chegaria — três quebras em série no mesmo caminho
+
+**Sintoma:** nenhum. É o pior tipo: `disparar-lembretes` respondia `{"ok":true,"disparados":0}`
+todo hora cheia, o cron marcava `succeeded`, e ninguém recebia nada. Descoberto em 09/08/2026
+numa varredura, não por alguém reclamar.
+
+**Causa — três falhas independentes, em sequência, no caminho
+`pg_cron → disparar-lembretes → enviar-whatsapp → n8n → Meta`:**
+
+1. **O trigger não dispara para lembrete.** `secretary_message_trigger` tem
+   `WHEN (new.tipo = 'manual' AND new.direcao = 'saida')`. Lembrete grava
+   `tipo = 'lembrete_24h'` — nunca casa. O caminho que entrega mensagem manual
+   simplesmente não existia para lembrete.
+2. **A chamada direta ao n8n ia sem `message_id`.** `enviar-whatsapp` chamava
+   `/webhook/enviar-mensagem` com `{telefone, mensagem, tipo}`, mas o primeiro nó daquele
+   workflow faz `process_secretary_message(p_message_id := $json.body.message_id)`. Recebia
+   NULL, devolvia vazio, e o envio ia para `graph.facebook.com/v20.0/undefined/messages`.
+   Pior que falhar: no caminho **manual** o trigger entregava a mensagem e essa chamada
+   direta falhava logo depois, marcando o log como `failed` — mensagem entregue aparecendo
+   como erro no CRM.
+3. **Texto livre fora da janela de 24h é recusado pela Meta** (erro 131047). Lembrete é, por
+   definição, fora da janela — o paciente não escreveu nas últimas 24h. **Nada no sistema
+   inteiro enviava template**: zero referências a `type: "template"` em qualquer lugar.
+   Ter os templates aprovados na WABA não adianta se ninguém os usa. A D-16 previa exatamente
+   isso ("trocar `disparar-lembretes` para chamar o template") e nunca foi implementada.
+
+**Correção (09/08/2026):** `enviar-whatsapp` v9 ganhou dois caminhos explícitos —
+recebendo `template`, fala **direto** com a Graph API (sem n8n, que não tinha como servir
+esse caso); sem `template`, apenas grava o log e deixa o trigger fazer o envio manual, sem
+a chamada direta que corrompia o status. O de-para lembrete→template mora em
+`config_automacao` (`meta_template_nome`/`meta_template_idioma`/`meta_template_params`).
+
+**Verificado de verdade, não só publicado:** consulta de teste criada para +24h20,
+`disparar-lembretes` disparado à mão, `disparados: 1`, `mensagem_logs.status = 'sent'` com
+`evo_message_id` real (`wamid.HBgMNTU4ODgxNDU4NjMzFQIAERgSM0VEMjYzMEQ3MEFFRjZFM0Y3AA==`) e
+mensagem entregue no WhatsApp. Consulta de teste apagada depois
+(`mensagem_logs.consulta_id` é `ON DELETE SET NULL`, então o log da prova sobreviveu).
+
+**Pegadinhas de template que vão morder de novo:**
+- **O idioma do template é o que está cadastrado na Meta, não o idioma do texto.**
+  `consulta_amanha` foi aprovado como **`en`** com corpo em português. Mandar `pt_BR` nele
+  devolve 132001 ("template does not exist in that language"). Está registrado em
+  `config_automacao.meta_template_idioma`, com comentário na coluna.
+- **Os templates aprovados usam parâmetros NOMEADOS** (`parameter_format: NAMED`), então cada
+  parâmetro vai com `parameter_name`. Formato posicional é recusado.
+- **Mandar parâmetro a mais ou a menos** dá 132000. Por isso `meta_template_params` lista
+  exatamente os que aquele template declara: `consulta_amanha` usa nome/data/hora/medico,
+  `confirmao_horas_antes` usa só nome/hora/medico (não tem `data`).
+- Para ler os templates reais sem expor o token: `net.http_get` com o token vindo de
+  `SELECT meta_access_token FROM clinics` dentro do próprio SQL — o segredo nunca sai do banco.
+
+**Ainda quebrado de propósito (não corrigido nesta rodada):** o botão "enviar WhatsApp" da
+Agenda manda **texto livre** pelo caminho manual. Para um paciente que não escreveu nas
+últimas 24h, a Meta vai recusar do mesmo jeito (131047) e a mensagem fica presa em
+`sending` (§5c). Só é seguro usar esse botão dentro da janela de 24h. Resolver isso é o
+mesmo trabalho: fazer aquele botão escolher um template.
+
+## 32. `list_tables` disse "0 linhas" numa tabela que tinha 3 — e isso quase virou decisão errada
+
+**Sintoma:** `list_tables` (MCP do Supabase) reportou `config_automacao` com `rows: 0`. Conclusão
+tirada: "não existe nenhuma configuração de lembrete, preciso criar". Criadas 2 configs novas.
+Aí o teste real acusou uma config `reminder_24h` que ninguém tinha visto — havia **3 configs
+de 04/06/2026** o tempo todo.
+
+**Causa:** essa contagem vem de estatística do planejador (`pg_class.reltuples`), não de um
+`COUNT(*)`. Em tabela que nunca sofreu `ANALYZE` depois de ser populada, ela fica em zero
+indefinidamente.
+
+**Consequência real:** duas configs de 24h e duas de 4h ativas ao mesmo tempo — o paciente
+receberia o mesmo lembrete duas vezes assim que alguém preenchesse o template nas antigas.
+As 3 antigas foram **desativadas** (`ativo = false`), não apagadas: guardam o texto original
+e a volta é um `UPDATE`.
+
+**Correção de método:** antes de concluir que uma tabela está vazia, rode
+`SELECT count(*)` de verdade. `list_tables` serve para descobrir *que* tabelas existem e se
+têm RLS — não para saber se têm dado.

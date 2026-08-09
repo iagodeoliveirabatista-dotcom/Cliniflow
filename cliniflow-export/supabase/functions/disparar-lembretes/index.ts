@@ -1,7 +1,13 @@
 // supabase/functions/disparar-lembretes/index.ts
-// Scheduler de lembretes automáticos via n8n
-// Chamada via Supabase Cron (pg_cron) ou n8n Schedule Trigger
+// Scheduler de lembretes automáticos de consulta.
+// Chamada via Supabase Cron (pg_cron), de hora em hora.
 // Deploy: supabase functions deploy disparar-lembretes
+//
+// Não passa pelo n8n: o envio é feito por `enviar-whatsapp`, que fala direto
+// com a Graph API usando o TEMPLATE aprovado da Meta. Lembrete acontece
+// sempre fora da janela de 24h, e ali a Cloud API recusa texto livre.
+// O de-para lembrete -> template mora em `config_automacao`
+// (`meta_template_nome`/`meta_template_idioma`/`meta_template_params`).
 //
 // Configurar cron no Supabase SQL Editor:
 //   select cron.schedule('disparar-lembretes', '0 * * * *', $$
@@ -56,7 +62,7 @@ serve(async (req) => {
       const { data: consultas } = await supabase
         .from('consultas')
         .select(`
-          id, data_hora, tipo, medico, status, preco,
+          id, data_hora, tipo, medico, status, preco, clinic_id,
           patient:patients (id, nome, telefone, email)
         `)
         .eq('whatsapp_ativo', true)
@@ -84,12 +90,42 @@ serve(async (req) => {
           const dataFormatada = `${dataConsulta.getDate()}/${dataConsulta.getMonth() + 1}/${dataConsulta.getFullYear()}`;
           const horaFormatada = `${String(dataConsulta.getHours()).padStart(2,'0')}:${String(dataConsulta.getMinutes()).padStart(2,'0')}`;
 
+          // Valores que alimentam TANTO o texto legível gravado no histórico
+          // QUANTO os parâmetros do template aprovado na Meta — os dois têm
+          // que contar a mesma história, senão o CRM mostra uma coisa e o
+          // paciente recebe outra.
+          const valores: Record<string, string> = {
+            nome: paciente.nome,
+            data: dataFormatada,
+            hora: horaFormatada,
+            medico: consulta.medico || 'seu médico',
+            tipo: consulta.tipo || 'consulta',
+          };
+
           const mensagem = (config.template_mensagem || '')
-            .replace(/{nome}/g, paciente.nome)
-            .replace(/{data}/g, dataFormatada)
-            .replace(/{hora}/g, horaFormatada)
-            .replace(/{medico}/g, consulta.medico || 'seu médico')
-            .replace(/{tipo}/g, consulta.tipo || 'consulta');
+            .replace(/{nome}/g, valores.nome)
+            .replace(/{data}/g, valores.data)
+            .replace(/{hora}/g, valores.hora)
+            .replace(/{medico}/g, valores.medico)
+            .replace(/{tipo}/g, valores.tipo);
+
+          // Lembrete é sempre fora da janela de 24h, e aí a Cloud API só
+          // aceita template aprovado. Sem `meta_template_nome` configurado o
+          // envio seria recusado pela Meta (131047), então nem tentamos:
+          // falha explícita aqui é melhor que mensagem sumindo em silêncio.
+          if (!config.meta_template_nome) {
+            erros.push(
+              `config ${config.tipo_lembrete}: sem meta_template_nome — lembrete fora da janela de 24h exige template aprovado`,
+            );
+            return;
+          }
+
+          // Só os parâmetros que ESTE template declara. Mandar a mais (ou a
+          // menos) faz a Meta recusar por contagem de parâmetros (132000).
+          const nomesParams: string[] = config.meta_template_params
+            || Object.keys(valores).filter((k) => (config.template_mensagem || '').includes(`{${k}}`));
+          const params: Record<string, string> = {};
+          for (const k of nomesParams) params[k] = valores[k] ?? '';
 
           const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
           const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -108,6 +144,13 @@ serve(async (req) => {
                 tipo: config.tipo_lembrete,
                 consulta_id: consulta.id,
                 nome_paciente: paciente.nome,
+                patient_id: (consulta.patient as any)?.id || null,
+                clinic_id: consulta.clinic_id || null,
+                template: {
+                  nome: config.meta_template_nome,
+                  idioma: config.meta_template_idioma || 'pt_BR',
+                  params,
+                },
               }),
             });
 

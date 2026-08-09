@@ -24,6 +24,9 @@ Multi-clínica por `clinic_id`.
 | **`REVOKE ... FROM PUBLIC` não basta** | O Supabase concede a `anon` por fora. São duas concessões — leia o `proacl` depois. §17 |
 | **Mudar o `RETURNS TABLE` de uma RPC reabre o ACL dela** | Exige `DROP`+`CREATE`, e isso apaga os REVOKEs. Reaplique no mesmo script. §23 |
 | **Webhook da Meta reenvia a própria mensagem do bot** | `statuses[]` no mesmo endpoint. Sem filtrar, o bot responde a si mesmo em loop. §24 |
+| **Fora da janela de 24h só passa TEMPLATE** | Texto livre é recusado (131047). Lembrete é sempre fora da janela. §31 |
+| **O idioma do template é o da Meta, não o do texto** | `consulta_amanha` foi aprovado como `en` com corpo em português. §31 |
+| **`list_tables` mente sobre contagem de linhas** | Reportou 0 numa tabela com 3. Use `count(*)` antes de concluir que está vazia. §32 |
 | **Nó Supabase que não acha nada mata o ramo** | Execução fica `success` e para no meio. O `If` seguinte nunca roda. `alwaysOutputData`. §25 |
 | **`Busca Paciente` casa só por telefone** | Sem `clinic_id` no filtro, a 2ª clínica pega paciente da 1ª. §26 |
 | **`DROP COLUMN` quebra função em silêncio** | plpgsql só valida na execução. E a sonda com UUID falso diz "funciona". §27 |
@@ -54,13 +57,59 @@ Multi-clínica por `clinic_id`.
   entre elas. `Prepara Log Saída`/`Log Mensagem Saída` (usados pelos fluxos de
   confirmação/cancelamento) não foram tocados — só perderam a entrada vinda do AI Agent.
   **Também não verificado com conversa real ainda.**
-- ⛔ **Pendência real, não cosmética:** nenhuma das duas mudanças acima rodou contra uma
-  mensagem de paciente de verdade desde a publicação. Antes de confiar nisso amanhã, alguém
-  precisa mandar uma mensagem de teste que peça agendamento e conferir (a) se
-  `tool_calls.requested >= 1` e uma linha nova aparece em `consultas`, e (b) se uma resposta
-  com `|||` chega como balões separados no WhatsApp, não como texto com `|||` literal.
+- 🐛→✅ **2ª camada do mesmo bug, achada no teste real:** a IA passou a chamar a tool (prompt
+  corrigido funcionou), mas a tool `criar_pre_agendamento` em si estava quebrada — Custom
+  Code Tool com o `jsCode` inteiro envolto errado em `{{ \`...\` }}` (nunca executava de
+  verdade) e dependente de `this.helpers.httpRequest`, indisponível no sandbox do Code Tool.
+  Recriado como `@n8n/n8n-nodes-langchain.toolHttpRequest` (nó oficial pra tool de IA que
+  chama API), com `$fromAI()` pros campos da IA. Publicado, `activeVersion`
+  `1067f7e7-ecd2-4ddc-91c3-93f3c9919b0d`. Detalhes completos em `ARMADILHAS.md` §30.
+- ⛔ **Pendência real, não cosmética:** ainda falta confirmar com uma NOVA conversa real que
+  agora sim a linha aparece em `consultas`. E os balões separados (`|||`) continuam nunca
+  testados contra WhatsApp de verdade.
 
-## Estado atual (09/08/2026 — bug crítico do toggle "IA Pausada" corrigido em produção)
+## Estado atual (09/08/2026, madrugada — VARREDURA GERAL: lembretes consertados e PROVADOS)
+
+- 🎉 **Lembrete com template funciona de verdade, provado ponta a ponta.** Consulta de teste
+  para +24h → `disparar-lembretes` → `enviar-whatsapp` v9 → Graph API → **mensagem entregue no
+  WhatsApp**, `mensagem_logs.status='sent'` com `wamid` real. Consulta de teste apagada depois.
+  Este é o único item desta sessão que está ✅ **verificado rodando**, não só publicado.
+- 🔴 **O que estava quebrado (e ninguém sabia): lembrete NUNCA chegaria.** Três falhas em
+  série no mesmo caminho, todas silenciosas — `disparar-lembretes` respondia
+  `{"ok":true,"disparados":0}` e o cron marcava `succeeded`. Diagnóstico completo em
+  `ARMADILHAS.md` §31. Resumo: (1) o trigger de envio só dispara para `tipo='manual'`, nunca
+  para lembrete; (2) a chamada ao n8n ia sem `message_id`, então a RPC devolvia vazio e a URL
+  virava `.../undefined/messages`; (3) **nada no sistema enviava template** — e texto livre
+  fora da janela de 24h é recusado pela Meta (131047). Template aprovado não serve de nada
+  se ninguém o usa.
+- ✅ **`enviar-whatsapp` v9** agora tem dois caminhos explícitos: com `template`, fala direto
+  com a Graph API; sem `template`, só grava o log e deixa o trigger fazer o envio manual
+  (a chamada direta que corrompia o status foi removida). O de-para lembrete→template mora
+  em `config_automacao` (`meta_template_nome`/`meta_template_idioma`/`meta_template_params`).
+- ✅ **`process_secretary_message` normaliza o telefone** via `public.telefone_e164()`. O envio
+  manual da recepção mandava `to` **sem o 55** (patients guarda 11 dígitos) — a Graph API
+  precisa do número internacional. Corrigido no ponto de estrangulamento por onde TODO envio
+  manual passa, sem tocar no frontend. Assinatura da RPC inalterada de propósito (§23).
+- ✅ **Templates conferidos direto na Meta** (via `net.http_get`, token nunca saiu do banco).
+  Aprovados na WABA I2B: `consulta_amanha` (⚠️ idioma **`en`**, params nome/data/hora/medico),
+  `confirmao_horas_antes` (pt_BR, params nome/hora/medico), `resp_confirmacao`,
+  `responde_confirmacao`. As pegadinhas de idioma/parâmetros estão em `ARMADILHAS.md` §31.
+- ⚠️ **3 configs de lembrete antigas foram DESATIVADAS** (`reminder_custom`/`reminder_24h`/
+  `reminder_2h`, de 04/06). Duplicavam antecedência com as novas → paciente receberia o mesmo
+  lembrete duas vezes. Não foram apagadas. Elas só apareceram porque o teste real acusou —
+  `list_tables` reportava a tabela como vazia. Ver `ARMADILHAS.md` §32.
+- ⛔ **Segue quebrado de propósito:** o botão "enviar WhatsApp" da **Agenda** manda texto livre.
+  Para paciente fora da janela de 24h a Meta recusa e a mensagem trava em `sending` (§5c).
+  Seguro só dentro da janela. Corrigir = fazer aquele botão usar template também.
+- ⛔ **Continua sem verificação real:** (a) a tool `criar_pre_agendamento` recriada como
+  `toolHttpRequest` — a última conversa de teste (05:39) é **anterior** à correção, então a
+  linha em `consultas` ainda não foi vista nascer; (b) os balões separados (`|||`) nunca
+  chegaram ao WhatsApp de verdade. Os dois dependem de uma conversa real nova.
+- **Pendência que só o dono resolve:** a Edge Function `status-evolution` continua no ar,
+  morta (sem chamador desde 07/08) e quebrada (lê `evolution_instance`, coluna removida).
+  Não há como apagar Edge Function pelo MCP — tem que ser pelo painel do Supabase.
+
+## Estado anterior (09/08/2026 — bug crítico do toggle "IA Pausada" corrigido em produção)
 
 - 🐛→✅ **Bug crítico achado e corrigido ao vivo, com paciente real em conversa:** o toggle
   "IA Pausada" do CRM (`patients.bot_pausado`) nunca era lido pelo n8n — o bot continuava
