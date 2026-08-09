@@ -947,3 +947,33 @@ enquanto a correção no n8n era publicada.
 "pausar por N horas"), lembre que **nenhum campo de `patients` é lido pelo n8n por padrão**
 — precisa ser explicitamente buscado via `$('Busca Paciente')` e checado onde o gate real
 mora (`Valida Expiração`), não assumido só porque o CRM grava a coluna.
+
+## 30. A IA dizia "agendei" sem nunca ter agendado nada
+
+**Sintoma:** numa conversa de teste real (09/08/2026), a IA respondeu "Recebido, Iago! Tudo
+certo, agendei sua avaliação para segunda-feira, às 14h" — mas `consultas` estava (e continuou)
+vazia. A recepção nunca teria visto esse pedido.
+
+**Causa:** o prompt do `AI Agent` nunca instruía explicitamente a IA a chamar a tool
+`criar_pre_agendamento` — só dizia "confirme e siga para registrar" em prosa. A tool está
+corretamente conectada (`ai_tool: criar_pre_agendamento → AI Agent`, confirmado nas
+conexões do workflow) — **não é bug de wiring**, é lacuna de instrução. Provado via
+`get_execution`: em toda a conversa de teste, `ai.agent.tool_calls.requested` ficou em **0**
+em todos os turnos. A IA também inventou pedir "sobrenome e telefone de contato" — dado que a
+tool não usa e que já é conhecido via WhatsApp — porque, sem instrução, ela improvisou seu
+próprio conceito de "finalizar o agendamento".
+
+**Como diagnosticar isso de novo, se voltar:** `mcp__n8n-mcp__get_execution` com
+`includeData: true` e `nodeNames: ["AI Agent"]` na execução suspeita — o campo
+`metadata.tracing["ai.agent.tool_calls.requested"]` mente por omissão do jeito oposto do
+§14 (aquele mentia dizendo 0 quando a tool FOI chamada; aqui achamos 0 porque a tool
+genuinamente nunca foi chamada) — então **os dois casos exigem conferir a tabela de destino
+(`consultas`) além da métrica**, nunca confiar só num dos dois sinais.
+
+**Correção (09/08/2026):** nova seção `[REGISTRAR O AGENDAMENTO - OBRIGATÓRIO USAR A TOOL]`
+no prompt, mandando chamar a tool no mesmo turno em que o paciente confirma um período, e
+proibindo a IA de dizer "agendei"/"confirmado"/"reservado" sem tê-la chamado antes. Publicado
+na `activeVersion` `54133dd0-da3f-4a9d-ad0a-706ac22f0e16`.
+
+**Ainda não verificado com execução real pós-correção** — ver `AGENTS.md`, próximo passo
+obrigatório antes de confiar nisso em produção.

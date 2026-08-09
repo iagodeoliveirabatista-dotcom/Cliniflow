@@ -6,6 +6,13 @@
 
 ---
 
+**Atualização (09/08/2026, mesma sessão):** o escopo cresceu em duas frentes depois da
+primeira versão deste spec, a partir de uma conversa de teste real: (1) achado e corrigido
+aqui um bug crítico de agendamento fantasma (seção 2); (2) adicionado envio em múltiplas
+mensagens do WhatsApp ("balões separados") como parte de deixar o atendimento mais humano
+(seção 3-B e 4). Ambos incorporados ao mesmo prompt/mudança de workflow, para não publicar
+o redesenho em duas etapas.
+
 ## 1. Visão Geral do Objetivo
 
 Redesenhar o prompt de sistema do nó `AI Agent` (workflow n8n `ZAQ6I2CiBGh8swye`, `Project
@@ -36,6 +43,18 @@ seção 6).
 | "Toda mensagem termina em pergunta / escolha forçada"? | **Solta, mas com gatilhos explícitos.** A IA não convida para agendar em toda mensagem nem na primeira troca — isso cansa e soa forçado. Convida em **momentos-chave** nomeados no prompt (queixa validada, interesse específico num procedimento, pedido explícito de agendar, ou logo após responder bem uma dúvida). Fora desses momentos, segue a conversa sem empurrar. Guardrail: se um momento-chave já apareceu e o paciente ainda não foi convidado depois de várias trocas, aí sim é hora de convidar — a conversa nunca fica emperrada indefinidamente. Refinado pelo usuário depois da primeira versão do design (09/08/2026). |
 | Como verificar antes de ir para paciente real? | **Publica direto na `activeVersion`** e o usuário acompanha pelo painel Atendimentos do CRM — sem simulação prévia no chat de teste do n8n. |
 
+**Bug crítico confirmado nesta sessão (09/08/2026, conversa real de teste):** o prompt em
+produção hoje nunca instrui explicitamente a IA a chamar a tool `criar_pre_agendamento` — só
+diz "confirme e siga para registrar" em prosa. Auditado via `get_execution` do n8n: em toda
+a conversa de teste, `ai.agent.tool_calls.requested` ficou em **0** em todos os turnos, e a
+IA disse ao paciente "Recebido, Iago! Tudo certo, agendei sua avaliação para segunda-feira,
+às 14h" — **sem nenhuma linha criada em `consultas`**. A tool está corretamente conectada ao
+nó (`ai_tool: criar_pre_agendamento → AI Agent`, confirmado nas conexões do workflow) — não é
+bug de wiring, é lacuna de instrução. A IA também inventou pedir "sobrenome e telefone de
+contato" — dado que a tool não usa e que já é conhecido via WhatsApp. Correção: seção
+`[REGISTRAR O AGENDAMENTO]` nova abaixo, com instrução explícita e proibição de confirmar
+sem ter chamado a tool.
+
 **Guardrails herdados do prompt atual, não questionados neste brainstorm** (continuam fixos):
 não diagnosticar; tag `[ACIONAR_HUMANO]` para dor/urgência/estresse extremo (ver `DECISIONS.md`
 D-9 — não reintroduzir os nós removidos, a tag continua só como marcador que
@@ -46,10 +65,11 @@ em JSON.
 
 ## 3. Arquitetura Técnica
 
-**Único ponto de mudança:** `parameters.options.systemMessage` do nó `AI Agent`, workflow
-`ZAQ6I2CiBGh8swye`, via `mcp__n8n-mcp__update_workflow` (`setNodeParameter`) seguido de
-`publish_workflow` — segue `DECISIONS.md` D-4 (aplicar via MCP, nunca reimportar o JSON
-exportado, que não carrega credenciais).
+**Dois pontos de mudança:** (1) `parameters.options.systemMessage` do nó `AI Agent`, workflow
+`ZAQ6I2CiBGh8swye` — texto novo, mesma técnica de sempre; (2) o trecho do fluxo entre
+`Parse AI Response` e o envio ao WhatsApp, para suportar múltiplos balões (seção 3-B). Ambos
+via `mcp__n8n-mcp__update_workflow` seguido de `publish_workflow` — segue `DECISIONS.md` D-4
+(aplicar via MCP, nunca reimportar o JSON exportado, que não carrega credenciais).
 
 Nós que **não mudam** e por quê:
 - `Consulta na database` (Supabase Vector Store / RAG) — já é chamada condicionalmente pelo
@@ -57,16 +77,52 @@ Nós que **não mudam** e por quê:
   traz, não em como ela é buscada.
 - `Parse AI Response` — já faz parse robusto do JSON (`resposta`/`intencao`/
   `procedimento_interesse`/`tipo_objecao`) com fallback via regex se o JSON vier malformado.
-  Schema de saída não muda.
-- `Envia Resposta do Agent` — já limpa qualquer tag entre colchetes (`.replace(/\[.*?\]/g, '')`)
-  antes de enviar ao WhatsApp, incluindo `[ACIONAR_HUMANO]`. Nenhuma mudança necessária.
-- `criar_pre_agendamento` (tool) — schema e comportamento inalterados.
+  Schema de saída não muda — o texto com `|||` continua um `output` string só, igual hoje.
+  A divisão em balões acontece no nó novo `Divide Blocos de Resposta`, logo depois.
+- `criar_pre_agendamento` (tool) — schema e comportamento inalterados; o que muda é o prompt
+  mandar chamá-la de forma explícita (seção 4), não a tool em si.
+
+Nó que muda de comportamento (não de posição):
+- `Envia Resposta do Agent` — continua limpando tags entre colchetes
+  (`.replace(/\[.*?\]/g, '')`) antes de enviar, mas passa a rodar uma vez por balão
+  (`$json.texto`) em vez de uma vez por turno (`$json.output`) — ver 3-B.
 
 **Dependência não-técnica:** para o bot poder "responder bem" sobre preço, os documentos em
 `documentos_clinica` (RAG) precisam efetivamente conter a informação de forma clara quando ela
 for divulgável. Isso é curadoria de conteúdo, não código — fora do escopo deste spec, mas vale
 registrado: se o documento de preço não estiver bom, a regra de preço do novo prompt não tem
 o que citar e cai no fallback ("definido na avaliação").
+
+### 3-B. Envio em múltiplas mensagens ("balões separados")
+
+Decisão do usuário: balões de WhatsApp de verdade em sequência, não só quebra de parágrafo
+numa mensagem só. Isso exige nós novos — não é só texto de prompt.
+
+**Convenção:** a IA marca onde quebrar usando o delimitador `|||` dentro do campo
+`resposta` do JSON. Máximo 3 partes (guardrail no prompt, ver seção 4). A maioria das
+respostas continua sendo 1 parte só — isso não é "sempre mandar 2-3 mensagens", é permitir
+quando fizer sentido humano quebrar (ex: acolher em uma mensagem curta, perguntar na
+próxima).
+
+**Nós novos, entre `Parse AI Response` e o envio:**
+1. **`Divide Blocos de Resposta`** (Code node) — substitui o único `output` por uma lista:
+   faz `split('|||')`, `trim()` em cada parte, remove vazios, corta em no máximo 3 itens, e
+   devolve um item n8n por parte (`{ texto, indice, total }`). Se não houver `|||`, devolve
+   1 item só — comportamento idêntico ao atual.
+2. **`Loop Over Items`** (Split In Batches, tamanho de lote 1) envolvendo o que hoje é
+   `Envia Resposta do Agent` + o nó de log de saída — cada parte é enviada e logada antes da
+   próxima, na ordem certa.
+3. **`Envia Resposta do Agent`** passa a usar `$json.texto` em vez de `$json.output` no corpo
+   da requisição à Graph API — mudança de uma linha na expressão do body.
+4. **Nó de log de saída** (o que grava em `mensagem_logs` a saída automática) passa a rodar
+   uma vez por parte, não uma vez por turno — mesma `conversation_id`/`patient_id`, texto e
+   `enviado_em` diferentes por linha.
+5. **`Wait`** (~1.2-1.8s) dentro do loop, entre uma parte e a próxima — dá o efeito de alguém
+   digitando, sem atraso perceptível demais.
+
+**Por que não foi feito como "1 mensagem com `\n\n`":** o usuário pediu balões de verdade
+("recomendado p/ orgânico" foi a opção escolhida) — visualmente é isso que diferencia "bot
+mandando um texto" de "pessoa conversando aos poucos" no WhatsApp real.
 
 ---
 
@@ -117,6 +173,16 @@ procedimento, pode citar. Se não houver preço no documento, ou o procedimento 
 avaliação caso a caso, explique que o valor exato é definido na avaliação — sem fingir que
 não existe resposta nenhuma.
 
+[REGISTRAR O AGENDAMENTO - OBRIGATÓRIO USAR A TOOL]
+Quando o paciente confirmar um período ou data para a avaliação, você DEVE chamar a tool
+`criar_pre_agendamento` nesse mesmo turno, com os parâmetros que ela pede (procedimento de
+interesse, período de preferência, observações relevantes). NUNCA diga ao paciente que o
+agendamento foi feito, confirmado ou reservado sem ter chamado a tool antes — dizer
+"agendei"/"confirmado"/"reservado" sem chamar a tool é mentir para o paciente, e a recepção
+nunca vai ver o pedido. Não peça informação que a tool não precisa (ela não pede sobrenome
+nem telefone — o telefone já é conhecido pelo WhatsApp). Depois de chamar a tool, confirme
+ao paciente que o pedido foi registrado e que a recepção vai confirmar o horário exato.
+
 [CONDUZIR PARA O AGENDAMENTO - MOMENTOS-CHAVE]
 Não convide para agendar em toda mensagem, nem logo na primeira troca — isso cansa e soa a
 venda forçada. Convide quando a conversa chegar num momento-chave real:
@@ -138,6 +204,14 @@ Fale como uma pessoa real da equipe digitando no WhatsApp — contrações natur
 corporativo ou empolgado demais. Varie a forma de cumprimentar, validar e perguntar de uma
 conversa para outra; não repita sempre a mesma frase-modelo ("Perfeito!", "Entendo
 perfeitamente!").
+
+[MENSAGENS SEPARADAS - QUANDO FIZER SENTIDO]
+Uma pessoa real às vezes manda duas mensagens curtas seguidas em vez de um texto só — por
+exemplo, uma frase de acolhimento e, na sequência, a pergunta. Quando isso soar mais natural,
+separe as partes com `|||` dentro do campo "resposta" (ex: "Poxa, entendo você.|||Você
+prefere de manhã ou à tarde?"). No máximo 3 partes. Isso é a exceção, não a regra: a maioria
+das respostas continua sendo uma parte só — não quebre uma resposta curta em pedaços só para
+parecer mais longa.
 
 [GUARDRAILS FIXOS - NÃO NEGOCIÁVEIS]
 - NÃO DIAGNOSTIQUE: apenas acolha a dor e direcione para a avaliação clínica; nunca dê
@@ -171,7 +245,10 @@ cobre "variar a linguagem"); `[REGRAS DE OURO]` é quebrada em seções por cont
 (`[COMO RESPONDER - SONDAGEM]` vs `[COMO RESPONDER - PERGUNTA ESPECÍFICA]`) em vez de uma
 lista única de proibições absolutas; a regra de preço vira condicional ao RAG; a regra de
 "toda mensagem termina em pergunta" sai como obrigação e vira orientação de bom senso com um
-guardrail de não abandonar o fio da conversa.
+guardrail de não abandonar o fio da conversa; **nova** seção `[REGISTRAR O AGENDAMENTO]`
+obrigando o uso explícito da tool `criar_pre_agendamento` (o prompt atual nunca menciona a
+tool — causa raiz do bug de agendamento fantasma, ver seção 2); **nova** seção
+`[MENSAGENS SEPARADAS]` introduzindo o delimitador `|||` para balões múltiplos.
 
 ---
 
@@ -186,13 +263,22 @@ checável sem depender de uma conversa real:
    `systemMessage` do nó `AI Agent` na versão ativa é exatamente o texto da seção 4 — não só
    o rascunho. (Mesmo padrão usado para verificar a correção do placeholder `[NOME DA
    CLÍNICA]` nesta mesma sessão.)
-2. **Não regressão nos nós vizinhos:** confirmar que `Parse AI Response` e `Envia Resposta do
-   Agent` não foram tocados (nenhuma operação do tipo `updateNodeParameters`/
-   `setNodeParameter` sobre eles nesta mudança).
-3. **Acompanhamento pós-publicação (responsabilidade do usuário, não automatizável por
+2. **Não regressão em `Parse AI Response`:** confirmar que não foi tocado (schema de saída
+   idêntico). `Envia Resposta do Agent` e o nó de log **mudam de propósito** — verificar que
+   continuam limpando tags `[...]` e que passam a usar `$json.texto` (não `$json.output`).
+3. **Correção do agendamento fantasma (a mais importante):** na primeira conversa real em
+   que o paciente confirmar um turno, usar `get_execution` (mesmo comando usado para
+   diagnosticar o bug) e conferir que `ai.agent.tool_calls.requested >= 1` nesse turno **e**
+   que surgiu uma linha nova em `consultas` com `status = 'solicitado'`. Se a IA disser
+   "agendei" sem isso, o prompt não resolveu o problema.
+4. **Balões separados funcionando:** confirmar visualmente (WhatsApp ou painel Atendimentos)
+   que uma resposta com `|||` chega como mensagens em sequência, na ordem certa, e que cada
+   balão gera sua própria linha em `mensagem_logs` (não uma linha só com `|||` literal dentro
+   do texto).
+5. **Acompanhamento pós-publicação (responsabilidade do usuário, não automatizável por
    aqui):** observar as primeiras conversas reais na aba Atendimentos do CRM depois do
-   deploy de amanhã. Não há teste automatizado de qualidade de conversa neste projeto hoje —
-   é leitura humana do painel.
+   deploy de amanhã. Qualidade de tom/conversa continua sendo leitura humana do painel — só
+   os itens 3 e 4 acima têm verificação objetiva.
 
 ---
 

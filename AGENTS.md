@@ -32,6 +32,34 @@ Multi-clínica por `clinic_id`.
 | **Não tire o TTL do buffer de debounce** | Sem ele, falha de envio gruda a conversa velha na nova. §12 |
 | **1º login por Google pode cair no onboarding em vez da clínica real** | Só teste com `iagodeoliveirabatista@gmail.com`; se aparecer "Cadastre sua clínica", PARE. §19 |
 
+## Estado atual (09/08/2026 — prompt orgânico + pipeline de balões publicados)
+
+- ✅ **Prompt do `AI Agent` reescrito e publicado** seguindo
+  `docs/superpowers/specs/2026-08-09-bot-atendimento-organico-design.md` e o plano
+  `docs/superpowers/plans/2026-08-09-bot-atendimento-organico.md`. `activeVersionId`
+  `54133dd0-da3f-4a9d-ad0a-706ac22f0e16`, conferido (não só o rascunho): as fases fixas viraram
+  objetivos, preço ficou condicional ao RAG, e — o mais importante — a seção
+  `[REGISTRAR O AGENDAMENTO]` agora obriga a IA a chamar `criar_pre_agendamento` antes de
+  confirmar qualquer coisa ao paciente.
+- ✅ **Bug do "agendamento fantasma" corrigido** (achado nesta sessão numa conversa de teste
+  real: a IA disse "agendei sua avaliação" sem nunca chamar a tool — `consultas` ficou vazia,
+  `ai.agent.tool_calls.requested = 0` em toda a conversa). Causa: o prompt antigo nunca
+  mencionava a tool explicitamente. **Corrigido, mas ainda NÃO verificado com execução real
+  pós-fix** — próximo passo obrigatório é confirmar com `get_execution` na próxima conversa
+  que pedir agendamento (Task 3 do plano).
+- ✅ **Pipeline de balões separados construído** — 5 nós novos (`Divide Blocos de Resposta`,
+  `Divide em Lotes`, `Loga Balão`, `Aguarda Próximo Balão`, `Limite 1 Balão`) entre
+  `Veio do Webhook?` e o envio, formando um loop `Split In Batches` que manda cada parte da
+  resposta (delimitada por `|||` no prompt) como mensagem separada no WhatsApp, com ~1.5s
+  entre elas. `Prepara Log Saída`/`Log Mensagem Saída` (usados pelos fluxos de
+  confirmação/cancelamento) não foram tocados — só perderam a entrada vinda do AI Agent.
+  **Também não verificado com conversa real ainda.**
+- ⛔ **Pendência real, não cosmética:** nenhuma das duas mudanças acima rodou contra uma
+  mensagem de paciente de verdade desde a publicação. Antes de confiar nisso amanhã, alguém
+  precisa mandar uma mensagem de teste que peça agendamento e conferir (a) se
+  `tool_calls.requested >= 1` e uma linha nova aparece em `consultas`, e (b) se uma resposta
+  com `|||` chega como balões separados no WhatsApp, não como texto com `|||` literal.
+
 ## Estado atual (09/08/2026 — bug crítico do toggle "IA Pausada" corrigido em produção)
 
 - 🐛→✅ **Bug crítico achado e corrigido ao vivo, com paciente real em conversa:** o toggle
