@@ -41,7 +41,33 @@ const STATUS_CFG = {
   rescheduled: { label:'Solicitado reagendamento', color:'#f59e0b', bg:'rgba(245,158,11,0.10)' },
   canceled:  { label:'Cancelado',  color:'#ef4444', bg:'rgba(239,68,68,0.10)'  },
   solicitado: { label:'Solicitado', color:'#a855f7', bg:'rgba(168, 85, 247, 0.10)' },
+  recusado:  { label:'Recusado',   color:'#6b7280', bg:'rgba(107,114,128,0.10)' },
 };
+
+// O bot grava a preferência dentro de `notas`, em prosa:
+//   "Pedido pelo bot. Preferência do paciente: segunda de manhã"
+// Para a recepção decidir o horário, o que importa é só o trecho final — o
+// resto é ruído que empurra a informação útil para o meio da frase.
+// Aceita também o formato antigo ("Solicitação IA. Preferência: X. Obs: Y").
+function extrairPreferencia(notas) {
+  if (!notas) return '';
+  const m = String(notas).match(/Prefer[êe]ncia(?:\s+do\s+paciente)?:\s*([^.]*)/i);
+  const bruto = m ? m[1] : String(notas);
+  return bruto.replace(/\s*Obs:.*$/i, '').trim();
+}
+
+// Há quanto tempo o pedido está esperando. Para a recepção, "há 2 dias" diz
+// mais sobre a urgência da triagem do que a data em que chegou.
+function tempoDesde(iso) {
+  if (!iso) return '';
+  const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (min < 1) return 'agora';
+  if (min < 60) return `há ${min}min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `há ${h}h`;
+  const d = Math.floor(h / 24);
+  return `há ${d}d`;
+}
 
 const getStatusStyle = (status) => {
   const normalized = {
@@ -49,7 +75,8 @@ const getStatusStyle = (status) => {
     pending: 'pendente',
     canceled: 'cancelado',
     rescheduled: 'remarcado',
-    solicitado: 'solicitado'
+    solicitado: 'solicitado',
+    recusado: 'recusado'
   }[status] || status;
 
   // Um tom médio + alfa, no mesmo estilo do STATUS_CFG — funciona em fundo
@@ -60,6 +87,7 @@ const getStatusStyle = (status) => {
     cancelado:  '#ef4444',
     remarcado:  '#f59e0b',
     solicitado: '#a855f7',
+    recusado:   '#6b7280',
     pendente:   '#9ca3af',
   };
   const c = TONS[normalized] || TONS.pendente;
@@ -302,7 +330,12 @@ function AppRow({ apt, isSelected, onClick, accent, isLast }) {
         opacity: dim ? .55 : 1,
       }}
     >
-      <div style={{ width:46, fontSize:12, fontWeight:500, color:'var(--supabase-text-muted)', flexShrink:0 }}>{apt.time}</div>
+      {/* Pedido não tem horário — o `time` dele é o instante em que o bot
+          gravou, não um compromisso. Mostrar isso como hora enganaria a
+          recepção, então no lugar vai a preferência que o paciente falou. */}
+      <div style={{ width:46, fontSize:12, fontWeight:500, color:'var(--supabase-text-muted)', flexShrink:0 }}>
+        {isSolicitado ? '—' : apt.time}
+      </div>
       <Avatar initials={apt.initials} size={28} color={isSolicitado ? st.text : s.color} />
       <div style={{ flex:1, minWidth:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:5 }}>
@@ -315,10 +348,14 @@ function AppRow({ apt, isSelected, onClick, accent, isLast }) {
         </div>
         <div style={{ fontSize:11.5, color:'var(--supabase-text-muted)', marginTop:1.5,
           whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
-          {apt.type} · {apt.doctor}
+          {isSolicitado
+            ? `${apt.type} · quer ${extrairPreferencia(apt.notas) || 'horário a combinar'}`
+            : `${apt.type} · ${apt.doctor}`}
         </div>
       </div>
-      <div style={{ fontSize:11, color:'var(--supabase-text-muted)', flexShrink:0 }}>{apt.dur}min</div>
+      <div style={{ fontSize:11, color:'var(--supabase-text-muted)', flexShrink:0 }}>
+        {isSolicitado ? tempoDesde(apt.dataHoraISO) : `${apt.dur}min`}
+      </div>
       <div style={{ flexShrink:0 }}><Badge status={apt.status} /></div>
     </div>
   );
@@ -838,17 +875,22 @@ function KanbanView({ appointments, selectedId, onSelect, accent }) {
 
 // ─── DETAIL PANEL ─────────────────────────────────────────────────────────────
 
-function DetailPanel({ appointment: apt, onClose, accent, onUpdateStatus, onDelete, onUpdatePreco }) {
+function DetailPanel({ appointment: apt, onClose, accent, onUpdateStatus, onDelete, onUpdatePreco, onAprovarPedido, onAvisarPaciente }) {
   const [waState, setWaState] = useState(null); // null | 'sending' | 'sent'
+  const [avisoState, setAvisoState] = useState(null); // null | 'sending' | 'sent' | mensagem de erro
   const [precoInput, setPrecoInput] = useState(apt.preco !== undefined && apt.preco !== null ? String(apt.preco) : '');
 
   const selectedConsulta = apt;
+  // Antes isto só marcava como 'confirmed' — o botão prometia "Definir Horário"
+  // e não abria formulário nenhum, então não havia como escolher quando seria.
   const abrirFormularioEdicao = (c) => {
-    onUpdateStatus && onUpdateStatus(c.id, 'confirmed');
+    onAprovarPedido && onAprovarPedido(c);
   };
+  // Recusar não apaga mais: marca 'recusado' e sai da fila. É ferramenta de
+  // organização da recepção — falar com o paciente sobre a recusa é humano.
   const deletarConsulta = (id) => {
-    if (confirm("Tem certeza que deseja recusar esta solicitação?")) {
-      onDelete && onDelete(id);
+    if (confirm("Recusar esta solicitação? Ela sai da caixa de entrada, mas fica no histórico do paciente.")) {
+      onUpdateStatus && onUpdateStatus(id, 'recusado');
     }
   };
 
@@ -985,8 +1027,16 @@ function DetailPanel({ appointment: apt, onClose, accent, onUpdateStatus, onDele
       <div style={{ padding:'14px 16px', borderBottom:'1px solid var(--supabase-border)', display:'flex', flexDirection:'column', gap:8 }}>
         {selectedConsulta.status === 'solicitado' ? (
           <div style={{ padding: 12, background: 'rgba(168, 85, 247, 0.08)', borderRadius: 8 }}>
-            <p style={{ margin: '0 0 10px 0', fontSize: 13, color: '#a855f7' }}>
-              <strong>🤖 Solicitação da IA:</strong> {selectedConsulta.notas || "Sem detalhes adicionais."}
+            <p style={{ margin: '0 0 4px 0', fontSize: 11, fontWeight: 600, color: '#a855f7', textTransform: 'uppercase', letterSpacing: .6 }}>
+              🤖 Pedido feito pelo bot
+            </p>
+            {/* A preferência é o dado que decide o horário, então sai do meio da
+                frase e vira a informação principal do bloco. */}
+            <p style={{ margin: '0 0 2px 0', fontSize: 14, color: 'var(--supabase-text-light)', fontWeight: 500 }}>
+              {extrairPreferencia(selectedConsulta.notas) || 'Sem preferência informada'}
+            </p>
+            <p style={{ margin: '0 0 10px 0', fontSize: 11.5, color: 'var(--supabase-text-muted)' }}>
+              é o que o paciente pediu — você define o horário exato ao aprovar
             </p>
             <div style={{ display: 'flex', gap: 10 }}>
               <button
@@ -997,7 +1047,7 @@ function DetailPanel({ appointment: apt, onClose, accent, onUpdateStatus, onDele
               </button>
               <button
                 onClick={() => deletarConsulta(selectedConsulta.id)}
-                style={{ background: '#ef4444', color: 'white', border: 'none', padding: '8px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}
+                style={{ background: 'transparent', color: '#ef4444', border: '1px solid rgba(239,68,68,.35)', padding: '8px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}
               >
                 Recusar
               </button>
@@ -1005,6 +1055,42 @@ function DetailPanel({ appointment: apt, onClose, accent, onUpdateStatus, onDele
           </div>
         ) : (
           <>
+            {/* Pedido do bot que já teve horário definido, mas o paciente ainda
+                não sabe qual foi. Fica visível até ser avisado — de propósito:
+                avisar é decisão da recepção, mas esquecer não pode ser silencioso. */}
+            {apt.veioDoBot && !apt.pacienteAvisadoEm && apt.status !== 'canceled' && (
+              <div style={{ padding: 12, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,.25)', borderRadius: 8 }}>
+                <p style={{ margin: '0 0 8px 0', fontSize: 12.5, color: 'var(--supabase-text-light)' }}>
+                  O paciente pediu <strong>{extrairPreferencia(apt.notas) || 'um horário'}</strong> e ainda não sabe que ficou{' '}
+                  <strong>{apt.time}</strong>.
+                </p>
+                <button
+                  disabled={avisoState === 'sending' || avisoState === 'sent'}
+                  onClick={async () => {
+                    setAvisoState('sending');
+                    const r = await (onAvisarPaciente && onAvisarPaciente(apt));
+                    setAvisoState(r && r.success ? 'sent' : (r && r.error) || 'Não foi possível avisar');
+                  }}
+                  style={{
+                    width: '100%', background: avisoState === 'sent' ? 'rgba(37,211,102,.14)' : '#f59e0b',
+                    color: avisoState === 'sent' ? '#25d366' : '#1f2937',
+                    border: 'none', padding: '8px 12px', borderRadius: 6,
+                    cursor: avisoState ? 'default' : 'pointer', fontSize: 12, fontWeight: 600,
+                  }}
+                >
+                  {avisoState === 'sending' ? 'Enviando…'
+                    : avisoState === 'sent' ? 'Paciente avisado ✓'
+                    : 'Avisar paciente do horário'}
+                </button>
+                {avisoState && avisoState !== 'sending' && avisoState !== 'sent' && (
+                  // Falha explícita: fora da janela de 24h da Meta o envio é
+                  // recusado. Dizer isso é melhor que a recepção achar que avisou.
+                  <p style={{ margin: '8px 0 0', fontSize: 11.5, color: '#ef4444', lineHeight: 1.4 }}>
+                    {avisoState} — fale com o paciente por outro canal.
+                  </p>
+                )}
+              </div>
+            )}
             <div style={{ display:'flex', gap:8 }}>
               {(apt.status === 'pending' || apt.status === 'rescheduled') && <>
                 <GhostBtn label="Confirmar" color={accent} onClick={() => onUpdateStatus(apt.id, 'confirmed')} />
@@ -1663,7 +1749,7 @@ function AtendimentosView({ accent }) {
 // ─── EXPORTS ─────────────────────────────────────────────────────────────────
 
 Object.assign(window, {
-  APPOINTMENTS, STATUS_CFG,
+  APPOINTMENTS, STATUS_CFG, extrairPreferencia,
   Avatar, Badge, WaIcon,
   Sidebar, ListView, CalendarView, KanbanView, DetailPanel,
   AtendimentosView,

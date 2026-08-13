@@ -721,6 +721,7 @@
       no_show: 'canceled',
       remarcado: 'rescheduled',
       solicitado: 'solicitado',
+      recusado: 'recusado',
     };
 
     return {
@@ -740,6 +741,13 @@
       age,
       last: '—',
       preco: c.preco,
+      notas: c.notas || '',
+      // A origem do pedido é o que decide se o CRM cobra "avisar o paciente":
+      // consulta marcada no balcão não precisa de aviso, pedido do bot precisa.
+      veioDoBot: /Pedido pelo bot|Solicita[çc][ãa]o IA/i.test(c.notas || ''),
+      pacienteAvisadoEm: c.paciente_avisado_em || null,
+      dataHoraISO: c.data_hora,
+      patientId: c.patient_id,
       _raw: c,
     };
   }

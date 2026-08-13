@@ -35,6 +35,14 @@ Multi-clínica por `clinic_id`.
 | **Não tire o TTL do buffer de debounce** | Sem ele, falha de envio gruda a conversa velha na nova. §12 |
 | **1º login por Google pode cair no onboarding em vez da clínica real** | Só teste com `iagodeoliveirabatista@gmail.com`; se aparecer "Cadastre sua clínica", PARE. §19 |
 
+## Estado atual (13/08/2026 — Triagem e Aprovação de Pré-Agendamento)
+
+- ✅ **Triagem e aprovação de pré-agendamento implementadas e integradas:**
+  - **Banco:** Migration `docs/db/07-triagem-pre-agendamento.sql` aplicada. Adicionou a coluna `paciente_avisado_em` em `consultas` e atualizou a RPC `criar_pre_agendamento` para fazer deduplicação de pedidos abertos (`status = 'solicitado'`) do mesmo paciente numa janela de 60h (evita acumular múltiplos pedidos repetidos por turno).
+  - **CRM:** `AprovarPedidoModal` criado em `patients-components.jsx`, permitindo à recepção definir o horário real (com palpite inteligente via `palpiteDeHorario`), duração, médico e procedimento.
+  - **Grade da Agenda & Kanban:** Pedidos `solicitado` e `recusado` foram retirados da grade de horários da agenda (pois a `data_hora` inicial é um placeholder `now()`), ficando visíveis na aba de triagem ("Solicitadas").
+  - **Aviso ao Paciente:** Adicionado o fluxo manual de "Avisar paciente do horário" no `DetailPanel` quando a consulta veio do bot e o paciente ainda não foi notificado.
+
 ## Estado atual (09/08/2026 — prompt orgânico + pipeline de balões publicados)
 
 - ✅ **Prompt do `AI Agent` reescrito e publicado** seguindo

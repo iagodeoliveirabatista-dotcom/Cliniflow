@@ -286,6 +286,167 @@ function EditPatientModal({ patient, onClose, onSave, accent }) {
   );
 }
 
+// ─── APROVAR PEDIDO DO BOT (TRIAGEM) ─────────────────────────────────────────
+//
+// O pedido criado pelo bot NÃO tem horário: `consultas.data_hora` é NOT NULL, e
+// a RPC grava now() só para satisfazer a coluna. Quem decide quando a consulta
+// acontece é a recepção — e este modal é onde isso acontece.
+//
+// Não reutiliza `NewAppointmentModal` de propósito: o seletor de dia de lá
+// (`getDayOptions`) só oferece Seg–Sex da semana que está aberta na agenda,
+// então aprovar um pedido para "próxima segunda" obrigaria a navegar a semana
+// antes. Aqui a data é um campo de data de verdade.
+
+const fmtData = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+// Sábado e domingo caem para segunda: a clínica atende de segunda a sexta
+// (é o que a agenda mostra — a grade tem 5 colunas).
+function proximoDiaUtil(base) {
+  const d = new Date(base);
+  d.setHours(0, 0, 0, 0);
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+  return d;
+}
+
+// Transforma o que o paciente falou ("segunda de manhã", "à tarde", "dia 12 às
+// 14h") num palpite de data+hora. É PALPITE: a recepção vê a frase original ao
+// lado e corrige se não bater. Não tenta ser esperto demais de propósito —
+// errar para mais cedo é fácil de perceber e ajustar.
+function palpiteDeHorario(preferencia) {
+  const hoje = new Date();
+  // O RegExp e montado a partir de string ASCII para remover os acentos:
+  // escrever os caracteres combinantes direto no literal deixaria a regra
+  // dependente da codificacao com que o arquivo for salvo, e ela passaria a
+  // nao casar nada em silencio.
+  const SEM_ACENTO = new RegExp('[\u0300-\u036f]', 'g');
+  const txt = String(preferencia || '')
+    .toLowerCase()
+    .normalize('NFD').replace(SEM_ACENTO, '');
+
+  let hora = '09:00';
+  if (/tarde/.test(txt)) hora = '14:00';
+  else if (/noite/.test(txt)) hora = '18:00';
+  else if (/manha/.test(txt)) hora = '09:00';
+
+  // Hora explícita ganha do turno: "segunda às 15h" é mais específico que "tarde".
+  const mHora = txt.match(/(\d{1,2})\s*(?::|h)\s*(\d{2})?/);
+  if (mHora) {
+    const h = Math.min(23, parseInt(mHora[1], 10));
+    const min = mHora[2] ? Math.min(59, parseInt(mHora[2], 10)) : 0;
+    hora = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+  }
+
+  const DIAS = { domingo: 0, segunda: 1, terca: 2, quarta: 3, quinta: 4, sexta: 5, sabado: 6 };
+  const diaNome = Object.keys(DIAS).find(k => txt.includes(k));
+
+  let data;
+  if (diaNome) {
+    // Próxima ocorrência daquele dia da semana, sempre no futuro.
+    const alvo = DIAS[diaNome];
+    data = new Date(hoje);
+    data.setHours(0, 0, 0, 0);
+    let delta = (alvo - data.getDay() + 7) % 7;
+    if (delta === 0) delta = 7;
+    data.setDate(data.getDate() + delta);
+  } else if (/amanha/.test(txt)) {
+    data = new Date(hoje);
+    data.setDate(data.getDate() + 1);
+    data = proximoDiaUtil(data);
+  } else {
+    const amanha = new Date(hoje);
+    amanha.setDate(amanha.getDate() + 1);
+    data = proximoDiaUtil(amanha);
+  }
+
+  return { data: fmtData(data), hora };
+}
+
+function AprovarPedidoModal({ pedido, preferencia, onClose, onSave, accent }) {
+  const palpite = useMemo(() => palpiteDeHorario(preferencia), [preferencia]);
+  const [f, setF] = useStateP({
+    data: palpite.data,
+    hora: palpite.hora,
+    dur: pedido?.dur || 30,
+    tipo: pedido?.type || 'Avaliação',
+    doctor: pedido?.doctor || '',
+  });
+  const set = (k, v) => setF(prev => ({ ...prev, [k]: v }));
+
+  const ok = !!f.data && !!f.hora && String(f.tipo).trim() !== '';
+
+  const salvar = () => {
+    if (!ok) return;
+    const [ano, mes, dia] = f.data.split('-').map(Number);
+    const [h, min] = f.hora.split(':').map(Number);
+    const quando = new Date(ano, mes - 1, dia, h, min, 0, 0);
+    onSave({
+      id: pedido.id,
+      data_hora: quando.toISOString(),
+      duracao_min: parseInt(f.dur, 10) || 30,
+      tipo: f.tipo,
+      medico: f.doctor || null,
+    });
+    onClose();
+  };
+
+  return (
+    <Modal title="Aprovar pedido e definir horário" onClose={onClose} accent={accent} width={480}>
+      <div style={{ padding: '18px 18px 4px' }}>
+        <div style={{
+          padding: 12, marginBottom: 16, borderRadius: 8,
+          background: 'rgba(168, 85, 247, 0.08)', border: '1px solid rgba(168,85,247,.25)',
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#a855f7', textTransform: 'uppercase', letterSpacing: .6, marginBottom: 4 }}>
+            {pedido?.patient || 'Paciente'} pediu
+          </div>
+          <div style={{ fontSize: 14, color: 'var(--supabase-text-light)', fontWeight: 500 }}>
+            {preferencia || 'sem preferência informada'}
+          </div>
+          <div style={{ fontSize: 11.5, color: 'var(--supabase-text-muted)', marginTop: 4 }}>
+            Os campos abaixo já vêm com um palpite a partir disso — confira e ajuste.
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <Field label="Data">
+            <Input type="date" value={f.data} onChange={e => set('data', e.target.value)} autoFocus />
+          </Field>
+          <Field label="Hora">
+            <Input type="time" value={f.hora} onChange={e => set('hora', e.target.value)} />
+          </Field>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <Field label="Duração">
+            <Select value={String(f.dur)} onChange={v => set('dur', v)}
+              options={[
+                { value: '15', label: '15 min' }, { value: '20', label: '20 min' },
+                { value: '30', label: '30 min' }, { value: '45', label: '45 min' },
+                { value: '60', label: '1 hora' },
+              ]} />
+          </Field>
+          <Field label="Profissional">
+            <Input value={f.doctor} onChange={e => set('doctor', e.target.value)} placeholder="Ex: Dra. Anaruthe" />
+          </Field>
+        </div>
+
+        <Field label="Procedimento">
+          <Input value={f.tipo} onChange={e => set('tipo', e.target.value)} placeholder="Ex: Avaliação estética" />
+        </Field>
+
+        <div style={{ fontSize: 11.5, color: 'var(--supabase-text-muted)', lineHeight: 1.5, marginBottom: 4 }}>
+          A consulta entra na agenda como <strong>pendente</strong> — quem confirma é o
+          paciente. Ele recebe o lembrete automático 24h antes; se quiser avisar do
+          horário agora, use o botão no painel da consulta.
+        </div>
+      </div>
+      <ModalFooter onCancel={onClose} onSave={salvar} saveLabel="Aprovar e agendar"
+        accent={accent} saveDisabled={!ok} />
+    </Modal>
+  );
+}
+
 // ─── NEW APPOINTMENT MODAL ───────────────────────────────────────────────────
 
 function NewAppointmentModal({ onClose, onSave, accent, patients, defaultDay, defaultTime, currentMonday }) {
@@ -694,6 +855,6 @@ function PatientRow({ p, onEdit, accent }) {
 Object.assign(window, {
   PATIENTS, STATUS_PAT,
   Modal, Field, Input, Select, ModalFooter,
-  AddPatientModal, EditPatientModal, NewAppointmentModal, PatientsView,
+  AddPatientModal, EditPatientModal, NewAppointmentModal, AprovarPedidoModal, PatientsView,
   formatarTelefone, aplicarMascaraTelefone, formatarDataBR,
 });

@@ -117,7 +117,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useCallback } = React;
+    const { useState, useEffect, useCallback, useMemo } = React;
     const {
       TweaksPanel, TweakSection, TweakRadio, TweakToggle, useTweaks,
     } = window;
@@ -125,7 +125,8 @@
       APPOINTMENTS, STATUS_CFG,
       Sidebar, ListView, CalendarView, KanbanView, DetailPanel,
       PATIENTS, PatientsView,
-      AddPatientModal, EditPatientModal, NewAppointmentModal,
+      AddPatientModal, EditPatientModal, NewAppointmentModal, AprovarPedidoModal,
+      extrairPreferencia,
       ReportsView,
       AutomationView,
       AtendimentosView,
@@ -173,6 +174,7 @@
       const [filter, setFilter] = useState('todas');
       const [page, setPage] = useState('agenda');
       const [newApptOpen, setNewApptOpen] = useState(false);
+      const [pedidoEmAprovacao, setPedidoEmAprovacao] = useState(null);
       const [newPatientOpen, setNewPatientOpen] = useState(false);
       const [editingPatient, setEditingPatient] = useState(null);
       const [settingsOpen, setSettingsOpen] = useState(false);
@@ -303,6 +305,51 @@
         }
       }, [dbConnected, currentMonday]);
 
+      // Aprovar pedido do bot: é aqui que o pedido ganha um horário de verdade
+      // e vira consulta na agenda.
+      // Status vira 'pendente', NÃO 'confirmado': quem escolheu o horário foi a
+      // recepção, o paciente ainda não sabe. Como 'pendente' é exatamente o que
+      // `disparar-lembretes` procura, a consulta entra sozinha no lembrete de
+      // 24h — o paciente recebe o template e confirma. Assim o ciclo fecha
+      // mesmo que ninguém clique em "Avisar paciente".
+      const aprovarPedido = useCallback(async ({ id, data_hora, duracao_min, tipo, medico }) => {
+        const dt = new Date(data_hora);
+        const monday = new Date(currentMonday);
+        const day = Math.floor((new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()) - monday) / 86400000);
+        const time = `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+
+        setAppts(prev => prev.map(a => a.id === id
+          ? { ...a, status: 'pending', day, time, dur: duracao_min, type: tipo, doctor: medico || '' }
+          : a));
+
+        if (dbConnected) {
+          await SB.updateConsulta(id, {
+            data_hora, duracao_min, tipo, medico, status: 'pendente',
+          });
+        }
+      }, [dbConnected, currentMonday]);
+
+      // Avisar o paciente é decisão da recepção (não é automático). Só existe
+      // enquanto `paciente_avisado_em` for nulo — depois o botão some.
+      const avisarPacienteDoHorario = useCallback(async (apt) => {
+        if (!dbConnected) return { success: false, error: 'Sem conexão com o banco' };
+
+        const dt = apt.dataHoraISO ? new Date(apt.dataHoraISO) : null;
+        const quando = dt
+          ? dt.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' })
+          : '';
+        const texto = `Oi ${apt.patient.split(' ')[0]}! Seu horário ficou para ${quando}, às ${apt.time}`
+          + `${apt.doctor ? ` com ${apt.doctor}` : ''}. Qualquer coisa é só me chamar por aqui!`;
+
+        const r = await SB.enviarWhatsApp(apt.phone, texto, 'manual', apt._supabaseId || apt.id, apt.patient);
+        if (r && r.success) {
+          await SB.updateConsulta(apt._supabaseId || apt.id, { paciente_avisado_em: new Date().toISOString() });
+          setAppts(prev => prev.map(a => a.id === apt.id ? { ...a, pacienteAvisadoEm: new Date().toISOString() } : a));
+          return { success: true };
+        }
+        return { success: false, error: (r && r.error) || 'Falha ao enviar' };
+      }, [dbConnected]);
+
       const addAppt = useCallback(async (a) => {
         if (dbConnected) {
           // Calculate real datetime from currentMonday
@@ -372,15 +419,30 @@
         }
       }, [dbConnected]);
 
+      // Pedido do bot ainda não tem horário: o `data_hora` que ele carrega é o
+      // now() de quando foi criado, só porque a coluna é NOT NULL. Deixá-lo na
+      // grade faria a agenda mostrar compromissos que ninguém marcou.
+      // A agenda passa a significar "o que está marcado de verdade"; os pedidos
+      // vivem na aba "Solicitadas", que é onde a triagem acontece.
+      // 'recusado' também fica fora: é arquivo, não agenda.
+      const naAgenda = useMemo(
+        () => appts.filter(a => a.status !== 'solicitado' && a.status !== 'recusado'),
+        [appts]
+      );
+      const pedidos = useMemo(
+        () => appts.filter(a => a.status === 'solicitado'),
+        [appts]
+      );
+
       const counts = {
-        todas:       appts.length,
+        todas:       naAgenda.length,
         confirmed:   appts.filter(a => a.status === 'confirmed').length,
         pending:     appts.filter(a => a.status === 'pending').length,
-        solicitado:  appts.filter(a => a.status === 'solicitado').length,
+        solicitado:  pedidos.length,
         rescheduled: appts.filter(a => a.status === 'rescheduled').length,
         canceled:    appts.filter(a => a.status === 'canceled').length,
       };
-      const filteredList = filter === 'todas' ? appts : appts.filter(a => a.status === filter);
+      const filteredList = filter === 'todas' ? naAgenda : appts.filter(a => a.status === filter);
 
       return (
         <div style={{ display:'flex', height:'100vh', overflow:'hidden', background:'var(--supabase-bg-studio)' }}>
@@ -417,14 +479,14 @@
                   )}
                   {t.layout === 'calendário' && (
                     <div key="calendario" style={{ flex:1, display:'flex', minWidth:0, minHeight:0, overflow:'hidden', animation:'fadeIn .2s var(--ease-premium)' }}>
-                      <CalendarView appointments={appts} selectedId={selectedId}
+                      <CalendarView appointments={naAgenda} selectedId={selectedId}
                         onSelect={setSelectedId} accent={accent} onMove={moveAppt}
                         currentMonday={currentMonday} />
                     </div>
                   )}
                   {t.layout === 'kanban' && (
                     <div key="kanban" style={{ flex:1, display:'flex', minWidth:0, minHeight:0, overflow:'hidden', animation:'fadeIn .2s var(--ease-premium)' }}>
-                      <KanbanView appointments={appts} selectedId={selectedId}
+                      <KanbanView appointments={naAgenda} selectedId={selectedId}
                         onSelect={setSelectedId} accent={accent} />
                     </div>
                   )}
@@ -434,6 +496,8 @@
                       onUpdateStatus={(id, status) => updateConsulta(id, { status })}
                       onDelete={deleteAppt}
                       onUpdatePreco={(id, preco) => updateConsulta(id, { preco })}
+                      onAprovarPedido={setPedidoEmAprovacao}
+                      onAvisarPaciente={avisarPacienteDoHorario}
                     />
                   )}
                 </div>
@@ -464,6 +528,15 @@
           </div>
 
           {/* ── Modals ─────────────────────────────────────────────── */}
+          {pedidoEmAprovacao && (
+            <AprovarPedidoModal
+              accent={accent}
+              pedido={pedidoEmAprovacao}
+              preferencia={extrairPreferencia(pedidoEmAprovacao.notas)}
+              onClose={() => setPedidoEmAprovacao(null)}
+              onSave={aprovarPedido}
+            />
+          )}
           {newApptOpen && (
             <NewAppointmentModal
               accent={accent}
