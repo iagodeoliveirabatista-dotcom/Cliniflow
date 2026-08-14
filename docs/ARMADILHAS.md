@@ -1162,3 +1162,63 @@ condição sozinha teria barrado exatamente este caso.
 ⚠️ **A correção depende da IA classificar certo.** Se ela marcar `quer_agendar` por engano, o
 pedido duplicado volta. Por isso o dedup de 60h da §"triagem" fica de pé junto — são duas
 camadas, não uma substituindo a outra.
+
+## 36. O roteiro de confirmação nunca funcionou — e por 16h ele bloqueia o bot inteiro
+
+**Sintoma:** o dono aprovou um pedido, o lembrete saiu, ele respondeu "Oi", "Certo" e "Ok" —
+três execuções `success`, **zero resposta útil**, e o `AI Agent` não rodou nenhuma vez. Como
+as execuções ficam verdes, nada disso aparece em nenhum painel.
+
+**Causa raiz nº1 — o desvio modal.** `Status da sessão?` só encaminha pro `AI Agent` na saída
+**2** (`sessao_status == 'NAO_ENCONTRADA'`). O lembrete cria linha em `sessoes_ativas` com TTL
+de 16h → durante 16h **toda** mensagem do paciente vai pro roteiro de confirmação, e ele não
+consegue falar com o bot sobre mais nada (preço, dúvida, outro procedimento).
+
+**Causa raiz nº2 — o roteiro estava morto desde sempre.** `Consulta Encontrada?` testava:
+
+```
+{{ $json.length > 0 }}
+```
+
+`$json` aí é a **linha** da consulta (item n8n), não um array. `length` é `undefined`, e
+`undefined > 0` é `false`. **Sempre falso.** Confirmado na execução 83417: a linha veio
+preenchida e saiu pela saída 1. Logo `Análise de evento - Claude` e o `Switch`
+CONFIRMADO/CANCELADO/REMARCAR **nunca rodaram**. Ninguém jamais confirmou consulta por WhatsApp
+— e `CONFIRMAR` digitado pelo paciente daria no mesmo lugar. O CTA do próprio lembrete não
+funcionava.
+
+**Causa raiz nº3 — `Busca Consulta` pegava a consulta errada.** Filtro `patient_id` +
+`status='pendente'`, `limit 1`, **sem ordenação**. Com duas consultas `pendente` do mesmo
+paciente, veio a de 09/08 em vez da que estava sendo confirmada.
+
+**E o pior — a mensagem mentirosa.** O nó `ENCAMINHAR MENSAGEM` respondia:
+
+> *"Para te atender melhor, encaminhei sua mensagem para a nossa equipe humana. Em alguns
+> minutos a gente continua por aqui, tá bem?"*
+
+Ele manda para `$('Normalizar Dados v2').telefone_whatsapp` — **o próprio paciente**, apesar do
+nome. Ninguém era notificado, e o nó não grava em `mensagem_logs`, então a recepção não via
+nem que a mensagem existiu.
+
+**Correção (13/08/2026, `activeVersion` `6945f2a8-a3df-42de-b4d2-d1d3da606b86`):**
+1. `Consulta Encontrada?` → `={{ !!$json.id }}`.
+2. `Busca Consulta` → filtra por `id eq {{ $('Get a row').first().json.consulta_id }}`, que é a
+   consulta da própria sessão. Sem ambiguidade de ordenação.
+3. `ENCAMINHAR MENSAGEM` → texto que não promete o que não acontece.
+4. Nó novo `MSG - NAO ENTENDI` ligado no `REGISTRO OUTLIER1`, que era **beco sem saída** (sem
+   conexão de saída). SAUDACAO/PERGUNTA/DESCONHECIDO caíam ali e o paciente ficava no silêncio.
+
+**Continua quebrado de propósito (vai no redesenho B — `docs/superpowers/specs/2026-08-13-confirmacao-organica-pela-ia-design.md`):**
+
+- **"ok" e "certo" não confirmam nada.** Em `Valida contexto`, a regra 10 (SAUDAÇÕES) casa
+  `^(oi|...|legal|certo|ok|tá bom)$` e vem **antes** da regra 12 (CONFIRMAÇÃO FRACA), que lista
+  `sim|vou|beleza|pode ser|ok|tá bom|certo|combinado`. A 10 ganha. As duas respostas mais
+  naturais a um lembrete são descartadas como saudação.
+- **Mensagens escritas e jogadas fora.** `Análise de evento - Claude` monta 3
+  `mensagem_para_usuario` e `Valida contexto` monta 3 `mensagem_para_paciente`. **Nenhum nó
+  consome esses campos.** "Sua consulta já foi confirmada anteriormente" nunca chegou a
+  ninguém.
+
+**Lição de método:** execução `success` no n8n não quer dizer que o paciente recebeu alguma
+coisa. Um ramo que termina num nó sem conexão de saída fecha verde. Ao auditar, olhe
+`lastNodeExecuted` — na 83417 ele era `ENCAMINHAR MENSAGEM`, e isso entregou o caso inteiro.

@@ -38,8 +38,44 @@ Multi-clínica por `clinic_id`.
 | **`retryOnFail` não é aplicável pelo MCP do n8n** | É config de nó, não parâmetro. Só na UI. §33 |
 | **RPC que devolve escalar quebra o nó HTTP Request** | `RETURNS uuid` → "not valid JSON". A linha É criada; só a leitura falha. §34 |
 | **Memória da IA re-registra pedido a cada mensagem** | Um "Oi" virava pré-agendamento novo. Exija `intencao` também, não só `periodo_preferencia`. §35 |
+| **Lembrete disparado = bot mudo por 16h** | Sessão em `sessoes_ativas` desvia TUDO pro roteiro de confirmação. O `AI Agent` não roda. §36 |
+| **Execução `success` ≠ paciente recebeu algo** | Ramo que morre em nó sem saída fecha verde. Olhe `lastNodeExecuted`. §36 |
 
-## Estado atual (13/08/2026, noite — bot mudo diagnosticado, fallback de modelo e legibilidade)
+## Estado atual (14/08/2026, madrugada — roteiro de confirmação consertado; redesenho B especificado)
+
+Teste real do dono (execuções 83417/83421/83425) mostrou que **nada do que foi publicado
+antes tinha sido exercitado** — as três mensagens nem chegaram ao `AI Agent`.
+
+- 🐛→✅ **O roteiro de confirmação nunca funcionou** (`ARMADILHAS.md` §36). `Consulta
+  Encontrada?` testava `{{ $json.length > 0 }}` sobre uma linha, não um array → sempre falso →
+  `Análise de evento - Claude` e o `Switch` CONFIRMADO/CANCELADO/REMARCAR **jamais rodaram**.
+  Ninguém nunca confirmou consulta por WhatsApp. Corrigido para `={{ !!$json.id }}`.
+- 🐛→✅ **`Busca Consulta` pegava a consulta errada** (sem ordenação, `limit 1`). Agora filtra
+  por `id` = `consulta_id` da própria sessão.
+- 🐛→✅ **`ENCAMINHAR MENSAGEM` mentia para o paciente** — dizia "encaminhei para a nossa equipe
+  humana" e mandava para o próprio paciente, sem notificar ninguém e sem gravar em
+  `mensagem_logs`. Texto trocado por um que não promete o que não acontece.
+- ✅ **Nó novo `MSG - NAO ENTENDI`** ligado no `REGISTRO OUTLIER1`, que era beco sem saída.
+  SAUDACAO/PERGUNTA/DESCONHECIDO caíam ali e o paciente ficava no silêncio.
+- ✅ **Publicado e conferido na `activeVersion`** `6945f2a8-a3df-42de-b4d2-d1d3da606b86`
+  (79 nós).
+- 📄 **Spec do redesenho escrito:**
+  `docs/superpowers/specs/2026-08-13-confirmacao-organica-pela-ia-design.md`. Decisão do dono:
+  **"A agora, B como alvo"** — A é o conserto cirúrgico acima; B tira o desvio modal e faz a
+  confirmação virar tool da IA. **4 questões abertas na seção 7 do spec bloqueiam a
+  implementação** (principalmente: o que a IA faz quando o paciente pede pra remarcar).
+- ⛔ **Segue quebrado de propósito, vai no B:** (a) "ok" e "certo" isolados são classificados
+  como SAUDAÇÃO em `Valida contexto` (regra 10 vem antes da regra 12) — as duas respostas mais
+  naturais a um lembrete não confirmam nada; (b) `Análise de evento - Claude` e `Valida
+  contexto` montam 6 mensagens para o paciente que **nenhum nó consome**.
+- ⛔ **Achado não investigado (outra camada):** o aviso do CRM disse "quinta-feira, 13/08, às
+  09:00" e o lembrete disse "09:00", mas `consultas.data_hora` é `2026-08-14 12:30 UTC` =
+  **14/08 às 09:30**. Os dois textos concordam entre si e discordam do banco. Além disso o
+  template renderizou "**com .**" porque `consultas.medico` é null e a tela de aprovação
+  deixou passar sem médico.
+- ⛔ **Nada de A foi testado com conversa real ainda.**
+
+## Estado anterior (13/08/2026, noite — bot mudo diagnosticado, fallback de modelo e legibilidade)
 
 Sessão disparada por um sintoma do dono: *"mandei mensagem do número de teste, ela respondeu
 uma vez e depois não respondeu mais — o Iago e a Laís ainda estão sintonizados com o agente?"*
