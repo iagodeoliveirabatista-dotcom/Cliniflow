@@ -1083,3 +1083,82 @@ e a volta é um `UPDATE`.
 **Correção de método:** antes de concluir que uma tabela está vazia, rode
 `SELECT count(*)` de verdade. `list_tables` serve para descobrir *que* tabelas existem e se
 têm RLS — não para saber se têm dado.
+
+## 33. Um 503 de 2 segundos do Gemini abandona o paciente no meio da conversa
+
+**Sintoma:** o dono mandou uma mensagem do número de teste, o bot respondeu uma vez e depois
+**nunca mais respondeu**. Parecia que o número tinha sido desconectado do agente, ou que o
+toggle "IA Pausada" tinha voltado a dar problema. Não era nada disso: `patients.bot_pausado`
+estava `false`, `sessoes_ativas` vazia, webhook da Meta recebendo normalmente.
+
+**Causa:** execução 83403 (14/08/2026 01:07 UTC) morreu no nó `AI Agent` com
+`[GoogleGenerativeAI Error]: 503 Service Unavailable` — *"gemini-3.1-flash-lite is currently
+experiencing high demand"*. O nó `Google Gemini Chat Model1` não tinha `retryOnFail` e o
+`AI Agent` não tinha saída de erro. O modelo engasgou por alguns segundos, a execução abortou
+inteira, e **nada foi enviado ao paciente**. Sem aviso, sem log visível pra recepção.
+
+**Por que é traiçoeiro:** o sintoma ("parou de responder") aponta para desconexão/pausa, que
+é o que se investiga primeiro. A causa real só aparece abrindo a execução específica — e
+mensagem que não gerou resposta não deixa rastro em `mensagem_logs` (só a linha de entrada,
+`status='pending'`, igual a qualquer outra).
+
+**Correção (13/08/2026):** `needsFallback: true` no `AI Agent` (typeVersion 3.1 tem fallback
+nativo de modelo) + nó `Gemini Fallback` com `models/gemini-3.1-flash` ligado no
+`ai_languageModel` índice **1**. O principal continua sendo o `flash-lite` no índice 0.
+Publicado, `activeVersion` `a4bfe1ff-1912-42c0-8e4a-a5e14aa3d6c1`.
+
+⚠️ **`retryOnFail` NÃO é aplicável pelo MCP do n8n.** É configuração de nó, não parâmetro, e
+`update_workflow` só opera sobre parâmetros/conexões/nós. Tem que ser na mão no editor
+(`AI Agent` → Settings → Retry On Fail). Mesmo caso do `Envia Resposta do Agent`, que também
+foi ligado na UI pelo usuário. Não tente contornar com `PUT` cru na API — ver §5.
+
+## 34. Nó HTTP Request quebra lendo RPC que devolve escalar — e a execução vira `error` tendo funcionado
+
+**Sintoma:** toda conversa em que o paciente pedia horário terminava com a execução marcada
+`error` no nó `Grava Pre-Agendamento`: *"Response body is not valid JSON. Change Response
+Format to Text"*. Dava a impressão de que o pré-agendamento não estava sendo criado.
+
+**Causa:** a RPC `criar_pre_agendamento` tem `RETURNS uuid` — escalar, não tabela. O PostgREST
+devolve o valor cru, e o nó HTTP Request tenta `JSON.parse` em cima disso e estoura.
+
+**O pedido É criado.** Prova na execução 83389: a linha `d708ca7f` nasceu em `consultas` às
+`22:40:06.703` e o erro estourou às `22:40:06.823` — 120 ms depois. O `INSERT` já tinha
+commitado; quem falhou foi só a leitura da resposta.
+
+**Consequência real:** não é cosmético. Cada pedido registrado dispara o `Error Trigger`, manda
+e-mail de erro e enche `logs_erro` — o que treina qualquer um a ignorar erro no painel. Além
+disso mascara falhas de verdade no mesmo caminho.
+
+**Correção (13/08/2026):** `options.response.response.responseFormat = "text"` no nó. É o
+último nó do ramo; ninguém consome a saída dele, então não parsear não custa nada.
+
+**Regra geral:** nó HTTP Request apontando pra RPC do Supabase que devolve escalar (`uuid`,
+`int`, `bool`, `text`) precisa de `responseFormat: text`. Só RPC com `RETURNS TABLE`/`SETOF`
+devolve JSON que o n8n parseia sozinho.
+
+## 35. A memória da IA re-registra o mesmo pedido a cada mensagem nova do paciente
+
+**Sintoma:** o paciente mandou só **"Oi"** e nasceu um pedido de agendamento novo em
+`consultas`. A recepção vê pedidos duplicados do mesmo paciente na aba "Solicitadas".
+
+**Causa:** o `If` `Pediu Agendamento?` checava uma condição só — `periodo_preferencia` não
+vazio. Quem preenche esse campo é a IA, que tem memória da conversa inteira: quando o Iago
+disse "Oi" em 13/08, ela respondeu lembrando do contexto e **devolveu `periodo_preferencia:
+"manhã"` de novo**, porque continua sendo verdade que ele prefere manhã. O workflow não
+distinguia "o paciente acabou de dizer isso" de "eu lembro disso de quatro dias atrás".
+
+**Rastro:** `9c32cf3a` (09/08 19:31, do "Manhã" legítimo) e `d708ca7f` (13/08 22:40, do "Oi").
+Mesmo padrão com a paciente Laís em 11/08: dois pedidos (00:46:17 e 00:47:26), o segundo
+disparado por *"Combinado, obrigada!!"*.
+
+**Por que o dedup de 60h não resolve:** ele pega repetição dentro da janela — o caso do Iago
+teve 4 dias de intervalo e passou reto. Dedup é rede de segurança, não a correção.
+
+**Correção (13/08/2026):** segunda condição no mesmo `If` (combinator `and`) exigindo
+`intencao == 'quer_agendar'`. O prompt já mandava a IA marcar `quer_agendar` quando o paciente
+diz QUANDO; no "Oi" ela marcou `saudacao` — conferido no metadata da execução 83389, essa
+condição sozinha teria barrado exatamente este caso.
+
+⚠️ **A correção depende da IA classificar certo.** Se ela marcar `quer_agendar` por engano, o
+pedido duplicado volta. Por isso o dedup de 60h da §"triagem" fica de pé junto — são duas
+camadas, não uma substituindo a outra.

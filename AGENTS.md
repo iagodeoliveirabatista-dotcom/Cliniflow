@@ -34,8 +34,57 @@ Multi-clínica por `clinic_id`.
 | **Tabela nova nasce com RLS ligado e SEM policy** | Event trigger `ensure_rls`. Anon lê `[]` com HTTP 200. §13 |
 | **Não tire o TTL do buffer de debounce** | Sem ele, falha de envio gruda a conversa velha na nova. §12 |
 | **1º login por Google pode cair no onboarding em vez da clínica real** | Só teste com `iagodeoliveirabatista@gmail.com`; se aparecer "Cadastre sua clínica", PARE. §19 |
+| **"Bot parou de responder" quase nunca é desconexão** | 503 do Gemini mata a execução e o paciente não recebe NADA. Cheque a execução antes de suspeitar de pausa/toggle. §33 |
+| **`retryOnFail` não é aplicável pelo MCP do n8n** | É config de nó, não parâmetro. Só na UI. §33 |
+| **RPC que devolve escalar quebra o nó HTTP Request** | `RETURNS uuid` → "not valid JSON". A linha É criada; só a leitura falha. §34 |
+| **Memória da IA re-registra pedido a cada mensagem** | Um "Oi" virava pré-agendamento novo. Exija `intencao` também, não só `periodo_preferencia`. §35 |
 
-## Estado atual (13/08/2026 — Triagem e Aprovação de Pré-Agendamento)
+## Estado atual (13/08/2026, noite — bot mudo diagnosticado, fallback de modelo e legibilidade)
+
+Sessão disparada por um sintoma do dono: *"mandei mensagem do número de teste, ela respondeu
+uma vez e depois não respondeu mais — o Iago e a Laís ainda estão sintonizados com o agente?"*
+
+- ✅ **Resposta: estavam sintonizados o tempo todo.** Os dois pacientes existem, `bot_pausado`
+  `false`, `sessoes_ativas` vazia, webhook da Meta recebendo. **Não era desconexão.**
+- 🐛→✅ **Causa real: 503 do Gemini sem retry** (`ARMADILHAS.md` §33). Execução 83403 morreu no
+  `AI Agent` com `gemini-3.1-flash-lite ... high demand`. Sem retry e sem saída de erro, a
+  execução aborta inteira e o paciente **não recebe nada**. Corrigido com fallback nativo:
+  `needsFallback: true` + nó `Gemini Fallback` (`models/gemini-3.1-flash`) no
+  `ai_languageModel` índice 1.
+- 🐛→✅ **Toda conversa que registrava pedido virava `error`** (§34). `Grava Pre-Agendamento`
+  quebrava lendo a resposta escalar da RPC — mas a linha era criada. Corrigido com
+  `responseFormat: text`.
+- 🐛→✅ **Um "Oi" criava pré-agendamento novo** (§35). `Pediu Agendamento?` só olhava
+  `periodo_preferencia`, que a IA reemite de memória em toda resposta. Adicionada a condição
+  `intencao == 'quer_agendar'`.
+- ✅ **Prompt reescrito para legibilidade**, a pedido do dono. Nova seção
+  `[RITMO E LEGIBILIDADE DA MENSAGEM]` separando duas ferramentas que estavam confundidas:
+  **quebra de parágrafo** (`\n\n` dentro da mesma mensagem — o padrão) e **`|||`** (balões
+  separados — a exceção, que já existia e era a única coisa documentada). `[TOM]` apertado com
+  os vícios que apareceram nas conversas reais de 09-13/08: narrar processo interno
+  ("analisei nossa lista de profissionais"), elogio de vendedor ("excelente escolha"),
+  se anunciar como assistente virtual sem ninguém perguntar, excesso de exclamação.
+- ✅ **Publicado e conferido na `activeVersion`** `a4bfe1ff-1912-42c0-8e4a-a5e14aa3d6c1`
+  (78 nós), não só no rascunho.
+- ⛔ **PENDENTE, só o dono faz:** `AI Agent` → Settings → **Retry On Fail** ✅, Max Tries `3`,
+  Wait Between Tries `5000`. Não é aplicável pelo MCP (§33). O fallback cobre "modelo fora do
+  ar"; o retry cobre "soluço de 2 segundos" — são camadas diferentes, ambas necessárias.
+- ⛔ **PENDENTE de conferência visual:** o nó `Gemini Fallback` foi criado com a credencial
+  `googlePalmApi` `U2agdNLaZs7ZzKzO` explícita, mas o MCP **redige credenciais na leitura** —
+  não deu para confirmar de volta que ficou ligada. Confirmar no editor na mesma passada do
+  retry. Se estiver vazia, o fallback falha justamente na hora que for necessário.
+- ⛔ **NADA foi testado com conversa real depois do publish.** Prompt novo, fallback e condição
+  do "Oi" estão em produção mas **não verificados rodando**. Próximo passo obrigatório: uma
+  conversa de teste que (a) mostre parágrafos separados no WhatsApp, (b) não crie pedido
+  duplicado numa saudação, (c) crie o pedido normalmente quando o paciente disser um turno.
+- **Decisão do dono:** camada 3 do fallback (mensagem "só um instante" + aviso pra recepção)
+  **fica de fora por ora**. Combinado medir com retry + modelo reserva primeiro; se ainda
+  faltar, é sinal de que o Google caiu inteiro e aí a mensagem passa a fazer sentido.
+- **Fora do escopo, mas visível:** o workflow `[MVP] Garimpo & Análise de Criativos Meta Ads`
+  (`7s3KCRODyjMM4vLt`, outro projeto) falha a cada 15 min há dias — ~200 execuções em erro
+  poluindo o histórico do n8n.
+
+## Estado anterior (13/08/2026 — Triagem e Aprovação de Pré-Agendamento)
 
 - ✅ **Triagem e aprovação de pré-agendamento implementadas e integradas:**
   - **Banco:** Migration `docs/db/07-triagem-pre-agendamento.sql` aplicada. Adicionou a coluna `paciente_avisado_em` em `consultas` e atualizou a RPC `criar_pre_agendamento` para fazer deduplicação de pedidos abertos (`status = 'solicitado'`) do mesmo paciente numa janela de 60h (evita acumular múltiplos pedidos repetidos por turno).
