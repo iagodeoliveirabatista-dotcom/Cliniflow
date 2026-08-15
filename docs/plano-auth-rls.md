@@ -473,7 +473,8 @@ Reabrir é uma medida de emergência, não um final aceitável.
 
 Contrato de handoff deste projeto (ver `CLAUDE.md`):
 
-1. Atualizar `SYNC_STATUS.md` com o que foi feito e o que ficou pela metade.
+1. Atualizar o `AGENTS.md` ("Estado atual" e "Próximos passos") com o que foi feito e o que
+   ficou pela metade. *(Era o `SYNC_STATUS.md`, removido em 15/08/2026 — D-29.)*
 2. Regravar `docs/db/03-rls-policies.sql` com o estado novo.
 3. Registrar em `docs/ARMADILHAS.md` qualquer coisa que tenha custado tempo.
 4. Marcar ✅ **apenas** o que você viu funcionando. "Aplicou sem erro" não é "funciona".

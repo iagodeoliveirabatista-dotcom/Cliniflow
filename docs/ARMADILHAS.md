@@ -99,6 +99,12 @@ Os workflows menores (`fluxo-n8n-enviar-mensagem.json`) têm.
 **Consequência prática:** **não reimporte esse arquivo por cima do workflow vivo.**
 O arquivo é referência, não fonte de deploy.
 
+> **15/08/2026 — os dois arquivos foram REMOVIDOS do repo** (D-29). A regra continua valendo
+> para qualquer export que você venha a gerar: export do n8n não carrega credencial, então
+> reimportar sempre desconecta os nós. Deploy é pelo MCP (D-4). Se precisar ver como era antes
+> da migração para a Meta: `git show 4e401ee:"Projeto Clínica - Evo Go - Manipular esse arquivo
+> se necessário.json"`.
+
 **Como aplicar mudanças (validado em 26/07/2026):** use o MCP do n8n —
 `update_workflow` (operações atômicas) seguido de `publish_workflow`. Preserva credenciais
 e sub-nós. Leia a §5d antes: sem o publish, a correção fica só no rascunho.
@@ -217,6 +223,10 @@ eles pegam erro real.
 `clinics` com ID hardcoded. Mas o banco tem a função `process_secretary_message()`
 com trava atômica, que só faz sentido se o workflow vivo a chamar. Ou seja: o
 workflow vivo evoluiu e o arquivo não acompanhou.
+
+> **15/08/2026:** esses arquivos locais foram removidos justamente por isso (D-29). A armadilha
+> não morreu — ela vira "não confie em cópia local do n8n", inclusive nas que você baixar hoje.
+> Fonte de verdade é o workflow vivo, pelo MCP.
 
 **Regra:** antes de afirmar qualquer coisa sobre o n8n, valide contra a instância.
 O MCP do n8n em `.mcp.json` está retornando **401** — token revogado/expirado.
@@ -337,11 +347,11 @@ n8n), criada a Edge Function `status-evolution` — guarda a `evolution_apikey` 
 `{ok, connected, instance}` com CORS próprio. `verificarStatusEvo()` agora chama
 `client.functions.invoke('status-evolution')` em vez do webhook n8n.
 
-**Armadilha extra encontrada no meio da correção:** `evolution_api_reference.md` (§C)
-documenta a resposta como `data.connected` (minúsculo), mas a instância viva devolve
-`data.Connected` (maiúsculo). A função lê as duas chaves (`Connected ?? connected`) para não
-repetir o erro. **Se for usar esse endpoint em outro lugar, confira a resposta real antes de
-confiar na doc.**
+**Armadilha extra encontrada no meio da correção:** a doc da Evolution (`evolution_api_reference.md`,
+§C — arquivo removido em 15/08/2026, D-29) documentava a resposta como `data.connected`
+(minúsculo), mas a instância viva devolve `data.Connected` (maiúsculo). A função lê as duas
+chaves (`Connected ?? connected`) para não repetir o erro. **Se for usar esse endpoint em outro
+lugar, confira a resposta real antes de confiar na doc.**
 
 **Verificado rodando:** Playwright abriu o CRM local, painel mostrou "Bot online" /
 "Conectado", zero erros de console — confirmado contra a Evolution real

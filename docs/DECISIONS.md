@@ -40,14 +40,37 @@ justamente o alerta de que o n8n caiu.
 **Recomendação:** Evolution direto, gravando a linha no banco de qualquer forma para o
 painel não depender do push. **Status:** aguardando o usuário.
 
-### D-OPEN-2 — A pasta `apify/` pertence a este projeto?
-`apify/blueoceansem-posts.json` e `captions-ranked.txt` não têm relação com o Cliniflow.
-Parecem de outro trabalho. Foram **mantidos** na limpeza de 26/07/2026 por precaução.
-**Status:** aguardando o usuário confirmar se pode remover.
-
 ---
 
 ## 🟢 Tomadas
+
+### D-29 — Remover o legado da Evolution API e os docs de status superados · 15/08/2026
+**Decisão:** apagados (o dono confirmou os três grupos):
+
+| Grupo | O quê |
+|---|---|
+| Legado Evolution | `Projeto Clínica - Evo Go ….json` · `fluxo-n8n-enviar-mensagem.json` · `evolution_api_reference.md` · `docs/n8n-evidencia/` (~17.000 linhas) |
+| Docs superados | `DOCUMENTACAO.md` (descrevia a arquitetura Evo-Go) · `SYNC_STATUS.md` (ponte de agentes, parada em 26/07) |
+| Fora do escopo | `apify/` (2,4 MB) — **fecha a D-OPEN-2**, aberta desde 26/07 |
+
+**Por quê:** tudo parado desde 26/07/2026 e pertencente à era **Evolution API**, morta na
+migração para a Meta Cloud API. Da Evolution só restou vestígio no código (`status-evolution`
+e o schema antigo). O `AGENTS.md` substituiu os dois docs de status, e o `DOCUMENTACAO.md` já
+estava marcado como errado dentro do `docs/db/02`. Doc que descreve arquitetura morta não é
+neutro: ele mente com autoridade para o próximo agente.
+
+**O que NÃO foi apagado, e por quê:**
+- `ARMADILHAS.md` e `DECISIONS.md` — parecem gordos, mas é onde mora o que custou hora. O
+  contrato do `AGENTS.md` diz que a tabela de armadilhas não se corta.
+- `base_conhecimento_clinica.md` — parecia lixo de 26/07 e **não é**: é a base da clínica
+  **real** (Dra. Ana Ruthe Grangeiro, Fortaleza-CE), possivelmente o insumo que destrava o §40.
+- `docs/legado/` e `docs/db/` — legado por decisão anterior (D-5) e schema versionado.
+
+**Referências ajustadas** para não ficarem penduradas: `ARMADILHAS` §5, §6 e §C · `DECISIONS`
+R-1 · `docs/db/02` · `docs/plano-auth-rls.md`. As armadilhas viraram regra geral em vez de
+apontar arquivo morto — o export do n8n continua sem credencial, mude o arquivo que mudar.
+
+**Reversível:** tudo estava versionado. `git revert` do commit desta remoção traz de volta.
 
 ### D-28 — Antecedência do lembrete é valor livre em horas inteiras, não lista fixa · 15/08/2026
 **Decisão:** o campo "Antecedência" do card de lembrete virou entrada numérica livre (1 a 720
@@ -557,6 +580,8 @@ consoles externos. `registrar_clinica` foi verificado só por leitura de metadad
 `Projeto Clínica - Evo Go ....json` **não contém o bloco `credentials`** em nenhum dos 71 nós.
 Reimportar deixaria todo nó Supabase/Gemini/Gmail desconectado da credencial. O arquivo é
 **referência**, não fonte de deploy. Use o MCP (D-4).
+*(O arquivo foi removido em 15/08/2026 — D-29. A rejeição continua valendo para qualquer export
+novo: nenhum carrega credencial.)*
 
 ### R-2 — Tratar a chave anon exposta como não sendo problema · 26/07/2026
 O registro de 23/06 em `SYNC_STATUS.md` afirmava que a chave anon exposta "não representa falha de

@@ -129,7 +129,7 @@ REVOKE ALL ON FUNCTION public.process_secretary_message(uuid) FROM anon, authent
 
 -- ── 4. DISPARO pg_net PARA O n8n ────────────────────────────
 -- É isto que substituiu a chamada direta do React ao webhook.
--- A DOCUMENTACAO.md §3.2 ainda descreve o modelo antigo.
+-- (A DOCUMENTACAO.md descrevia o modelo antigo e foi removida em 15/08/2026 — D-29.)
 CREATE OR REPLACE FUNCTION public.trigger_secretary_webhook()
  RETURNS trigger
  LANGUAGE plpgsql
