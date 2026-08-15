@@ -69,11 +69,11 @@ paciente de verdade não — **ninguém jamais confirmou consulta por WhatsApp a
 consultas futuras no banco, então nada dispara sozinho. O template `consulta_amanha` (`en`,
 lembrete de 24h) nunca teve um envio sequer; o de 4h já provou (1 envio, 14/08).
 
-✅ **Antecedência do lembrete virou campo livre** (1–720h inteiras, D-28; visto rodando em modo
-demo). ⚠️ **Manter em 4h** enquanto o template for `confirmao_horas_antes` — §41.
-
-❗ **O CRM servido está atrasado** (confirmado): o print do dono tem 5 cards e "Envio às 14:00",
-o commitado tem 2. É cópia velha, não bug — hard refresh antes de investigar a tela.
+✅ **Lembrete: antecedência virou campo livre** (1–720h, D-28) — ⚠️ **manter em 4h** enquanto o
+template for `confirmao_horas_antes` (§41). 🧹 **Legado Evolution apagado** (D-29):
+`DOCUMENTACAO.md`, `SYNC_STATUS.md`, `docs/n8n-evidencia/`, JSON do n8n, `apify/` (estão no git).
+❗ **CRM servido está atrasado**: o print do dono tem 5 cards, o commitado tem 2 — hard refresh
+antes de investigar qualquer coisa na tela.
 
 ⛔ **Não existe 2ª clínica.** O isolamento multi-tenant está escrito, não testado.
 
