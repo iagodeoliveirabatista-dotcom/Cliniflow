@@ -183,6 +183,25 @@ function LembretesTab({ configs, accent, onSave, saving, isConnected }) {
   const enviaveis = isConnected ? configs.filter(c => c.meta_template_nome) : configs;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, animation: 'fadeIn .2s var(--ease-premium)' }}>
+      {/* Clínica nova começa com ZERO lembretes de propósito (D-24): template da
+          Meta é por WABA, então não dá para semear config apontando para um
+          template que a WABA dela não tem. Sem este aviso a aba ficaria vazia e
+          pareceria "sem nada para fazer" — a mesma falha silenciosa do §39. */}
+      {enviaveis.length === 0 && (
+        <div style={{
+          padding: '20px 22px', borderRadius: 8, textAlign: 'center',
+          background: 'var(--supabase-bg-studio)', border: '1px dashed var(--supabase-border)',
+        }}>
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--supabase-text-light)', marginBottom: 6 }}>
+            Nenhum lembrete automático configurado
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--supabase-text-muted)', lineHeight: 1.6 }}>
+            Lembrete é enviado fora da janela de 24h do WhatsApp, e ali a Meta só aceita
+            <strong> template aprovado</strong>. Registre os templates na sua conta da Meta e
+            cadastre-os aqui — enquanto não houver template, nenhum lembrete sai.
+          </div>
+        </div>
+      )}
       {enviaveis.map(cfg => (
         <LembreteCard key={cfg.id} config={cfg} accent={accent} onSave={onSave} saving={saving} isConnected={isConnected} />
       ))}

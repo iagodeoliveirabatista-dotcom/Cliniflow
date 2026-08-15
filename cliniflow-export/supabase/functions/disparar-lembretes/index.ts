@@ -58,13 +58,19 @@ serve(async (req) => {
       const inicioJanela = new Date(agora.getTime() + horasAntes * 60 * 60 * 1000);
       const fimJanela = new Date(inicioJanela.getTime() + 60 * 60 * 1000); // +1h de tolerância
 
-      // Buscar consultas na janela que ainda não receberam este tipo de lembrete
+      // Buscar consultas na janela que ainda não receberam este tipo de lembrete.
+      // O filtro por `clinic_id` é obrigatório: esta função roda com
+      // service_role, que ATRAVESSA o RLS. Sem ele, a config de uma clínica
+      // dispararia lembretes para as consultas de todas — com o template
+      // aprovado só na WABA dela, que a Meta recusaria para as outras.
+      // Ver docs/db/09-config-automacao-multi-tenant.sql.
       const { data: consultas } = await supabase
         .from('consultas')
         .select(`
           id, data_hora, tipo, medico, status, preco, clinic_id,
           patient:patients (id, nome, telefone, email)
         `)
+        .eq('clinic_id', config.clinic_id)
         .eq('whatsapp_ativo', true)
         .eq('status', 'pendente')
         .gte('data_hora', inicioJanela.toISOString())
@@ -115,7 +121,7 @@ serve(async (req) => {
           // falha explícita aqui é melhor que mensagem sumindo em silêncio.
           if (!config.meta_template_nome) {
             erros.push(
-              `config ${config.tipo_lembrete}: sem meta_template_nome — lembrete fora da janela de 24h exige template aprovado`,
+              `clinica ${config.clinic_id} / config ${config.tipo_lembrete}: sem meta_template_nome — lembrete fora da janela de 24h exige template aprovado`,
             );
             return;
           }

@@ -49,6 +49,26 @@ Parecem de outro trabalho. Foram **mantidos** na limpeza de 26/07/2026 por preca
 
 ## 🟢 Tomadas
 
+### D-24 — Clínica nova nasce com ZERO lembretes, sem seed automático · 15/08/2026
+**Decisão:** ao criar uma clínica, o sistema **não** cria configs em
+`config_automacao`. A aba Lembretes aparece vazia, com um aviso explicando o que falta.
+
+**Por quê:** template do WhatsApp é aprovado **por WABA**, não globalmente.
+`consulta_amanha` e `confirmao_horas_antes` existem na WABA da clínica atual. Semear essas
+linhas para uma clínica nova entregaria um painel com dois lembretes "ligados" apontando para
+templates que a WABA dela não tem — a Meta recusaria cada envio e ninguém veria, porque o
+painel diria que está tudo ativo. É exatamente a falha do ARMADILHAS §39, só que de fábrica.
+
+**A alternativa considerada e rejeitada:** semear com `ativo = false`. Rejeitada porque um
+toggle desligado convida a ser ligado, e ligar não faz funcionar — o que faltava era o
+template, não o toggle. Vazio com explicação é mais honesto que desligado sem explicação.
+
+**Consequência aceita:** onboarding de clínica tem um passo manual (registrar templates na
+Meta e cadastrá-los). Isso é inerente à Cloud API, não é dívida nossa.
+
+**Quando revisar:** se um dia existir cadastro de template pelo CRM via Graph API, o seed
+passa a fazer sentido — porque aí dá para criar o template junto com a config.
+
 ### D-23 — Aprovar um pré-agendamento desliga a IA daquele paciente · 15/08/2026
 **Decisão:** aprovar um pedido (`solicitado` → `pendente`) grava
 `patients.bot_pausado = true`. Quem já tem horário marcado passa a ser atendido por gente.
