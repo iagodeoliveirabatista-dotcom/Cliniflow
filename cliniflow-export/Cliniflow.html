@@ -312,7 +312,15 @@
       // `disparar-lembretes` procura, a consulta entra sozinha no lembrete de
       // 24h — o paciente recebe o template e confirma. Assim o ciclo fecha
       // mesmo que ninguém clique em "Avisar paciente".
-      const aprovarPedido = useCallback(async ({ id, data_hora, duracao_min, tipo, medico }) => {
+      // E aprovar desliga a IA do paciente (decisão do dono, D-23): quem já tem
+      // horário marcado passa a ser atendido por gente. Isso NÃO o deixa mudo —
+      // `Grava Mensagem Inbound` e `Cria Conversa` rodam antes do gate no n8n,
+      // então o que ele escrever aparece no painel Atendimentos sem resposta
+      // automática. E responder ao lembrete continua funcionando: o roteiro de
+      // confirmação é determinístico e o n8n abre exceção para sessão viva com
+      // `consulta_id` (ARMADILHAS §37). Só falha se o n8n estiver numa versão
+      // anterior à `dea36506` — aí o "ok" do paciente é descartado.
+      const aprovarPedido = useCallback(async ({ id, patient_id, data_hora, duracao_min, tipo, medico }) => {
         const dt = new Date(data_hora);
         const monday = new Date(currentMonday);
         const day = Math.floor((new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()) - monday) / 86400000);
@@ -322,10 +330,17 @@
           ? { ...a, status: 'pending', day, time, dur: duracao_min, type: tipo, doctor: medico || '' }
           : a));
 
+        if (patient_id) {
+          setPatients(prev => prev.map(p => p.id === patient_id ? { ...p, bot_pausado: true } : p));
+        }
+
         if (dbConnected) {
           await SB.updateConsulta(id, {
             data_hora, duracao_min, tipo, medico, status: 'pendente',
           });
+          // Falha aqui não desfaz a aprovação: a consulta já está marcada e o
+          // pior caso é a IA seguir ativa, que é o comportamento de antes.
+          if (patient_id) await SB.updatePaciente(patient_id, { bot_pausado: true });
         }
       }, [dbConnected, currentMonday]);
 

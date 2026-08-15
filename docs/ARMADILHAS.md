@@ -1225,9 +1225,11 @@ coisa. Um ramo que termina num nó sem conexão de saída fecha verde. Ao audita
 
 ## 37. "IA Inativa" não silencia a IA — mata o WhatsApp do paciente, confirmação inclusive
 
-**Status: ATIVO em produção.** Achado por leitura de código em 15/08/2026
-(`activeVersion b67e21a5`, 78 nós). **Ainda não observado com paciente real** — porque o
-cenário que o dispara ainda não aconteceu (ver "Por que ninguém viu ainda").
+**Status: CORRIGIDO e publicado em 15/08/2026** (`activeVersion dea36506`, 78 nós). Achado por
+leitura de código, **nunca observado com paciente real** — porque o cenário que o dispara ainda
+não aconteceu (ver "Por que ninguém viu ainda"). A correção também **não** foi exercitada por
+conversa real: está provada só por execução da lógica fora do n8n (9 casos, ver o fim desta
+seção).
 
 **Sintoma esperado:** paciente com `bot_pausado = true` recebe o lembrete de 24h, responde
 "ok", e **nada acontece**. A consulta nunca vira `confirmado`. A execução fecha `success`.
@@ -1258,22 +1260,76 @@ cadastrado paciente pela tela até então, a combinação "paciente pausado + le
 existiu. **Ela passa a existir no momento em que a dona cadastrar a base de pacientes**, que
 é o próximo passo declarado do projeto — e aí atinge a base inteira de uma vez.
 
-**Correção proposta (NÃO aplicada — decisão do dono pendente):** `bot_pausado` deve silenciar
-o **AI Agent**, não a resposta a um lembrete. Deixar passar quando existir sessão viva
-apontando para uma consulta:
+**Correção aplicada:** `bot_pausado` agora silencia o **AI Agent**, não a resposta a um
+lembrete. O gate abre exceção quando existe sessão viva apontando para uma consulta:
 
 ```js
-const row = items[0].json;
-const sessaoViva = row && row.expira_em && new Date() <= new Date(row.expira_em);
-const confirmacaoPendente = sessaoViva && !!row.consulta_id;
+const sessaoViva = !!(row && row.expira_em && new Date() <= new Date(row.expira_em));
+const confirmacaoPendente = sessaoViva && !!row.consulta_id && row.atendimento_humano !== true;
 
-if (row && row.atendimento_humano === true) { /* ATIVA_HUMANA — sempre vence */ }
-if (paciente?.bot_pausado === true && !confirmacaoPendente) { /* BOT_PAUSADO */ }
+if (paciente && paciente.bot_pausado === true && !confirmacaoPendente) { /* BOT_PAUSADO */ }
 ```
 
 O `!!row.consulta_id` é o que impede o vazamento: sem ele, qualquer sessão residual de um
 paciente pausado passaria a ser roteada para o roteiro, que cairia no ramo "consulta não
-encontrada" e poderia responder a quem a clínica silenciou de propósito.
+encontrada" e poderia responder a quem a clínica silenciou de propósito. O
+`atendimento_humano !== true` garante que takeover humano continua vencendo tudo.
+
+**Prova (não é conversa real — é a lógica publicada rodando fora do n8n, 9 casos):**
+
+| Situação | `sessao_status` |
+|---|---|
+| pausado + sem sessão (escreve espontaneamente) | `BOT_PAUSADO` |
+| pausado + sessão viva **com** `consulta_id` | `ATIVA` ✅ confirma |
+| pausado + sessão viva **sem** `consulta_id` | `BOT_PAUSADO` (não vaza) |
+| pausado + sessão expirada com `consulta_id` | `BOT_PAUSADO` |
+| pausado + `atendimento_humano` | `BOT_PAUSADO` |
+| ativo + sem sessão (lead novo) | `NAO_ENCONTRADA` → AI Agent |
+| ativo + sessão viva com consulta | `ATIVA` |
+| ativo + `atendimento_humano` | `ATIVA_HUMANA` |
+| ativo + sessão expirada | `EXPIRADA` |
+
+⛔ **O que continua sem prova:** nenhuma conversa real de WhatsApp exercitou isto. O primeiro
+paciente pausado que responder a um lembrete é o teste de verdade — confira em `consultas` se
+o status virou `confirmado`.
 
 **Relacionado:** §29 (a correção que introduziu esta checagem e resolveu o problema oposto),
-§36 (o roteiro de confirmação em si), D-23 (por que a aprovação não desliga a IA).
+§36 (o roteiro de confirmação em si), §38 ("ok" não confirmava), D-23 (a decisão que depende
+desta correção).
+
+## 38. "ok" e "certo" eram saudação, não confirmação — e a regra 12 nunca era alcançada
+
+**Status: CORRIGIDO e publicado em 15/08/2026** (`activeVersion dea36506`). Provado só por
+execução da lógica fora do n8n, **não** por conversa real.
+
+**Sintoma:** paciente responde "ok" ao lembrete de 24h e recebe *"Desculpe, não entendi.
+Responda: CONFIRMAR / CANCELAR / REMARCAR"*. A consulta não vira `confirmado`. Execução
+`success`.
+
+**Causa:** em `Valida contexto`, a regra **10 (SAUDAÇÕES)** vinha antes da **12 (CONFIRMAÇÃO
+FRACA)** e as duas listavam as mesmas palavras. A regex da 10 é **ancorada**:
+
+```js
+/^(oi|olá|...|legal|certo|ok|tá bom)$/i    // ← casa a mensagem INTEIRA
+```
+
+Então "ok" sozinho — que é exatamente como as pessoas respondem — casava na 10 e retornava
+`SAUDACAO`. A regra 12, que listava `ok|tá bom|ta bom|certo` justamente para tratar isso,
+**era código morto para essas palavras**. `SAUDACAO` não bate em nenhuma regra do `Switch`
+(que só conhece CONFIRMADO/CANCELADO/REMARCAR/DESCONHECIDO/MIDIA_SEM_TEXTO) → cai no
+`Fallback` → `REGISTRO OUTLIER1` → `MSG - NAO ENTENDI`.
+
+**Correção:** `certo`, `ok` e `tá bom` **removidos da regra 10**. Agora caem na 12 e viram
+`CONFIRMADO` (confiança 75). `oi`, `bom dia`, `obrigado`, `valeu`, `legal` e `tudo bem`
+continuam saudação de propósito — agradecer não é confirmar.
+
+**Prova (13 casos, lógica publicada rodando fora do n8n):** `ok`, `Ok`, `certo`, `tá bom`,
+`sim`, `confirmo`, `👍` → `CONFIRMADO`. `oi`, `bom dia`, `obrigado` → `SAUDACAO`.
+`cancelar` → `CANCELADO`. `remarcar` → `REMARCAR`. `quanto custa?` → `PERGUNTA`.
+
+⚠️ **Ao mexer nesta função:** a ordem das regras **é** a lógica. Toda regra ancorada (`^...$`)
+colocada acima de uma regra `\b...\b` que compartilha vocabulário torna a de baixo inalcançável
+para aquelas palavras. Foi assim que a 12 morreu sem ninguém notar.
+
+⛔ **Sem prova real:** ninguém confirmou consulta por WhatsApp neste projeto **até hoje** (§36).
+Isto continua valendo até uma conversa real fechar o ciclo.

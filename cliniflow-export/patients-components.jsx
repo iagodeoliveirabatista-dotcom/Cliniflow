@@ -413,6 +413,7 @@ function AprovarPedidoModal({ pedido, preferencia, onClose, onSave, accent }) {
     const quando = new Date(ano, mes - 1, dia, h, min, 0, 0);
     onSave({
       id: pedido.id,
+      patient_id: pedido.patientId,
       data_hora: quando.toISOString(),
       duracao_min: parseInt(f.dur, 10) || 30,
       tipo: f.tipo,

@@ -49,46 +49,55 @@ Parecem de outro trabalho. Foram **mantidos** na limpeza de 26/07/2026 por preca
 
 ## 🟢 Tomadas
 
-### D-23 — Aprovar um pré-agendamento **não** desliga a IA do paciente · 15/08/2026
-**Decisão:** o fluxo de aprovação (`solicitado` → `pendente`) segue sem tocar em
-`patients.bot_pausado`. A regra "paciente da clínica é atendido por gente" **não** é
-implementada desligando a IA na aprovação.
+### D-23 — Aprovar um pré-agendamento desliga a IA daquele paciente · 15/08/2026
+**Decisão:** aprovar um pedido (`solicitado` → `pendente`) grava
+`patients.bot_pausado = true`. Quem já tem horário marcado passa a ser atendido por gente.
+Implementado em `aprovarPedido` (`Cliniflow.html`).
 
-**A pergunta que gerou isso:** o dono considerou fazer a aprovação gravar
-`bot_pausado = true`, para que quem já é paciente sempre fale com um humano.
+**Pré-requisito que teve de existir antes (não pule isto):** a decisão só é segura com o n8n
+na `activeVersion dea36506` ou posterior. Antes dela, `bot_pausado` descartava **toda**
+mensagem do telefone, inclusive a resposta ao lembrete de 24h — ver ARMADILHAS §37. Se o
+workflow for revertido para uma versão anterior, esta decisão vira bug: o paciente aprovado
+não consegue mais confirmar consulta.
 
-**Por quê não (motivo nº1, mecânico):** `bot_pausado` não silencia o bot — ele **descarta a
-mensagem**. A checagem é a primeira linha do nó `Valida Expiração` e devolve
-`sessao_status: "BOT_PAUSADO"` com `deve_processar: false`. O Switch `Status da sessão?` tem
-três regras (`deve_processar === true` → *Validada*, `EXPIRADA`, `NAO_ENCONTRADA`) e **nenhum
-fallback** — então o item morre ali. A rota do **roteiro de confirmação** fica atrás da saída
-*Validada*. Logo: desligar a IA na aprovação também desliga a capacidade de o paciente
-**responder ao lembrete de 24h** que a própria clínica manda. Consertar o roteiro (`468bb50`,
-13/08) e enterrá-lo aconteceria no mesmo ciclo, antes do primeiro teste real dele.
-Conferido na `activeVersion b67e21a5` (78 nós), não só na documentação.
+**Por que é seguro (os dois fatos que sustentam a decisão, os dois verificados no fluxo):**
+1. **A mensagem não some.** `Grava Mensagem Inbound` (→ `mensagem_logs`) e `Cria Conversa`
+   (→ `conversations`) rodam **antes** do gate em `Valida Expiração`. O paciente pausado que
+   escreve aparece no painel Atendimentos com badge "IA Inativa", sem resposta automática.
+   Isso é handoff para humano, não buraco negro.
+2. **Confirmar continua funcionando.** O roteiro de confirmação é 100% determinístico
+   (`Valida contexto` regex → `Análise de evento - Claude`, que apesar do nome é um nó
+   `n8n-nodes-base.code` sem IA → `Switch` → `UPDATE consultas`). O §37 abriu exceção no gate
+   para sessão viva com `consulta_id`, então confirmar/cancelar/remarcar sobrevive à IA
+   inativa.
 
-**Por quê não (motivo nº2, de produto):** `bot_pausado` é permanente e ninguém religa. A
-consequência é que o agendamento automático passa a servir só lead de primeira viagem — numa
-clínica estabelecida, a minoria das consultas. E a falha é silenciosa: o paciente simplesmente
-não recebe resposta, e não existe tela no CRM que mostre "N pacientes com IA Inativa".
+**Por quê:** é a política de atendimento do dono ("paciente da clínica sempre fala com
+gente"), e o bot hoje **não tem contexto nenhum sobre consultas existentes** — isso só chega
+no spec B. Um bot solto conversando com quem já tem horário marcado tem mais chance de
+constranger do que de ajudar. Mesmo raciocínio que já valia para `createPaciente` nascer com
+`bot_pausado = true` desde `3324bc0`.
 
-**Onde a regra deve morar:** ela é propriedade do **momento** (este paciente tem consulta
-pendente aguardando), não da **pessoa** (este paciente existe). O lugar é o spec B
-(`docs/superpowers/specs/2026-08-13-confirmacao-organica-pela-ia-design.md`), onde
-`sessoes_ativas` vira contexto do prompt e a IA passa a *saber* que há consulta pendente,
-em vez de ser morta por um booleano.
+⚠️ **Consequências que o dono aceitou de olhos abertos:**
+- **É catraca.** Todo paciente que tiver uma consulta aprovada vira IA Inativa **para sempre**.
+  Agendamento automático passa a servir só lead de primeira viagem. Reverter depois é um
+  `UPDATE public.patients SET bot_pausado = false WHERE ...` — mas alguém precisa lembrar.
+- **Não há notificação.** A conversa aparece no painel, mas ninguém é avisado por push. De
+  madrugada ela fica lá até alguém abrir o CRM.
+- **Quando o spec B entregar contexto de consulta para a IA, reavaliar.** Aí o bot saberá que
+  a pessoa tem horário marcado, e a catraca deixa de ser necessária.
 
-⚠️ **Ao próximo agente:** se você encontrar "aprovou e o bot continua falando com o paciente"
-e a correção óbvia parecer ser `bot_pausado = true` na aprovação — **é essa decisão, não é
-bug.** Fazer isso quebra a confirmação por WhatsApp de forma silenciosa (execução fica
-`success`). Ver §37 do ARMADILHAS.
+**Histórico honesto desta decisão (para não repetirem meu caminho):** eu recomendei primeiro o
+**oposto** — não desligar — com dois argumentos, e **os dois estavam errados**:
+- *"Quebra a confirmação por WhatsApp."* Quebrava, mas era consertável. Era restrição de
+  ordem de implementação, não impedimento. Virou o §37.
+- *"A falha é silenciosa."* **Não é.** Eu não tinha verificado que o log da mensagem e a
+  criação da conversa acontecem antes do gate. Verificado depois: acontecem.
 
-**Descartado no caminho:** cheguei a propor deduplicar `criar_pre_agendamento` também contra
-consulta `pendente`, achando que o paciente que pede alteração depois da aprovação geraria
-duplicatas. **Não gera:** a primeira mensagem cria um `solicitado`, e as refinações seguintes
-caem no dedupe de 60h contra esse mesmo `solicitado` (D-07/`07-triagem-pre-agendamento.sql`).
-O resultado — uma consulta `pendente` real + um pedido de alteração na fila de triagem — é a
-representação correta. Não mexer.
+**Descartado no caminho:** deduplicar `criar_pre_agendamento` também contra consulta
+`pendente`, para o paciente que pede alteração depois da aprovação. **Não é necessário:** a
+primeira mensagem cria um `solicitado` e as refinações seguintes caem no dedupe de 60h contra
+esse mesmo `solicitado` (`07-triagem-pre-agendamento.sql`). O resultado — consulta `pendente`
+real + pedido de alteração na fila de triagem — é a representação correta. Não mexer.
 
 ### D-22 — `Meta WhatsApp - Producao` nasce de uma duplicata do `Evo-Go`, não de reconstrução · 06/08/2026
 **Decisão:** o workflow de produção do canal Meta é criado pela função **Duplicate da interface do
