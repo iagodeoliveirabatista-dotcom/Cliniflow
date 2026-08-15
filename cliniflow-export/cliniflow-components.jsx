@@ -875,7 +875,7 @@ function KanbanView({ appointments, selectedId, onSelect, accent }) {
 
 // ─── DETAIL PANEL ─────────────────────────────────────────────────────────────
 
-function DetailPanel({ appointment: apt, onClose, accent, onUpdateStatus, onDelete, onUpdatePreco, onAprovarPedido, onAvisarPaciente }) {
+function DetailPanel({ appointment: apt, onClose, accent, onUpdateStatus, onDelete, onUpdatePreco, onUpdateDuracao, onAprovarPedido, onAvisarPaciente }) {
   const [waState, setWaState] = useState(null); // null | 'sending' | 'sent'
   const [avisoState, setAvisoState] = useState(null); // null | 'sending' | 'sent' | mensagem de erro
   const [precoInput, setPrecoInput] = useState(apt.preco !== undefined && apt.preco !== null ? String(apt.preco) : '');
@@ -973,7 +973,28 @@ function DetailPanel({ appointment: apt, onClose, accent, onUpdateStatus, onDele
       <div style={{ padding:'14px 16px', borderBottom:'1px solid var(--supabase-border)' }}>
         <div style={{ fontSize:10.5, fontWeight:600, color:'var(--supabase-text-muted)', textTransform:'uppercase', letterSpacing:.9, marginBottom:10 }}>Consulta de hoje</div>
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-          <InfoRow label="Horário" value={`${apt.time} · ${apt.dur} min`} />
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+            <span style={{ fontSize:12, color:'var(--supabase-text-muted)', flexShrink:0 }}>Horário</span>
+            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <span style={{ fontSize:12.5, color:'var(--supabase-text-light)' }}>{apt.time}</span>
+              <span style={{ fontSize:12, color:'var(--supabase-text-muted)' }}>·</span>
+              <select
+                value={apt.dur}
+                onChange={e => onUpdateDuracao && onUpdateDuracao(apt.id, parseInt(e.target.value, 10))}
+                style={{
+                  background:'var(--supabase-bg-input)', border:'1px solid var(--supabase-border)',
+                  borderRadius:5, color:'var(--supabase-text-light)', fontSize:12,
+                  padding:'3px 6px', outline:'none', cursor:'pointer',
+                }}
+              >
+                {[15, 20, 30, 45, 60, 90].map(m => (
+                  <option key={m} value={m} style={{ background:'var(--supabase-bg-input)' }}>
+                    {m === 60 ? '1 hora' : m === 90 ? '1h 30' : `${m} min`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           <InfoRow label="Tipo" value={apt.type} />
           <InfoRow label="Médico(a)" value={apt.doctor} />
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>

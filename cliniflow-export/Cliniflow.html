@@ -16,7 +16,7 @@
   <script src="supabase-client.js?v=11"></script>
 
   <script type="text/babel" src="tweaks-panel.jsx?v=5"></script>
-  <script type="text/babel" src="cliniflow-components.jsx?v=10"></script>
+  <script type="text/babel" src="cliniflow-components.jsx?v=11"></script>
   <script type="text/babel" src="patients-components.jsx?v=9"></script>
   <script type="text/babel" src="reports-components.jsx?v=5"></script>
   <script type="text/babel" src="automation-components.jsx?v=6"></script>
@@ -283,6 +283,19 @@
         }
       }, [dbConnected]);
 
+      // Duração não pode reusar updateConsulta genérico: o campo local do
+      // agendamento é `dur`, mas a coluna no Supabase é `duracao_min` — um
+      // merge genérico gravaria certo no banco e deixaria a UI desatualizada
+      // até o próximo fetch. Mesmo motivo pelo qual moveAppt já tem função
+      // própria em vez de reusar o genérico.
+      const updateDuracao = useCallback(async (id, dur) => {
+        setAppts(prev => prev.map(a => a.id === id ? { ...a, dur } : a));
+
+        if (dbConnected) {
+          await SB.updateConsulta(id, { duracao_min: dur });
+        }
+      }, [dbConnected]);
+
       const deleteAppt = useCallback(async (id) => {
         // Update locally first (optimistic)
         setAppts(prev => prev.filter(a => a.id !== id));
@@ -514,6 +527,7 @@
                       onUpdateStatus={(id, status) => updateConsulta(id, { status })}
                       onDelete={deleteAppt}
                       onUpdatePreco={(id, preco) => updateConsulta(id, { preco })}
+                      onUpdateDuracao={(id, dur) => updateDuracao(id, dur)}
                       onAprovarPedido={setPedidoEmAprovacao}
                       onAvisarPaciente={avisarPacienteDoHorario}
                     />
