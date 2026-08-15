@@ -37,11 +37,11 @@ const APPOINTMENTS = [
 
 const STATUS_CFG = {
   confirmed: { label:'Confirmado', color:'#3ecf8e', bg:'rgba(62,207,142,0.10)' },
-  pending:   { label:'Pendente',   color:'#9ca3af', bg:'rgba(156,163,175,0.10)' },
+  pending:   { label:'Pendente',   color:'#6b7280', bg:'rgba(156,163,175,0.14)' },
   rescheduled: { label:'Solicitado reagendamento', color:'#f59e0b', bg:'rgba(245,158,11,0.10)' },
   canceled:  { label:'Cancelado',  color:'#ef4444', bg:'rgba(239,68,68,0.10)'  },
   solicitado: { label:'Solicitado', color:'#a855f7', bg:'rgba(168, 85, 247, 0.10)' },
-  recusado:  { label:'Recusado',   color:'#6b7280', bg:'rgba(107,114,128,0.10)' },
+  recusado:  { label:'Recusado',   color:'#4b5563', bg:'rgba(107,114,128,0.14)' },
 };
 
 // O bot grava a preferência dentro de `notas`, em prosa:
@@ -187,7 +187,7 @@ function Sidebar({ accent, currentPage, onNavigate, onOpenSettings }) {
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
           </svg>
         </div>
-        <span style={{ fontSize:15, fontWeight:600, color:'#efefef', letterSpacing:-.4 }}>Cliniflow</span>
+        <span style={{ fontSize:15, fontWeight:600, color:'var(--supabase-text-light)', letterSpacing:-.4 }}>Cliniflow</span>
       </div>
 
       {/* Nav */}
@@ -632,22 +632,22 @@ function CalendarView({ appointments, selectedId, onSelect, accent, onMove, curr
                 style={{
                   position:'relative',
                   height: totalH,
-                  borderLeft:'1px solid var(--supabase-border)',
-                  background: isToday ? 'rgba(255,255,255,0.012)' : 'transparent',
+                  borderLeft:'1px solid var(--supabase-border-strong)',
+                  background: isToday ? `${accent}0d` : 'transparent',
                 }}
               >
                 {/* Horizontal hour lines */}
                 {hours.map((_, i) => (
                   <div key={i} style={{
                     position:'absolute', left:0, right:0, top: i * slotH,
-                    borderTop:'1px solid var(--supabase-border)',
+                    borderTop:'1px solid var(--supabase-border-strong)',
                   }} />
                 ))}
                 {/* Half-hour ticks */}
                 {hours.map((_, i) => (
                   <div key={`half-${i}`} style={{
                     position:'absolute', left:0, right:0, top: i * slotH + slotH/2,
-                    borderTop:'1px dashed var(--supabase-border)',
+                    borderTop:'1px dashed var(--supabase-border-strong)',
                   }} />
                 ))}
 
