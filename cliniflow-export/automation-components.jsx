@@ -174,9 +174,16 @@ function AutomationView({ accent }) {
 // ─── LEMBRETES TAB ───────────────────────────────────────────────────────────
 
 function LembretesTab({ configs, accent, onSave, saving, isConnected }) {
+  // Só aparece o que o sistema consegue mandar de verdade. Lembrete cai sempre
+  // fora da janela de 24h da Meta, e ali só passa template aprovado — sem
+  // `meta_template_nome` a `disparar-lembretes` pula a config (index.ts:116).
+  // As 3 configs de 04/06/2026 nunca tiveram template e ficam escondidas: elas
+  // estavam LIGADAS na tela em 15/08 enquanto as boas estavam desligadas, e o
+  // painel parecia saudável com zero lembrete saindo. Ver ARMADILHAS.md §39.
+  const enviaveis = isConnected ? configs.filter(c => c.meta_template_nome) : configs;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, animation: 'fadeIn .2s var(--ease-premium)' }}>
-      {configs.map(cfg => (
+      {enviaveis.map(cfg => (
         <LembreteCard key={cfg.id} config={cfg} accent={accent} onSave={onSave} saving={saving} isConnected={isConnected} />
       ))}
 
@@ -215,10 +222,17 @@ function LembreteCard({ config, accent, onSave, saving, isConnected }) {
   const [draft, setDraft] = useStateA({ ...config });
   const set = (k, v) => setDraft(prev => ({ ...prev, [k]: v }));
 
+  // As chaves em uso são `lembrete_*` (criadas em 09/08/2026, com template
+  // aprovado na Meta). As `reminder_*` são de 04/06/2026, sem template, e só
+  // continuam aqui para não virar nome cru se alguém reativar pelo banco.
+  // O título NÃO cita horas: quem manda é `antecedencia_horas`, e o título fixo
+  // já mentiu — "Lembrete 2 horas antes" com 4h no banco. Ver ARMADILHAS §39.
   const tipoLabel = {
-    reminder_24h: { titulo: 'Lembrete 24 horas antes', desc: 'Enviado no dia anterior à consulta', icon: '🔔' },
-    reminder_2h: { titulo: 'Lembrete 2 horas antes', desc: 'Enviado próximo ao horário da consulta', icon: '⏰' },
-    reminder_custom: { titulo: 'Lembrete personalizado', desc: 'Antecedência e horário configuráveis', icon: '⚙️' },
+    lembrete_24h: { titulo: 'Lembrete do dia anterior', desc: 'Enviado antes da consulta', icon: '🔔' },
+    lembrete_4h: { titulo: 'Lembrete no dia da consulta', desc: 'Enviado próximo ao horário', icon: '⏰' },
+    reminder_24h: { titulo: 'Lembrete do dia anterior (legado)', desc: 'Sem template da Meta — não envia', icon: '🔔' },
+    reminder_2h: { titulo: 'Lembrete do dia (legado)', desc: 'Sem template da Meta — não envia', icon: '⏰' },
+    reminder_custom: { titulo: 'Lembrete personalizado (legado)', desc: 'Sem template da Meta — não envia', icon: '⚙️' },
   };
   const info = tipoLabel[config.tipo_lembrete] || { titulo: config.tipo_lembrete, desc: '', icon: '📩' };
 
@@ -255,8 +269,8 @@ function LembreteCard({ config, accent, onSave, saving, isConnected }) {
             </div>
             <div style={{ fontSize: 11.5, color: 'var(--supabase-text-muted)', marginTop: 2 }}>
               {info.desc}
-              {draft.horario_envio && ` · Envio às ${draft.horario_envio}`}
               {draft.antecedencia_horas && ` · ${draft.antecedencia_horas}h antes`}
+              {config.meta_template_nome && ` · template ${config.meta_template_nome}`}
             </div>
           </div>
         </div>
@@ -295,22 +309,12 @@ function LembreteCard({ config, accent, onSave, saving, isConnected }) {
       {/* Edit panel */}
       {editando && (
         <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {/* Row: horário + antecedência */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--supabase-text-muted)', textTransform: 'uppercase', letterSpacing: .7, marginBottom: 6 }}>
-                Horário de envio
-              </label>
-              <input
-                type="time" value={draft.horario_envio || ''}
-                onChange={e => set('horario_envio', e.target.value)}
-                style={{
-                  width: '100%', padding: '8px 10px', borderRadius: 6,
-                  background: 'var(--supabase-bg-input)', border: '1px solid var(--supabase-border)',
-                  color: 'var(--supabase-text-light)', fontSize: 13, outline: 'none',
-                }}
-              />
-            </div>
+          {/* O campo "Horário de envio" foi REMOVIDO em 15/08/2026: a
+              `disparar-lembretes` nunca leu `horario_envio` — a janela é só
+              `agora + antecedencia_horas` (+1h de tolerância). O controle
+              prometia escolher a hora e não escolhia nada. A coluna continua no
+              banco e o valor atual é preservado no save. Ver ARMADILHAS §39. */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
             <div>
               <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--supabase-text-muted)', textTransform: 'uppercase', letterSpacing: .7, marginBottom: 6 }}>
                 Antecedência

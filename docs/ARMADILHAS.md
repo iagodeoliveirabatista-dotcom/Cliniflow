@@ -1333,3 +1333,49 @@ para aquelas palavras. Foi assim que a 12 morreu sem ninguém notar.
 
 ⛔ **Sem prova real:** ninguém confirmou consulta por WhatsApp neste projeto **até hoje** (§36).
 Isto continua valendo até uma conversa real fechar o ciclo.
+
+## 39. O painel de automações mostrava 4 lembretes, os 2 ligados não enviavam nada
+
+**Status: CORRIGIDO em 15/08/2026** (dado no banco + UI). Achado por print do dono, que leu a
+tela ao contrário — e a tela tinha todo motivo para enganar.
+
+**Sintoma:** o painel Automações lista 4 lembretes. Os dois com nome bonito ("Lembrete 24 horas
+antes", "Lembrete 2 horas antes") aparecem **ligados**, com ícone e descrição. Os dois com nome
+cru (`lembrete_24h`, `lembrete_4h`) aparecem **desligados**, com ícone genérico 📩, parecendo
+sobra de teste. Conclusão natural de quem olha: apagar os dois de cima.
+
+**É o inverso.** Os de nome cru são os ÚNICOS que enviam:
+
+| linha | criada | template Meta | enviava? |
+|---|---|---|---|
+| `reminder_24h`, `reminder_2h`, `reminder_custom` | 04/06/2026 | **null** | **não** |
+| `lembrete_24h` → `consulta_amanha` (`en`) | 09/08/2026 | sim | sim |
+| `lembrete_4h` → `confirmao_horas_antes` (`pt_BR`) | 09/08/2026 | sim | sim |
+
+**Causa da aparência invertida:** o mapa `tipoLabel` em `automation-components.jsx` só tinha as
+chaves `reminder_*`. As `lembrete_*` caíam no fallback `{ titulo: config.tipo_lembrete }` — nome
+cru, sem ícone. **A UI premiava visualmente exatamente as configs quebradas.**
+
+**Causa do envio morto:** `disparar-lembretes/index.ts:116` pula qualquer config sem
+`meta_template_nome` — lembrete cai sempre fora da janela de 24h da Meta, e ali só passa
+template aprovado (§31). Com só as `reminder_*` ativas, **zero lembrete saía**, e nada no painel
+denunciava isso. Isso desfez o que o commit `9f6d775` provou ponta a ponta em 09/08.
+
+**Duas mentiras menores que vieram junto:**
+- O título era fixo no código e a antecedência vinha do banco: **"Lembrete 2 horas antes" com
+  `antecedencia_horas = 4`**. Agora o título não cita horas.
+- O campo **"Horário de envio"** era editável e **nunca foi lido** por ninguém — a janela é só
+  `agora + antecedencia_horas` (+1h). Removido da UI; a coluna segue no banco.
+
+**Correção:** `lembrete_24h`/`lembrete_4h` reativadas e as 3 `reminder_*` desativadas (UPDATE,
+reversível). Na UI, a aba passou a listar **só configs com `meta_template_nome`** — o que o
+sistema não consegue enviar não aparece como se fosse enviar.
+
+⚠️ **Regra que fica:** neste painel, "ligado" nunca significou "envia". Ao mexer em lembrete,
+confira `meta_template_nome` no banco antes de acreditar no toggle.
+
+⛔ **Sem prova real:** o religamento não foi exercitado — nenhum lembrete novo saiu desde o
+UPDATE. A prova é a próxima consulta entrar na janela de 24h e o paciente receber.
+
+**Relacionado:** §31 (só template fora da janela), §10 (lembretes mortos por 48 dias sem ninguém
+ver), §38.
