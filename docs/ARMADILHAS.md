@@ -1222,3 +1222,58 @@ nem que a mensagem existiu.
 **Lição de método:** execução `success` no n8n não quer dizer que o paciente recebeu alguma
 coisa. Um ramo que termina num nó sem conexão de saída fecha verde. Ao auditar, olhe
 `lastNodeExecuted` — na 83417 ele era `ENCAMINHAR MENSAGEM`, e isso entregou o caso inteiro.
+
+## 37. "IA Inativa" não silencia a IA — mata o WhatsApp do paciente, confirmação inclusive
+
+**Status: ATIVO em produção.** Achado por leitura de código em 15/08/2026
+(`activeVersion b67e21a5`, 78 nós). **Ainda não observado com paciente real** — porque o
+cenário que o dispara ainda não aconteceu (ver "Por que ninguém viu ainda").
+
+**Sintoma esperado:** paciente com `bot_pausado = true` recebe o lembrete de 24h, responde
+"ok", e **nada acontece**. A consulta nunca vira `confirmado`. A execução fecha `success`.
+
+**Causa:** `Valida Expiração` checa `bot_pausado` **antes de tudo** e devolve
+`sessao_status: "BOT_PAUSADO"` com `deve_processar: false`:
+
+```js
+const paciente = $('Busca Paciente').first().json;
+if (paciente && paciente.bot_pausado === true) {
+  return [{ json: { ...items[0].json, sessao_status: "BOT_PAUSADO", deve_processar: false } }];
+}
+```
+
+O Switch `Status da sessão?` tem exatamente três regras — `deve_processar === true`
+(*Validada*), `sessao_status === 'EXPIRADA'`, `sessao_status === 'NAO_ENCONTRADA'` — e
+**nenhum fallback**. `BOT_PAUSADO` não bate em nenhuma e o item é descartado em silêncio.
+Isso é intencional para o AI Agent. O efeito colateral **não** é: o roteiro de confirmação
+fica atrás da saída *Validada*, então ele também nunca roda.
+
+Ou seja, o toggle do CRM não significa "a IA não conversa". Significa **"toda mensagem desse
+telefone é jogada fora"**, inclusive a resposta a um lembrete que a própria clínica mandou.
+
+**Por que ninguém viu ainda:** os 2 pacientes do banco vieram do bot, e o fluxo do n8n cria
+paciente com `bot_pausado = false`. Quem nasce pausado é quem é cadastrado **pela tela** —
+`createPaciente()` força `bot_pausado = true` desde `3324bc0` (14/08). Como ninguém tinha
+cadastrado paciente pela tela até então, a combinação "paciente pausado + lembrete" nunca
+existiu. **Ela passa a existir no momento em que a dona cadastrar a base de pacientes**, que
+é o próximo passo declarado do projeto — e aí atinge a base inteira de uma vez.
+
+**Correção proposta (NÃO aplicada — decisão do dono pendente):** `bot_pausado` deve silenciar
+o **AI Agent**, não a resposta a um lembrete. Deixar passar quando existir sessão viva
+apontando para uma consulta:
+
+```js
+const row = items[0].json;
+const sessaoViva = row && row.expira_em && new Date() <= new Date(row.expira_em);
+const confirmacaoPendente = sessaoViva && !!row.consulta_id;
+
+if (row && row.atendimento_humano === true) { /* ATIVA_HUMANA — sempre vence */ }
+if (paciente?.bot_pausado === true && !confirmacaoPendente) { /* BOT_PAUSADO */ }
+```
+
+O `!!row.consulta_id` é o que impede o vazamento: sem ele, qualquer sessão residual de um
+paciente pausado passaria a ser roteada para o roteiro, que cairia no ramo "consulta não
+encontrada" e poderia responder a quem a clínica silenciou de propósito.
+
+**Relacionado:** §29 (a correção que introduziu esta checagem e resolveu o problema oposto),
+§36 (o roteiro de confirmação em si), D-23 (por que a aprovação não desliga a IA).

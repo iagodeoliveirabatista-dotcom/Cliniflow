@@ -41,7 +41,32 @@ Multi-clínica por `clinic_id`.
 | **Lembrete disparado = bot mudo por 16h** | Sessão em `sessoes_ativas` desvia TUDO pro roteiro de confirmação. O `AI Agent` não roda. §36 |
 | **Execução `success` ≠ paciente recebeu algo** | Ramo que morre em nó sem saída fecha verde. Olhe `lastNodeExecuted`. §36 |
 
-## Estado atual (14/08/2026, madrugada — roteiro de confirmação consertado; redesenho B especificado)
+## Estado atual (15/08/2026 — decidido que aprovação NÃO desliga a IA; achada armadilha §37)
+
+Sessão de decisão, **sem mudança de código**. O dono perguntou se aprovar um pré-agendamento
+deveria gravar `patients.bot_pausado = true` ("paciente da clínica sempre fala com gente").
+
+- ✅ **Decidido: não.** Ver **D-23** em `docs/DECISIONS.md` para os dois motivos (mecânico e de
+  produto) e para onde a regra deve morar (spec B). ⚠️ Não "conserte" isso depois — a
+  correção óbvia quebra a confirmação por WhatsApp em silêncio.
+- ⛔ **ARMADILHAS §37 — ATIVO em produção, achado por leitura de código, ainda sem
+  correção aplicada.** `bot_pausado = true` não silencia a IA: descarta **toda** mensagem do
+  telefone, inclusive a resposta ao lembrete de 24h. `Valida Expiração` devolve
+  `BOT_PAUSADO`/`deve_processar: false`, e o Switch `Status da sessão?` não tem fallback →
+  item some. O roteiro de confirmação fica atrás da saída *Validada* e nunca roda.
+  Conferido na `activeVersion b67e21a5` (78 nós), não só no doc.
+- 🔥 **Por que é urgente:** desde `3324bc0`, `createPaciente()` faz o paciente cadastrado
+  **pela tela** nascer com `bot_pausado = true`. O próximo passo declarado é a dona cadastrar
+  a base de pacientes pela tela — **no dia em que isso acontecer, a base inteira fica sem
+  conseguir confirmar consulta**, e a execução fecha `success`. Hoje não morde só porque os
+  2 pacientes do banco vieram do bot (que cria com `false`).
+- 📋 **Correção proposta e pronta em §37, aguardando o go do dono** (mexe em produção, com
+  paciente real, e não dá para testar sem conversa de verdade).
+- ↩️ **Descartado:** dedupe de `criar_pre_agendamento` contra `pendente`. Eu tinha proposto,
+  conferi e não é necessário — as refinações pós-aprovação já caem no dedupe de 60h contra o
+  `solicitado` novo. Motivo completo no rodapé do D-23.
+
+## Estado anterior (14/08/2026, madrugada — roteiro de confirmação consertado; redesenho B especificado)
 
 Teste real do dono (execuções 83417/83421/83425) mostrou que **nada do que foi publicado
 antes tinha sido exercitado** — as três mensagens nem chegaram ao `AI Agent`.
