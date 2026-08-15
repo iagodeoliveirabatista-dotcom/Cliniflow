@@ -89,7 +89,49 @@ E ao `:root[data-theme="light"]`:
 
 Trocar `var(--supabase-border)` por `var(--supabase-border-strong)` nas três linhas de grade do `CalendarView` (`cliniflow-components.jsx:557` — borda das colunas de dia, `:643` — linha de cada hora, `:650` — linha tracejada de meia-hora). Não mexe em nenhuma outra borda do app (cards, modais, listas continuam com `--supabase-border` normal).
 
-### 3.4 Critério de pronto
+### 3.4 Destaque do dia "hoje" no calendário — invisível no tema claro
+
+`CalendarView` (`cliniflow-components.jsx:636`) marca a coluna do dia atual com:
+```js
+background: isToday ? 'rgba(255,255,255,0.012)' : 'transparent',
+```
+Um tingimento branco a 1.2% de opacidade. No tema escuro isso cria uma coluna sutilmente mais clara, visível contra o fundo quase preto. No tema claro é branco sobre branco — **o destaque não existe visualmente**, o que é exatamente o tipo de "não dá para me situar" que o usuário reportou (não dá para saber, batendo o olho, qual coluna é hoje).
+
+Correção: trocar o branco fixo por um tingimento do `accent` da clínica (já disponível como prop em `CalendarView`, mesmo padrão de `${cor}NN` usado em outros pontos do arquivo — ver a armadilha de concatenação de alfa nas Global Constraints do plano de 05/08):
+```js
+background: isToday ? `${accent}0d` : 'transparent',
+```
+Isso funciona nos dois temas sem precisar de token novo — um tingimento de 5% do accent é visível tanto sobre fundo escuro quanto claro, e reforça a identidade visual (a cor de destaque já escolhida pelo usuário) em vez de depender de branco/preto fixo.
+
+### 3.5 Camadas de fundo e borda padrão do tema claro — separação muito estreita
+
+Diagnóstico adicional (pedido pelo usuário após ver o spec): os quatro tons que formam a "profundidade" do tema claro estão todos espremidos perto do branco puro:
+
+| Token | Valor atual | Distância de `#ffffff` |
+|---|---|---|
+| `--supabase-bg-card` | `#ffffff` | 0 |
+| `--supabase-bg-main` | `#fbfcfd` | ~2 |
+| `--supabase-bg-studio` | `#f4f5f7` | ~9 |
+| `--supabase-border` | `#e6e8eb` | ~14 |
+
+Diferente do tema escuro — onde `--supabase-bg-studio` (`#0f0f0f`) e `--supabase-border` (`#2e2e2e`) têm bastante distância entre si e do card —, no tema claro sidebar, canvas, card e borda praticamente se confundem. Como a sensibilidade do olho a diferença de luminância cai perto do branco (o mesmo delta numérico "lê" muito mais fraco em tons claros do que em tons escuros), isso é a causa mais provável do "muito claro, não dá pra se localizar" além dos bugs pontuais já corrigidos acima.
+
+Correção: abrir mais a distância entre as camadas, mantendo a mesma ordem relativa que o tema escuro já usa (`studio` mais recuado que `main`, `card` sempre o mais claro/"elevado"):
+
+| Token | Valor atual | Valor novo |
+|---|---|---|
+| `--supabase-bg-card` | `#ffffff` | `#ffffff` (sem mudança — continua a superfície mais clara) |
+| `--supabase-bg-main` | `#fbfcfd` | `#f3f4f6` |
+| `--supabase-bg-studio` | `#f4f5f7` | `#e9ebef` |
+| `--supabase-border` | `#e6e8eb` | `#d8dce1` |
+| `--supabase-bg-hover` | `#f1f3f5` | `#eceef1` |
+| `--supabase-bg-input` | `#f8f9fa` | `#eef0f2` |
+
+(`--supabase-bg-hover`/`--supabase-bg-input`, criados no spec de 05/08, são reajustados junto para continuarem coerentes com os novos `main`/`studio` — sem isso, o hover ficaria mais claro que o próprio canvas da página, invertendo a hierarquia visual.) Os tokens de texto (`--supabase-text`/`-light`/`-muted`) não mudam — como os fundos ficam mais escuros, o contraste do texto só melhora, nunca piora.
+
+**Não-objetivo:** isto não muda nenhuma cor de marca/accent, não muda o tema escuro, e não é um redesign — é reabrir a distância entre tons que já existiam, na mesma ordem relativa. Ajuste fino de tom (se algum valor ainda parecer errado ao alternar o tema na cópia de teste) é esperado durante a verificação manual, não uma segunda rodada de design.
+
+### 3.6 Critério de pronto
 
 Igual ao spec de 05/08 (§3.3), reaplicado ao escopo deste spec: nos pontos listados acima, alternando o `TweaksPanel` para tema claro, nenhum texto fica ilegível contra o próprio fundo, o agendamento "Pendente" fica distinguível no card/calendário, e as linhas de hora do calendário são visíveis sem precisar apertar os olhos.
 
@@ -149,8 +191,8 @@ Mesma receita do spec de 05/08 (`docs/superpowers/plans/2026-08-05-ui-tema-claro
 
 | Arquivo | Natureza da mudança |
 |---|---|
-| `cliniflow-export/Cliniflow.html` | Novo token `--supabase-border-strong` (dois temas); novo callback `updateDuracao`; nova prop `onUpdateDuracao` passada ao `DetailPanel`. |
-| `cliniflow-export/cliniflow-components.jsx` | Cor da sidebar (linha 190) → token; `STATUS_CFG.pending`/`recusado` → tons corrigidos; 3 linhas do grid do `CalendarView` → `--supabase-border-strong`; `DetailPanel` ganha `Select` de duração no lugar do texto estático. |
+| `cliniflow-export/Cliniflow.html` | Novo token `--supabase-border-strong` (dois temas); tema claro reajustado (`--supabase-bg-main/-studio/-border/-bg-hover/-bg-input`, §3.5); novo callback `updateDuracao`; nova prop `onUpdateDuracao` passada ao `DetailPanel`. |
+| `cliniflow-export/cliniflow-components.jsx` | Cor da sidebar (linha 190) → token; `STATUS_CFG.pending`/`recusado` → tons corrigidos; 3 linhas do grid do `CalendarView` → `--supabase-border-strong`; destaque de "hoje" (linha 636) → tingimento de `accent` em vez de branco fixo; `DetailPanel` ganha `Select` de duração no lugar do texto estático. |
 | `cliniflow-export/patients-components.jsx` | `NewAppointmentModal`/`PatientPickRow` (linhas 562-665) — 11 pontos de cor fixa → tokens, listados na tabela §3.1. |
 
 A decomposição em tarefas bite-sized fica para o plano de implementação (`writing-plans`).
@@ -163,3 +205,4 @@ A decomposição em tarefas bite-sized fica para o plano de implementação (`wr
 - Este spec entra primeiro (chat, 15/08/2026).
 - Duração editável: só campo no card de detalhes agora; arrastar a borda no calendário (estilo Google Calendar) fica para depois (chat, 15/08/2026).
 - Correção de contraste aprovada como descrita: migrar cores esquecidas, escurecer só o tom claro de Pendente/Recusado (sem mudar os outros status nem o tema escuro), criar token novo e mais forte só para as linhas do calendário (chat, 15/08/2026).
+- Depois de ver o spec, o usuário achou o tema claro "ainda muito claro" e pediu mais mudanças para melhorar a localização visual. Escopo ampliado, aprovado no mesmo chat (15/08/2026): corrigir o destaque de "hoje" no calendário (branco sobre branco, invisível) e abrir a distância entre as camadas de fundo/borda do tema claro (§3.4, §3.5) — mantendo a mesma marca/paleta, sem virar redesign.
