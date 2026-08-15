@@ -222,19 +222,23 @@ function LembreteCard({ config, accent, onSave, saving, isConnected }) {
   const [draft, setDraft] = useStateA({ ...config });
   const set = (k, v) => setDraft(prev => ({ ...prev, [k]: v }));
 
-  // As chaves em uso são `lembrete_*` (criadas em 09/08/2026, com template
-  // aprovado na Meta). As `reminder_*` são de 04/06/2026, sem template, e só
-  // continuam aqui para não virar nome cru se alguém reativar pelo banco.
-  // O título NÃO cita horas: quem manda é `antecedencia_horas`, e o título fixo
-  // já mentiu — "Lembrete 2 horas antes" com 4h no banco. Ver ARMADILHAS §39.
-  const tipoLabel = {
-    lembrete_24h: { titulo: 'Lembrete do dia anterior', desc: 'Enviado antes da consulta', icon: '🔔' },
-    lembrete_4h: { titulo: 'Lembrete no dia da consulta', desc: 'Enviado próximo ao horário', icon: '⏰' },
-    reminder_24h: { titulo: 'Lembrete do dia anterior (legado)', desc: 'Sem template da Meta — não envia', icon: '🔔' },
-    reminder_2h: { titulo: 'Lembrete do dia (legado)', desc: 'Sem template da Meta — não envia', icon: '⏰' },
-    reminder_custom: { titulo: 'Lembrete personalizado (legado)', desc: 'Sem template da Meta — não envia', icon: '⚙️' },
+  // O TÍTULO É DERIVADO de `antecedencia_horas`, nunca texto fixo — e acompanha
+  // a edição ao vivo. O título fixo já mentiu em produção: "Lembrete 2 horas
+  // antes" com `antecedencia_horas = 4` no banco. Agora, mudar a antecedência no
+  // formulário renomeia o card. Ver ARMADILHAS.md §39.
+  // As chaves em uso são `lembrete_*` (09/08/2026, com template aprovado na
+  // Meta). As `reminder_*` são de 04/06/2026, sem template — ficam listadas aqui
+  // só para não virarem nome cru se alguém as reativar direto pelo banco.
+  const tipoInfo = {
+    lembrete_24h: { desc: 'Enviado no dia anterior à consulta', icon: '🔔' },
+    lembrete_4h: { desc: 'Enviado próximo ao horário da consulta', icon: '⏰' },
+    reminder_24h: { desc: 'Legado — sem template da Meta, não envia', icon: '🔔' },
+    reminder_2h: { desc: 'Legado — sem template da Meta, não envia', icon: '⏰' },
+    reminder_custom: { desc: 'Legado — sem template da Meta, não envia', icon: '⚙️' },
   };
-  const info = tipoLabel[config.tipo_lembrete] || { titulo: config.tipo_lembrete, desc: '', icon: '📩' };
+  const base = tipoInfo[config.tipo_lembrete] || { desc: '', icon: '📩' };
+  const horas = draft.antecedencia_horas || config.antecedencia_horas;
+  const info = { ...base, titulo: horas ? `Lembrete ${horas} horas antes` : config.tipo_lembrete };
 
   const handleSave = () => {
     onSave(config.id, {
@@ -269,7 +273,6 @@ function LembreteCard({ config, accent, onSave, saving, isConnected }) {
             </div>
             <div style={{ fontSize: 11.5, color: 'var(--supabase-text-muted)', marginTop: 2 }}>
               {info.desc}
-              {draft.antecedencia_horas && ` · ${draft.antecedencia_horas}h antes`}
               {config.meta_template_nome && ` · template ${config.meta_template_nome}`}
             </div>
           </div>
