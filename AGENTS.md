@@ -69,14 +69,11 @@ paciente de verdade não — **ninguém jamais confirmou consulta por WhatsApp a
 consultas futuras no banco, então nada dispara sozinho. O template `consulta_amanha` (`en`,
 lembrete de 24h) nunca teve um envio sequer; o de 4h já provou (1 envio, 14/08).
 
-✅ **Antecedência do lembrete virou campo livre** (1–720 horas inteiras, D-28), com save
-bloqueado em valor inválido e o título do card acompanhando ao vivo. Verificado rodando em
-`localhost:3000` (modo demo): 2→6→13 renomeia o card; vazio/0/999 desabilita o Salvar.
-⚠️ **Manter em 4h** enquanto o template ligado for `confirmao_horas_antes` — §41.
+✅ **Antecedência do lembrete virou campo livre** (1–720h inteiras, D-28; visto rodando em modo
+demo). ⚠️ **Manter em 4h** enquanto o template for `confirmao_horas_antes` — §41.
 
-❗ **CONFIRMADO: o CRM servido está atrasado.** O print do dono de 15/08 mostra 5 cards e
-"Envio às 14:00" — a versão commitada mostra 2. Não é bug, é cópia velha; peça hard refresh
-(Ctrl+Shift+R) / servidor apontando para o repo antes de investigar qualquer coisa na tela.
+❗ **O CRM servido está atrasado** (confirmado): o print do dono tem 5 cards e "Envio às 14:00",
+o commitado tem 2. É cópia velha, não bug — hard refresh antes de investigar a tela.
 
 ⛔ **Não existe 2ª clínica.** O isolamento multi-tenant está escrito, não testado.
 
@@ -140,4 +137,5 @@ bloqueado em valor inválido e o título do card acompanhando ao vivo. Verificad
 6. **Mudanças cirúrgicas:** não refatore o que não foi pedido.
 7. **Teto de ~100 linhas FORA a tabela de alerta.** A tabela cresce com o que doeu e não se
    corta — o resto sim: passou do teto, é detalhe demais, mova para um doc e aponte daqui.
-   Histórico vai no commit, nunca aqui. (Hoje: 135 no total, ~100 fora a tabela.)
+   Histórico vai no commit, nunca aqui. (Hoje: 141 no total, ~107 fora a tabela — **no teto**,
+   o próximo que escrever aqui tem que cortar algo.)
