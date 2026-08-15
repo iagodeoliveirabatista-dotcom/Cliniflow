@@ -13,11 +13,11 @@
   <script src="supabase.js"></script>
 
   <script src="config.js"></script>
-  <script src="supabase-client.js?v=11"></script>
+  <script src="supabase-client.js?v=12"></script>
 
   <script type="text/babel" src="tweaks-panel.jsx?v=5"></script>
   <script type="text/babel" src="cliniflow-components.jsx?v=11"></script>
-  <script type="text/babel" src="patients-components.jsx?v=9"></script>
+  <script type="text/babel" src="patients-components.jsx?v=10"></script>
   <script type="text/babel" src="reports-components.jsx?v=5"></script>
   <script type="text/babel" src="automation-components.jsx?v=6"></script>
 
@@ -172,6 +172,7 @@
       const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
       const [appts, setAppts] = useState([...APPOINTMENTS]);
       const [patients, setPatients] = useState([...PATIENTS]);
+      const [profissionais, setProfissionais] = useState([]);
       const [selectedId, setSelectedId] = useState(null);
       const [filter, setFilter] = useState('todas');
       const [page, setPage] = useState('agenda');
@@ -222,6 +223,13 @@
           }
         });
 
+        // Load profissionais
+        SB.fetchProfissionais().then(res => {
+          if (res.data) {
+            setProfissionais(res.data);
+          }
+        });
+
         // Sincronização em tempo real (Supabase Realtime) para pacientes
         const subPacientes = SB.subscribeToPacientes((payload) => {
           SB.fetchPacientes().then(res => {
@@ -231,8 +239,18 @@
           });
         });
 
+        // Sincronização em tempo real para profissionais
+        const subProfissionais = SB.subscribeToProfissionais((payload) => {
+          SB.fetchProfissionais().then(res => {
+            if (res.data) {
+              setProfissionais(res.data);
+            }
+          });
+        });
+
         return () => {
           if (subPacientes) subPacientes.unsubscribe();
+          if (subProfissionais) subProfissionais.unsubscribe();
         };
       }, []);
 
@@ -450,6 +468,34 @@
         }
       }, [dbConnected]);
 
+      const addProfissional = useCallback(async (nome) => {
+        const nomeLimpo = (nome || '').trim();
+        if (!nomeLimpo) return;
+        const tempId = 'temp_' + Date.now();
+        const novo = { id: tempId, nome: nomeLimpo, ativo: true, criado_em: new Date().toISOString() };
+        setProfissionais(prev => [...prev, novo].sort((a, b) => a.nome.localeCompare(b.nome)));
+
+        if (dbConnected) {
+          const res = await SB.createProfissional(nomeLimpo);
+          if (res.data) {
+            setProfissionais(prev => prev.map(p => p.id === tempId ? res.data : p));
+          }
+        }
+      }, [dbConnected]);
+
+      const toggleProfissionalAtivo = useCallback(async (id, novoAtivo) => {
+        setProfissionais(prev => prev.map(p => p.id === id ? { ...p, ativo: novoAtivo } : p));
+
+        if (dbConnected) {
+          await SB.updateProfissional(id, { ativo: novoAtivo });
+        }
+      }, [dbConnected]);
+
+      const profissionaisAtivos = useMemo(
+        () => profissionais.filter(p => p.ativo),
+        [profissionais]
+      );
+
       // Pedido do bot ainda não tem horário: o `data_hora` que ele carrega é o
       // now() de quando foi criado, só porque a coluna é NOT NULL. Deixá-lo na
       // grade faria a agenda mostrar compromissos que ninguém marcou.
@@ -567,6 +613,7 @@
               preferencia={extrairPreferencia(pedidoEmAprovacao.notas)}
               onClose={() => setPedidoEmAprovacao(null)}
               onSave={aprovarPedido}
+              profissionais={profissionaisAtivos}
             />
           )}
           {newApptOpen && (
@@ -576,6 +623,7 @@
               onClose={() => setNewApptOpen(false)}
               onSave={addAppt}
               currentMonday={currentMonday}
+              profissionais={profissionaisAtivos}
             />
           )}
           {newPatientOpen && (
@@ -605,6 +653,9 @@
               onSetTheme={v => setTweak('theme', v)}
               onSetAccent={v => setTweak('accent', v)}
               accent={accent}
+              profissionais={profissionais}
+              onAddProfissional={addProfissional}
+              onToggleProfissionalAtivo={toggleProfissionalAtivo}
               onClose={() => setSettingsOpen(false)}
             />
           )}
@@ -629,10 +680,11 @@
       );
     }
 
-    // ── Configurações: tema e cor de destaque ────────────────────────────
-    // Aberto pelo item "Configurações" da sidebar. Usa os mesmos tweaks
-    // (useTweaks) que o TweaksPanel — o painel externo continua funcionando.
-    function SettingsModal({ theme, accentKey, onSetTheme, onSetAccent, accent, onClose }) {
+    // ── Configurações: tema, cor de destaque e profissionais ─────────────
+    // Aberto pelo item "Configurações" da sidebar.
+    function SettingsModal({ theme, accentKey, onSetTheme, onSetAccent, accent, onClose, profissionais = [], onAddProfissional, onToggleProfissionalAtivo }) {
+      const [novoNome, setNovoNome] = useState('');
+
       useEffect(() => {
         const h = e => e.key === 'Escape' && onClose();
         window.addEventListener('keydown', h);
@@ -647,6 +699,14 @@
         fontSize:12.5, fontWeight: active ? 600 : 500,
       });
 
+      const handleAdd = (e) => {
+        e.preventDefault();
+        if (novoNome.trim() && onAddProfissional) {
+          onAddProfissional(novoNome.trim());
+          setNovoNome('');
+        }
+      };
+
       return (
         <div onClick={onClose} style={{
           position:'fixed', inset:0, zIndex:1000,
@@ -655,12 +715,13 @@
           animation:'fadeIn .2s var(--ease-premium)',
         }}>
           <div onClick={e => e.stopPropagation()} style={{
-            width:360, maxWidth:'92vw', padding:24, borderRadius:12,
+            width:420, maxWidth:'94vw', maxHeight:'90vh', padding:22, borderRadius:12,
             background:'var(--supabase-bg-card)',
             border:'1px solid var(--supabase-border)',
             boxShadow:'var(--shadow-lg)',
             animation:'slideUp .25s var(--ease-premium)',
             display:'flex', flexDirection:'column', gap:18,
+            overflowY:'auto',
           }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
               <span style={{ fontSize:15, fontWeight:600, color:'var(--supabase-text)' }}>Configurações</span>
@@ -692,6 +753,89 @@
                   }} />
                 ))}
               </div>
+            </div>
+
+            <div style={{ borderTop:'1px solid var(--supabase-border)', paddingTop:16 }}>
+              <div style={{ fontSize:11, fontWeight:600, color:'var(--supabase-text-muted)',
+                textTransform:'uppercase', letterSpacing:.7, marginBottom:8, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <span>Profissionais</span>
+                <span style={{ fontSize:10, textTransform:'none', fontWeight:400, color:'var(--supabase-icon-inactive)' }}>
+                  {profissionais.filter(p => p.ativo).length} ativo(s)
+                </span>
+              </div>
+
+              <div style={{ maxHeight:160, overflowY:'auto', display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
+                {profissionais.length === 0 ? (
+                  <div style={{
+                    fontSize:12, color:'var(--supabase-text-muted)', padding:'12px',
+                    background:'var(--supabase-bg-input)', border:'1px solid var(--supabase-border)',
+                    borderRadius:'var(--radius-studio)', textAlign:'center',
+                  }}>
+                    Nenhum profissional cadastrado.
+                  </div>
+                ) : (
+                  profissionais.map(p => (
+                    <div key={p.id} style={{
+                      display:'flex', alignItems:'center', justifyContent:'space-between',
+                      padding:'6px 10px', background:'var(--supabase-bg-input)',
+                      border:'1px solid var(--supabase-border)', borderRadius:'var(--radius-studio)',
+                    }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0, flex:1 }}>
+                        <span style={{
+                          width:7, height:7, borderRadius:'50%', flexShrink:0,
+                          background: p.ativo ? '#3ecf8e' : 'var(--supabase-text-muted)',
+                        }} />
+                        <span style={{
+                          fontSize:12.5, fontWeight:500,
+                          color: p.ativo ? 'var(--supabase-text)' : 'var(--supabase-text-muted)',
+                          textDecoration: p.ativo ? 'none' : 'line-through',
+                          whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+                        }}>{p.nome}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onToggleProfissionalAtivo && onToggleProfissionalAtivo(p.id, !p.ativo)}
+                        style={{
+                          padding:'3px 8px', borderRadius:4, cursor:'pointer',
+                          background: p.ativo ? 'rgba(239, 68, 68, 0.08)' : `${accent}15`,
+                          border: `1px solid ${p.ativo ? 'rgba(239, 68, 68, 0.25)' : accent + '40'}`,
+                          color: p.ativo ? '#ef4444' : accent,
+                          fontSize:11, fontWeight:600, flexShrink:0,
+                        }}
+                      >
+                        {p.ativo ? 'Desativar' : 'Ativar'}
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <form onSubmit={handleAdd} style={{ display:'flex', gap:6, marginTop:6 }}>
+                <input
+                  type="text"
+                  value={novoNome}
+                  onChange={e => setNovoNome(e.target.value)}
+                  placeholder="Nome do profissional (ex: Dra. Ana)"
+                  style={{
+                    flex:1, padding:'7px 10px', fontSize:12,
+                    background:'var(--supabase-bg-input)', border:'1px solid var(--supabase-border)',
+                    borderRadius:'var(--radius-studio)', color:'var(--supabase-text)', outline:'none',
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={!novoNome.trim()}
+                  style={{
+                    padding:'7px 12px', borderRadius:'var(--radius-studio)',
+                    background: novoNome.trim() ? accent : 'var(--supabase-bg-hover)',
+                    border:'none', color: novoNome.trim() ? '#000' : 'var(--supabase-icon-inactive)',
+                    fontSize:12, fontWeight:600, cursor: novoNome.trim() ? 'pointer' : 'not-allowed',
+                    flexShrink:0,
+                  }}
+                >
+                  Adicionar
+                </button>
+              </form>
             </div>
           </div>
         </div>

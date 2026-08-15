@@ -44,6 +44,26 @@ painel não depender do push. **Status:** aguardando o usuário.
 
 ## 🟢 Tomadas
 
+### D-30 — Cadastro de profissionais: só nome e status ativo, sem especialidade/cor e sem FK em consultas · 15/08/2026
+**Decisão:** tabela `public.profissionais` criada no Supabase com campos `id`, `clinic_id`, `nome`,
+`ativo` e `criado_em`. Gerenciada dentro do modal de **Configurações** (sem aba na sidebar nem
+botão inline no formulário de agendamento). `consultas.medico` **permanece coluna `text` livre**
+(sem FK para `profissionais.id`), gravando o nome selecionado.
+RLS fechado para `authenticated` com `clinic_id = auth_clinic_id()` e privilégios revogados de `anon`.
+
+**Por quê:**
+1. **Campos mínimos:** especialidade, cor de identificação, CRM/CRO e horários foram avaliados e
+   explicitamente deixados de fora por ora (mesmo raciocínio do D-25: não abstrair antes de saber
+   o que varia de verdade).
+2. **Sem FK em consultas:** ligar por FK exigiria migrar nomes fictícios já gravados em `consultas`
+   antigas. O seletor passa a alimentar a string com nomes reais cadastrados pela clínica.
+3. **Localização:** vive em Configurações para manter a navegação limpa, sem criar telas extras
+   ou sobrecarregar a sidebar.
+4. **Estado vazio:** se não houver profissionais cadastrados, os seletores de agendamento exibem
+   um aviso explicativo sem travar o restante do formulário.
+
+---
+
 ### D-29 — Remover o legado da Evolution API e os docs de status superados · 15/08/2026
 **Decisão:** apagados (o dono confirmou os três grupos):
 

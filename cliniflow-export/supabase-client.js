@@ -424,6 +424,26 @@
     };
   }
 
+  // ── PROFISSIONAIS ───────────────────────────────────────────────────────────
+
+  async function fetchProfissionais() {
+    return query(async (sb) => {
+      return sb.from('profissionais').select('*').order('nome', { ascending: true });
+    });
+  }
+
+  async function createProfissional(nome) {
+    return query(async (sb) => {
+      return sb.from('profissionais').insert({ nome: (nome || '').trim() }).select().single();
+    });
+  }
+
+  async function updateProfissional(id, dados) {
+    return query(async (sb) => {
+      return sb.from('profissionais').update(dados).eq('id', id).select().single();
+    });
+  }
+
   // ── CONFIGURAÇÃO DE AUTOMAÇÃO ───────────────────────────────────────────────
 
   async function fetchConfigAutomacao() {
@@ -692,6 +712,15 @@
       .subscribe();
   }
 
+  function subscribeToProfissionais(callback) {
+    const client = getClient();
+    if (!client) return null;
+    return client
+      .channel('profissionais_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profissionais' }, callback)
+      .subscribe();
+  }
+
   // ── UTILITÁRIOS ─────────────────────────────────────────────────────────────
 
   // Converte consulta do Supabase para o formato que os componentes esperam
@@ -817,6 +846,12 @@
     fetchPacientes,
     createPaciente,
     updatePaciente,
+
+    // Profissionais
+    fetchProfissionais,
+    createProfissional,
+    updateProfissional,
+    subscribeToProfissionais,
 
     // Consultas
     fetchConsultas,

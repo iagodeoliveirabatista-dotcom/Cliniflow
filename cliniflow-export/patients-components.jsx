@@ -393,14 +393,14 @@ function palpiteDeHorario(preferencia) {
   return { data: fmtData(data), hora };
 }
 
-function AprovarPedidoModal({ pedido, preferencia, onClose, onSave, accent }) {
+function AprovarPedidoModal({ pedido, preferencia, onClose, onSave, accent, profissionais = [] }) {
   const palpite = useMemo(() => palpiteDeHorario(preferencia), [preferencia]);
   const [f, setF] = useStateP({
     data: palpite.data,
     hora: palpite.hora,
     dur: pedido?.dur || 30,
     tipo: pedido?.type || 'Avaliação',
-    doctor: pedido?.doctor || '',
+    doctor: pedido?.doctor || (profissionais.length > 0 ? profissionais[0].nome : ''),
   });
   const set = (k, v) => setF(prev => ({ ...prev, [k]: v }));
 
@@ -459,7 +459,18 @@ function AprovarPedidoModal({ pedido, preferencia, onClose, onSave, accent }) {
               ]} />
           </Field>
           <Field label="Profissional">
-            <Input value={f.doctor} onChange={e => set('doctor', e.target.value)} placeholder="Ex: Dra. Anaruthe" />
+            {profissionais.length > 0 ? (
+              <Select value={f.doctor} onChange={v => set('doctor', v)}
+                options={profissionais.map(p => p.nome)} />
+            ) : (
+              <div style={{
+                fontSize: 11.5, color: 'var(--supabase-text-muted)', padding: '9px 10px',
+                background: 'var(--supabase-bg-input)', border: '1px solid var(--supabase-border)',
+                borderRadius: 'var(--radius-studio)', lineHeight: 1.3,
+              }}>
+                Nenhum cadastrado (Configurações)
+              </div>
+            )}
           </Field>
         </div>
 
@@ -481,14 +492,14 @@ function AprovarPedidoModal({ pedido, preferencia, onClose, onSave, accent }) {
 
 // ─── NEW APPOINTMENT MODAL ───────────────────────────────────────────────────
 
-function NewAppointmentModal({ onClose, onSave, accent, patients, defaultDay, defaultTime, currentMonday }) {
+function NewAppointmentModal({ onClose, onSave, accent, patients, defaultDay, defaultTime, currentMonday, profissionais = [] }) {
   const [f, setF] = useStateP({
     patientId: '', search: '',
     day: defaultDay ?? 0,
     time: defaultTime ?? '09:00',
     dur: 30,
     type: 'Consulta de rotina',
-    doctor: 'Dr. Carlos Mendes',
+    doctor: profissionais.length > 0 ? profissionais[0].nome : '',
     status: 'pending',
     wa: true,
     preco: '',
@@ -617,8 +628,18 @@ function NewAppointmentModal({ onClose, onSave, accent, patients, defaultDay, de
 
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
           <Field label="Médico(a)">
-            <Select value={f.doctor} onChange={v => set('doctor', v)}
-              options={['Dr. Carlos Mendes','Dra. Fernanda Costa','Dr. Paulo Ribeiro']} />
+            {profissionais.length > 0 ? (
+              <Select value={f.doctor} onChange={v => set('doctor', v)}
+                options={profissionais.map(p => p.nome)} />
+            ) : (
+              <div style={{
+                fontSize: 11.5, color: 'var(--supabase-text-muted)', padding: '9px 10px',
+                background: 'var(--supabase-bg-input)', border: '1px solid var(--supabase-border)',
+                borderRadius: 'var(--radius-studio)', lineHeight: 1.3,
+              }}>
+                Nenhum cadastrado (Configurações)
+              </div>
+            )}
           </Field>
           <Field label="Status inicial">
             <Select value={f.status} onChange={v => set('status', v)}

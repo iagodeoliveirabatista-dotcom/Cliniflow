@@ -73,11 +73,14 @@ template for `confirmao_horas_antes` (§41). 🧹 **Legado Evolution apagado** (
 ❗ **CRM servido está atrasado**: print do dono tem 5 cards, o commitado tem 2 — hard refresh
 antes de investigar qualquer coisa na tela.
 
-✅ **CRM: tema claro com mais contraste e duração da consulta editável** — cores esquecidas na
-migração de 05/08, status Pendente/Recusado, grade do calendário, destaque de "hoje" e camadas
-de fundo (`docs/superpowers/specs/2026-08-15-contraste-tema-claro-e-duracao-design.md`).
-Verificado **rodando** em modo demonstração via Browser MCP — não contra o Supabase real.
-⚠️ `node --check` não valida `.jsx` (Node não entende JSX) — real gate é o Babel do navegador. §42.
+✅ **CRM: cadastro de profissionais (médicos/dentistas)** — tabela `profissionais` no Supabase
+(`docs/db/10`, RLS fechado para authenticated), gerenciamento em Configurações (adicionar/desativar),
+e seletores de `NewAppointmentModal` e `AprovarPedidoModal` consumindo a lista real com fallback de
+estado vazio (D-30). Testado com Babel standalone e verificação de schema.
+
+✅ **CRM: tema claro com mais contraste e duração da consulta editável** — cores corrigidas,
+status Pendente/Recusado, grade do calendário, destaque de "hoje" e camadas de fundo. Verificado
+rodando em modo demonstração. ⚠️ `node --check` não valida `.jsx` (Babel do browser é o gate, §42).
 
 ⛔ **Não existe 2ª clínica.** O isolamento multi-tenant está escrito, não testado.
 
