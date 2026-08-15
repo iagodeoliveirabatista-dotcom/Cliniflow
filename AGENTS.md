@@ -64,16 +64,20 @@ bot como potencialmente falsa.
 ⏸️ **Decidido e NÃO implementado:** D-27 (consultar RAG por especificidade, não por fase da
 conversa). Texto pronto lá — aplicar **junto com os documentos reais, na mesma publicação**.
 
-⚠️ **Nada foi exercitado com conversa real.** Prova de lógica sim (22 casos fora do n8n),
-paciente de verdade não — **ninguém jamais confirmou consulta por WhatsApp aqui**. Há zero
-consultas futuras no banco, então nada dispara sozinho. O template `consulta_amanha` (`en`,
-lembrete de 24h) nunca teve um envio sequer; o de 4h já provou (1 envio, 14/08).
+⚠️ **Nada foi exercitado com conversa real.** Prova de lógica sim (22 casos), paciente de
+verdade não — zero consultas futuras no banco. `consulta_amanha` (24h) nunca enviou; o de 4h já
+provou (1 envio, 14/08).
 
 ✅ **Lembrete: antecedência virou campo livre** (1–720h, D-28) — ⚠️ **manter em 4h** enquanto o
-template for `confirmao_horas_antes` (§41). 🧹 **Legado Evolution apagado** (D-29):
-`DOCUMENTACAO.md`, `SYNC_STATUS.md`, `docs/n8n-evidencia/`, JSON do n8n, `apify/` (estão no git).
-❗ **CRM servido está atrasado**: o print do dono tem 5 cards, o commitado tem 2 — hard refresh
+template for `confirmao_horas_antes` (§41). 🧹 **Legado Evolution apagado** (D-29, ver commit).
+❗ **CRM servido está atrasado**: print do dono tem 5 cards, o commitado tem 2 — hard refresh
 antes de investigar qualquer coisa na tela.
+
+✅ **CRM: tema claro com mais contraste e duração da consulta editável** — cores esquecidas na
+migração de 05/08, status Pendente/Recusado, grade do calendário, destaque de "hoje" e camadas
+de fundo (`docs/superpowers/specs/2026-08-15-contraste-tema-claro-e-duracao-design.md`).
+Verificado **rodando** em modo demonstração via Browser MCP — não contra o Supabase real.
+⚠️ `node --check` não valida `.jsx` (Node não entende JSX) — real gate é o Babel do navegador. §42.
 
 ⛔ **Não existe 2ª clínica.** O isolamento multi-tenant está escrito, não testado.
 
@@ -137,5 +141,5 @@ antes de investigar qualquer coisa na tela.
 6. **Mudanças cirúrgicas:** não refatore o que não foi pedido.
 7. **Teto de ~100 linhas FORA a tabela de alerta.** A tabela cresce com o que doeu e não se
    corta — o resto sim: passou do teto, é detalhe demais, mova para um doc e aponte daqui.
-   Histórico vai no commit, nunca aqui. (Hoje: 141 no total, ~107 fora a tabela — **no teto**,
-   o próximo que escrever aqui tem que cortar algo.)
+   Histórico vai no commit, nunca aqui. (Hoje: 145 no total, ~110 fora a tabela — **acima do
+   teto**, o próximo que escrever aqui precisa cortar mais do que acrescenta.)

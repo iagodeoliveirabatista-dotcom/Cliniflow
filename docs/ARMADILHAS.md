@@ -1475,3 +1475,31 @@ select status_code, jsonb_pretty(content::jsonb -> 'data') from net._http_respon
 
 **Relacionado:** §39 (a família toda: painel dizendo uma coisa e o WhatsApp fazendo outra) e
 D-28 (a decisão que abriu o campo).
+
+---
+
+## 42. `node --check` não valida NADA em arquivo `.jsx` — nem tenta ⚠️ ATIVO
+
+**Sintoma:** um plano de implementação manda rodar `node --check arquivo.jsx` como gate de
+sintaxe depois de editar um `.jsx` do CRM. O comando falha com `ERR_UNKNOWN_FILE_EXTENSION`
+(Node recusa a extensão antes mesmo de abrir o arquivo) — ou, se você renomear para `.js` para
+contornar isso, falha com `SyntaxError: Unexpected token '<'` na primeira tag JSX.
+
+**Causa:** JSX nunca foi JavaScript válido. `node --check` roda o parser puro do V8, que não
+sabe o que fazer com `<div>` dentro de código. Isso vale pros 5 arquivos de componente do CRM
+(`cliniflow-components.jsx`, `patients-components.jsx`, `reports-components.jsx`,
+`automation-components.jsx`, `tweaks-panel.jsx`) — todos usam JSX puro, sem pré-compilação.
+
+**Por que isto engana:** planos anteriores (`docs/superpowers/plans/2026-08-05-*.md`) listam
+`node --check` como passo de verificação com "Expected: sem output" — nunca foi validado que o
+comando de fato passa; nenhuma sessão registrou o erro. Confirmado em 15/08/2026 rodando de
+verdade: falha sempre, em qualquer um desses arquivos, com ou sem edição.
+
+**O gate de sintaxe real deste projeto:** o Babel standalone no navegador. Se um `.jsx` tiver
+erro de sintaxe, o `<script type="text/babel">` falha ao transpilar e o console do navegador
+mostra o erro — a tela fica em branco ou o React não monta. Suba a cópia de teste (receita nos
+planos de UI) e confira o console, não tente `node --check`.
+
+**Não faça:** copiar o passo "`node --check <arquivo>.jsx`" de um plano antigo achando que já
+foi provado — nenhum foi. Se quiser um gate de sintaxe fora do navegador, seria preciso Babel
+CLI ou `@babel/parser` com o plugin JSX — nenhum dos dois está instalado neste projeto hoje.
