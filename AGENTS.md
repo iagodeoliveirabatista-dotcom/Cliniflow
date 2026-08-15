@@ -30,6 +30,7 @@ assumir. Multi-clínica por `clinic_id`. Lembretes saem por Edge Function + `pg_
 | **Fora da janela de 24h só passa TEMPLATE** | Texto livre é recusado (131047). Lembrete é sempre fora da janela. §31 |
 | **O idioma do template é o da Meta, não o do texto** | `consulta_amanha` foi aprovado como `en` com corpo em português. §31 |
 | **"Ligado" no painel de lembretes ≠ "envia"** | Sem `meta_template_nome` a config é pulada em silêncio. Confira no banco, não no toggle. §39 |
+| **O RAG é de uma clínica FICTÍCIA** | Preço, convênio, endereço e CRO que o bot cita são inventados. Não ligue divulgação de preço. §40 |
 | **`list_tables` mente sobre contagem de linhas** | Reportou 0 numa tabela com 3. Use `count(*)` antes de concluir que está vazia. §32 |
 | **Nó Supabase que não acha nada mata o ramo** | Execução fica `success` e para no meio. O `If` seguinte nunca roda. `alwaysOutputData`. §25 |
 | **`Busca Paciente` casa só por telefone** | Sem `clinic_id` no filtro, a 2ª clínica pega paciente da 1ª. §26 |
@@ -67,6 +68,10 @@ assumir. Multi-clínica por `clinic_id`. Lembretes saem por Edge Function + `pg_
 
 ## 🎯 Próximos passos (comece por aqui)
 
+0. 🔥 **Trocar os 7 documentos do RAG pelos dados reais da Anaruthe.** Hoje eles descrevem uma
+   clínica **fictícia** ("Sorriso & Essência"), e o bot responde paciente real com preços,
+   convênios, endereço e um CRO inventados. §40. É o único item desta lista que já causa dano
+   agora, e nenhum agente resolve — depende de conteúdo da clínica.
 1. **Fechar o ciclo de ponta a ponta, com paciente real.** Aprovar pedido → esperar o lembrete →
    responder "ok" → conferir se `consultas.status` virou `confirmado`. Um teste valida §37, §38,
    §39 e D-23 de uma vez. **É o item mais valioso do projeto agora.**

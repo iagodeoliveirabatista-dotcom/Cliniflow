@@ -1379,3 +1379,42 @@ UPDATE. A prova é a próxima consulta entrar na janela de 24h e o paciente rece
 
 **Relacionado:** §31 (só template fora da janela), §10 (lembretes mortos por 48 dias sem ninguém
 ver), §38.
+
+## 40. O RAG inteiro é de uma clínica fictícia — e o bot já responde com ele
+
+**Status: ATIVO em produção, sem correção possível por agente** (depende de conteúdo real da
+clínica). Achado em 15/08/2026 ao investigar se dava para divulgar preço.
+
+**Sintoma:** nenhum. É esse o problema. O bot responde perguntas específicas com confiança
+total, citando valores, convênios, endereço e nomes de profissionais — **de outra clínica, que
+não existe.**
+
+**Causa:** `clinics.name` é `Clinica Anaruthe` (cliente real, e é esse nome que o prompt
+interpola). Os 7 documentos de `documentos_clinica` descrevem a **"Clínica Sorriso & Essência"**,
+e o próprio texto do documento 20 diz: *"é uma clínica fictícia"*. São dados de teste que nunca
+foram trocados.
+
+O que está no ar sendo dito para paciente real:
+
+| Tema | O que o RAG devolve |
+|---|---|
+| Preços | Limpeza R$ 180 · Clareamento R$ 950 · Invisalign R$ 8.500 · Botox R$ 1.200 · Implante R$ 3.200 |
+| Convênios | OdontoPrev, SulAmérica Odonto, Hapvida, Bradesco Saúde Dental, Uniodonto |
+| Profissional | "Dra. Mariana Albuquerque — **CRO-PE 15422**" (registro profissional inventado) |
+| Endereço | Avenida das Palmeiras, 1450 — Centro, Petrolina/PE |
+| Emergência | (87) 99911-4455 |
+
+**Por que ninguém viu:** o prompt manda usar o RAG em toda pergunta específica, e a resposta
+volta bem escrita e plausível. Não há erro, não há log, e quem testou conhecia o sistema — não
+ia conferir se o CRO existe. A ordem de gravidade prática é convênio > preço > CRO: o paciente
+que pergunta "aceita OdontoPrev?" recebe "sim", falta ao trabalho e descobre no balcão.
+
+**Correção:** substituir os 7 documentos pelos dados reais da Anaruthe. Não dá para um agente
+fazer — é conteúdo que só a clínica tem.
+
+⚠️ **Enquanto os documentos forem fictícios, NÃO ligue divulgação de preço** e considere que
+toda resposta específica do bot é potencialmente falsa. O `[PREÇO]` do prompt já autoriza citar
+valor do documento — a permissão existe, o que falta é o documento estar certo.
+
+**Relacionado:** §15 (o chunking da tabela de preços não é recuperado) — é problema real, mas
+só passa a importar DEPOIS que os documentos forem verdadeiros. Hoje é o menor dos dois.
