@@ -204,6 +204,12 @@
       }
     }
 
+    // Paciente cadastrado por aqui ja e paciente da clinica: quem atende e a
+    // recepcao, nao a IA. So fica com a IA quem pedir explicitamente.
+    // (clinic_id nao vai no insert de proposito — a coluna tem DEFAULT
+    // auth_clinic_id(), ver docs/db/08-clinic-id-default.sql)
+    const botPausado = dados.bot_pausado !== undefined ? dados.bot_pausado : true;
+
     return query(async (sb) => {
       return sb.from('patients').insert({
         nome: dados.nome || dados.name,
@@ -212,6 +218,7 @@
         convenio: dados.convenio || 'Particular',
         data_nasc: dataNasc,
         status: dados.status || 'novo',
+        bot_pausado: botPausado,
       }).select().single();
     });
   }

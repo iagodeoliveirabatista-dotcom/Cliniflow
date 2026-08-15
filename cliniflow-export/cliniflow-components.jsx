@@ -1517,16 +1517,11 @@ function AtendimentosView({ accent }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{
                     fontSize: 9.5, padding: '1px 5px', borderRadius: 4,
-                    background: conv.assignee_id ? 'rgba(91,140,255,0.1)' : 'rgba(62,207,142,0.1)',
-                    color: conv.assignee_id ? '#5b8cff' : '#3ecf8e', fontWeight: 600
+                    background: conv.assignee_id ? 'rgba(91,140,255,0.1)' : (p.bot_pausado ? 'rgba(239,68,68,0.1)' : 'rgba(62,207,142,0.1)'),
+                    color: conv.assignee_id ? '#5b8cff' : (p.bot_pausado ? '#ef4444' : '#3ecf8e'), fontWeight: 600
                   }}>
-                    {conv.assignee_id ? 'Humano' : 'IA Ativa'}
+                    {conv.assignee_id ? 'Humano' : (p.bot_pausado ? 'IA Inativa' : 'IA Ativa')}
                   </span>
-                  {p.bot_pausado && (
-                    <span style={{ fontSize: 9.5, padding: '1px 5px', borderRadius: 4, background: 'rgba(239,68,68,0.1)', color: '#ef4444', fontWeight: 600 }}>
-                      Pausado
-                    </span>
-                  )}
                 </div>
               </div>
             );
@@ -1671,7 +1666,7 @@ function AtendimentosView({ accent }) {
               padding: '10px 12px', borderRadius: 6, background: 'var(--supabase-bg-input)', border: '1px solid var(--supabase-border)'
             }}>
               <span style={{ fontSize: 12, color: 'var(--supabase-text-muted)', fontWeight: 500 }}>
-                {selectedConversa.patient?.bot_pausado ? '🤖 IA Pausada' : '🤖 IA Ativa'}
+                {selectedConversa.patient?.bot_pausado ? '🤖 IA Inativa' : '🤖 IA Ativa'}
               </span>
               <button
                 onClick={togglePausaBot}

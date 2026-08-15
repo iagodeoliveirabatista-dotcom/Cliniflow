@@ -176,7 +176,9 @@ function ModalFooter({ onCancel, onSave, saveLabel, accent, saveDisabled }) {
 // ─── ADD PATIENT MODAL ───────────────────────────────────────────────────────
 
 function AddPatientModal({ onClose, onSave, accent }) {
-  const [f, setF] = useStateP({ name:'', data_nasc:'', phone:'', email:'', convenio:'Particular' });
+  // bot_ativo nasce false de proposito: quem e cadastrado aqui ja e paciente da
+  // clinica e deve ser atendido por gente. A IA e opt-in, nao opt-out.
+  const [f, setF] = useStateP({ name:'', data_nasc:'', phone:'', email:'', convenio:'Particular', bot_ativo:false });
   const set = (k,v) => setF(prev => ({ ...prev, [k]: v }));
   const ok = f.name.trim().length > 0 && f.phone.trim().length > 0;
 
@@ -189,6 +191,7 @@ function AddPatientModal({ onClose, onSave, accent }) {
       data_nasc: f.data_nasc || null,
       phone: f.phone, email: f.email,
       convenio: f.convenio, last:'—', visits:0, status:'novo',
+      bot_pausado: !f.bot_ativo,
     });
     onClose();
   };
@@ -213,6 +216,34 @@ function AddPatientModal({ onClose, onSave, accent }) {
         <Field label="Convênio">
           <Select value={f.convenio} onChange={v => set('convenio', v)}
             options={['Particular','Unimed','Bradesco Saúde','SulAmérica','Amil','Hapvida','Outro']} />
+        </Field>
+        <Field label="Atendimento no WhatsApp">
+          <div style={{
+            display:'flex', alignItems:'center', justifyContent:'space-between',
+            padding:'10px 12px', borderRadius:6,
+            background:'var(--supabase-bg-input)', border:'1px solid var(--supabase-border)'
+          }}>
+            <span style={{ fontSize:12, fontWeight:500, color:'var(--supabase-text-muted)' }}>
+              {f.bot_ativo ? '🤖 IA Ativa' : '🤖 IA Inativa'}
+            </span>
+            <button type="button" onClick={() => set('bot_ativo', !f.bot_ativo)}
+              style={{
+                position:'relative', width:34, height:18, border:0, borderRadius:999,
+                background: f.bot_ativo ? accent : 'var(--supabase-border)',
+                cursor:'pointer', padding:0, transition:'background .15s'
+              }}>
+              <span style={{
+                position:'absolute', top:2, left: f.bot_ativo ? 18 : 2,
+                width:14, height:14, borderRadius:'50%', background:'#fff',
+                boxShadow:'0 1px 3px rgba(0,0,0,0.3)', transition:'left .15s'
+              }} />
+            </button>
+          </div>
+          <p style={{ fontSize:10.5, color:'var(--supabase-icon-inactive)', marginTop:6, lineHeight:1.4 }}>
+            {f.bot_ativo
+              ? 'A IA vai responder este paciente no WhatsApp automaticamente.'
+              : 'A IA não responde este paciente. As mensagens dele chegam em Atendimentos para a recepção responder.'}
+          </p>
         </Field>
       </div>
       <ModalFooter onCancel={onClose} onSave={save} saveLabel="Cadastrar paciente" accent={accent} saveDisabled={!ok} />

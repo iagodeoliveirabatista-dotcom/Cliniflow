@@ -389,6 +389,7 @@
             email: p.email,
             convenio: p.convenio,
             data_nasc: p.data_nasc,
+            bot_pausado: p.bot_pausado,
           });
           if (res.data) {
             setPatients(prev => [SB.pacienteToPatient(res.data), ...prev]);
