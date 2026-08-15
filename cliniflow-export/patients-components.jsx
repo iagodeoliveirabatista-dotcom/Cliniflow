@@ -559,7 +559,7 @@ function NewAppointmentModal({ onClose, onSave, accent, patients, defaultDay, de
                 background:'var(--supabase-bg-card)', border:'1px solid var(--supabase-border)', borderRadius:'var(--radius-studio)',
               }}>
                 {filtered.length === 0 && (
-                  <div style={{ padding:'14px 12px', fontSize:12, color:'#444', textAlign:'center' }}>
+                  <div style={{ padding:'14px 12px', fontSize:12, color:'var(--supabase-icon-inactive)', textAlign:'center' }}>
                     Nenhum paciente encontrado
                   </div>
                 )}
@@ -581,11 +581,11 @@ function NewAppointmentModal({ onClose, onSave, accent, patients, defaultDay, de
                 fontSize:11, fontWeight:600, color:accent,
               }}>{selectedPatient.initials}</div>
               <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:13, fontWeight:500, color:'#e6e6e6' }}>{selectedPatient.name}</div>
-                <div style={{ fontSize:11, color:'#555' }}>{formatarTelefone(selectedPatient.phone)} · {selectedPatient.age} anos</div>
+                <div style={{ fontSize:13, fontWeight:500, color:'var(--supabase-text-light)' }}>{selectedPatient.name}</div>
+                <div style={{ fontSize:11, color:'var(--supabase-text-muted)' }}>{formatarTelefone(selectedPatient.phone)} · {selectedPatient.age} anos</div>
               </div>
               <button onClick={() => { set('patientId',''); set('search',''); }} style={{
-                background:'none', border:'none', color:'#666', cursor:'pointer',
+                background:'none', border:'none', color:'var(--supabase-text-muted)', cursor:'pointer',
                 fontSize:12, padding:'4px 8px', borderRadius:4,
               }}>Trocar</button>
             </div>
@@ -634,7 +634,7 @@ function NewAppointmentModal({ onClose, onSave, accent, patients, defaultDay, de
 
         <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer', marginTop:4, marginBottom:14 }}>
           <input type="checkbox" checked={f.wa} onChange={e => set('wa', e.target.checked)} style={{ accentColor: accent }} />
-          <span style={{ fontSize:12.5, color:'#aaa' }}>Enviar lembrete automático via WhatsApp</span>
+          <span style={{ fontSize:12.5, color:'var(--supabase-text-light)' }}>Enviar lembrete automático via WhatsApp</span>
         </label>
       </div>
       <ModalFooter onCancel={onClose} onSave={save} saveLabel="Agendar consulta" accent={accent} saveDisabled={!ok} />
@@ -654,15 +654,15 @@ function PatientPickRow({ p, onClick, accent }) {
       }}>
       <div style={{
         width:26, height:26, borderRadius:'50%', flexShrink:0,
-        background:'#1c1c1c', border:'1px solid #252525',
+        background:'var(--supabase-bg-hover)', border:'1px solid var(--supabase-border)',
         display:'flex', alignItems:'center', justifyContent:'center',
-        fontSize:10, fontWeight:600, color:'#888',
+        fontSize:10, fontWeight:600, color:'var(--supabase-text-muted)',
       }}>{p.initials}</div>
       <div style={{ flex:1, minWidth:0 }}>
-        <div style={{ fontSize:12.5, color:'#ccc', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{p.name}</div>
-        <div style={{ fontSize:11, color:'#484848' }}>{formatarTelefone(p.phone)}</div>
+        <div style={{ fontSize:12.5, color:'var(--supabase-text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{p.name}</div>
+        <div style={{ fontSize:11, color:'var(--supabase-text-muted)' }}>{formatarTelefone(p.phone)}</div>
       </div>
-      <span style={{ fontSize:10.5, color:'#3a3a3a' }}>{p.convenio}</span>
+      <span style={{ fontSize:10.5, color:'var(--supabase-icon-inactive)' }}>{p.convenio}</span>
     </div>
   );
 }
