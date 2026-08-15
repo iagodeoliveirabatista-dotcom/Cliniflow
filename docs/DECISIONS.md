@@ -49,6 +49,86 @@ Parecem de outro trabalho. Foram **mantidos** na limpeza de 26/07/2026 por preca
 
 ## 🟢 Tomadas
 
+### D-27 — Consultar o RAG por especificidade da mensagem, não por fase da conversa · 15/08/2026
+**Status: DECIDIDO, NÃO IMPLEMENTADO.** Bloqueado por §40 — só aplicar junto com os documentos
+reais da Anaruthe, **na mesma publicação**.
+
+**Decisão:** substituir as seções `[COMO RESPONDER - SONDAGEM E CONVERSA GERAL]` e
+`[COMO RESPONDER - PERGUNTA ESPECÍFICA]` do `systemMessage` por uma só, ancorada em **se a
+mensagem nomeia algo que um documento consegue responder** — não na fase da conversa.
+
+**O problema com a regra atual:** ela bloqueia o RAG durante "sondagem". Mas *"tenho manchas nos
+dentes"* é classificado como sondagem e **nomeia uma condição concreta com resposta na base**.
+O paciente recebe acolhimento vazio. É isso que faz o bot soar raso — não o limite de parágrafo,
+que o dono suspeitava (e que já permite 2 parágrafos em pergunta específica).
+
+**Por que não liberar geral:** desejo genérico ("quero melhorar meu sorriso") não tem resposta
+determinada — mapeia para N procedimentos. Responder ali vira escolha arbitrária ou lista que
+afoga. E cada consulta ao RAG é uma chamada a mais num caminho que já derrubou execução inteira
+com 503 do Gemini (§33).
+
+**Texto pronto para colar (não re-derive):**
+
+> **[QUANDO CONSULTAR A BASE DE DOCUMENTOS]**
+> O que decide não é a fase da conversa, é se a mensagem nomeia alguma coisa que um documento
+> consegue responder.
+>
+> CONSULTE quando o paciente nomear um procedimento ("vocês têm Invisalign?"), uma condição ou
+> sintoma ("tenho manchas nos dentes", "meu dente está sensível", "tenho rugas na testa"), ou
+> perguntar algo operacional determinado — preço de um procedimento, convênio, quem atende, como
+> é o pós. Responda com o que o documento realmente traz, em até 2 parágrafos curtos, só o que
+> foi perguntado.
+>
+> NÃO CONSULTE em saudação ("oi", "bom dia") nem em desejo genérico sem alvo ("quero melhorar
+> meu sorriso"). Isso não tem resposta determinada. Seja breve (1 parágrafo, 2-3 frases),
+> acolha, e faça UMA pergunta que transforme o desejo genérico em algo concreto ("o que mais te
+> incomoda hoje?").
+>
+> Na dúvida entre os dois, trate como genérico e pergunte: uma pergunta a mais custa menos que
+> uma resposta errada.
+
+**Efeito de segunda ordem que justifica o desenho:** no caso vago o bot não fica raso *nem*
+consulta à toa — ele converte o vago em específico com uma pergunta, e o turno seguinte já cai
+no ramo que consulta.
+
+⚠️ `"tenho rugas"` sai da lista de exemplos genéricos: sob esta regra é específico. É intencional.
+
+### D-26 — Dia e turno na mesma pergunta, com o turno fechado · 15/08/2026
+**Decisão:** o bot pergunta dia e turno **numa mensagem só** — *"Tem algum dia da semana que fica
+melhor pra você? E prefere de manhã ou à tarde?"*. O turno é sempre escolha fechada
+(manhã/tarde); só o dia pode ficar aberto. Publicado na `activeVersion 96f84442`.
+
+**Por quê:** o bot **não marca nada** — ele coleta uma preferência em texto livre que vira nota
+num pedido `solicitado`, e quem escolhe a hora exata é a recepção. Logo o alvo não é precisão
+máxima, é sinal suficiente com o mínimo de fricção. Segmentar em duas trocas gastava um
+round-trip para obter precisão que a recepção descarta.
+
+**Por que o turno fica fechado:** o prompt já proibia pergunta aberta e vaga, e por bom motivo —
+"que dia você prefere?" puxa "qualquer dia", que é nota ruim. A proposta original do dono era
+abrir os dois; manter o turno binário preserva a qualidade da nota sem custar troca.
+
+**O que torna seguro responder pela metade:** §35 exige `intencao = quer_agendar` junto com
+`periodo_preferencia`, então resposta parcial não cria pedido fantasma; e o dedupe de 60h da
+`criar_pre_agendamento` faz o complemento **atualizar a mesma linha** em vez de criar um segundo
+pedido. Sem esse dedupe esta decisão geraria fila duplicada.
+
+⚠️ **Não "conserte" isso voltando para duas perguntas.** Foi medido contra o custo do
+round-trip, não é descuido.
+
+### D-25 — Prompt por cliente (persona em tabela) fica para o segundo cliente · 15/08/2026
+**Decisão:** **não** construir agora configuração de persona/prompt por clínica no Supabase. O
+prompt segue como texto no nó `AI Agent`. Adiado a pedido do dono, e nada foi começado.
+
+**Por quê:** com um cliente não se sabe o que varia de verdade — abstrair agora garante abstrair
+errado e pagar duas vezes. É o mesmo raciocínio já fechado no **D-22**: neste projeto workflow
+não se reconstrói, se duplica. Duplicar para o cliente 2 é barato e ensina o que difere.
+
+**Onde está o acoplamento real (para quando chegar a hora):** não é o nome da clínica — esse já é
+dinâmico via `{{ $('Busca Clinica').first().json.name }}`. É o **domínio**: os exemplos do prompt
+estão cravados em odontologia/estética ("Invisalign", "botox", "rugas", "sorriso"), espalhados por
+quatro seções. Em outro nicho isso é reescrita, não substituição de variável. É isso que vira
+campo configurável.
+
 ### D-24 — Clínica nova nasce com ZERO lembretes, sem seed automático · 15/08/2026
 **Decisão:** ao criar uma clínica, o sistema **não** cria configs em
 `config_automacao`. A aba Lembretes aparece vazia, com um aviso explicando o que falta.

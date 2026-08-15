@@ -49,29 +49,37 @@ assumir. Multi-clínica por `clinic_id`. Lembretes saem por Edge Function + `pg_
 
 ## Estado atual (15/08/2026)
 
-- ✅ **Confirmação sobrevive à IA inativa.** `bot_pausado` descartava toda mensagem do telefone,
-  resposta ao lembrete inclusive; agora abre exceção para sessão viva com `consulta_id`.
-  n8n `activeVersion dea36506` (78 nós). §37
-- ✅ **"ok"/"certo" confirmam consulta.** A regra 10 (SAUDAÇÕES, ancorada) roubava as palavras da
-  regra 12 em `Valida contexto`. §38
-- ✅ **Aprovar pedido desliga a IA daquele paciente** (D-23). Depende do item 1 — se o n8n voltar
-  para versão anterior a `dea36506`, esta decisão vira bug.
-- ✅ **Lembretes voltaram a existir.** Estavam TODOS mortos: as configs ativas não tinham
-  `meta_template_nome`, e sem template a Meta recusa fora da janela de 24h. §39
-- ✅ **Lembretes multi-tenant.** `config_automacao` ganhou `clinic_id` (era a única tabela
-  operacional sem), policy por clínica no lugar de `USING (true)`, e a Edge Function filtra
-  consultas por clínica. `docs/db/09`, Edge Function v10.
-- ⚠️ **Nada disso foi exercitado com conversa real.** Prova de lógica sim (22 casos rodados fora
-  do n8n), paciente de verdade não. **Ninguém jamais confirmou consulta por WhatsApp aqui.**
-- ⛔ **Não existe 2ª clínica.** O isolamento multi-tenant está escrito, não testado contra um
-  segundo tenant.
+✅ **Consertado e publicado nesta data** (detalhe no §/D indicado, não repito aqui):
+confirmação sobrevive à IA inativa (§37) · "ok"/"certo" confirmam consulta (§38) · aprovar
+pedido desliga a IA do paciente (D-23) · lembretes voltaram a existir, estavam TODOS mortos
+(§39) · lembretes viraram multi-tenant, `config_automacao` ganhou `clinic_id` e policy por
+clínica (`docs/db/09`, Edge Function v10) · dia+turno numa pergunta só (D-26).
+⚠️ `dea36506` é **piso** do n8n: voltar para antes dele reabre o §37 e quebra o D-23.
+
+⛔ **O RAG é de uma clínica FICTÍCIA e está no ar** (§40). O dono ficou de produzir o documento
+real da Anaruthe. Até lá: não ligue divulgação de preço, e trate toda resposta específica do
+bot como potencialmente falsa.
+
+⏸️ **Decidido e NÃO implementado:** D-27 (consultar RAG por especificidade, não por fase da
+conversa). Texto pronto lá — aplicar **junto com os documentos reais, na mesma publicação**.
+
+⚠️ **Nada foi exercitado com conversa real.** Prova de lógica sim (22 casos fora do n8n),
+paciente de verdade não — **ninguém jamais confirmou consulta por WhatsApp aqui**. Há zero
+consultas futuras no banco, então nada dispara sozinho. O template `consulta_amanha` (`en`,
+lembrete de 24h) nunca teve um envio sequer; o de 4h já provou (1 envio, 14/08).
+
+❓ **CRM: não confirmado se o commitado está servido.** Print do dono mostrava tela antiga
+após as mudanças. Checagem: abrir Automações — 3 cards ou "Envio às 14:00" = cópia atrasada.
+
+⛔ **Não existe 2ª clínica.** O isolamento multi-tenant está escrito, não testado.
 
 ## 🎯 Próximos passos (comece por aqui)
 
 0. 🔥 **Trocar os 7 documentos do RAG pelos dados reais da Anaruthe.** Hoje eles descrevem uma
    clínica **fictícia** ("Sorriso & Essência"), e o bot responde paciente real com preços,
    convênios, endereço e um CRO inventados. §40. É o único item desta lista que já causa dano
-   agora, e nenhum agente resolve — depende de conteúdo da clínica.
+   agora, e nenhum agente resolve — depende de conteúdo da clínica (o dono ficou de produzir).
+   **Ao fazer isso, aplique o D-27 na mesma publicação** — o texto já está pronto lá.
 1. **Fechar o ciclo de ponta a ponta, com paciente real.** Aprovar pedido → esperar o lembrete →
    responder "ok" → conferir se `consultas.status` virou `confirmado`. Um teste valida §37, §38,
    §39 e D-23 de uma vez. **É o item mais valioso do projeto agora.**
@@ -110,8 +118,8 @@ assumir. Multi-clínica por `clinic_id`. Lembretes saem por Edge Function + `pg_
 | Specs e planos | `docs/superpowers/` |
 
 **IDs úteis:** n8n `ZAQ6I2CiBGh8swye` — nome real **"Project Clinica - Migração para Meta"**,
-**78 nós**, `activeVersion dea36506` · Supabase `mxvaufkqijdkapvtkvee` · clínica única
-`7936105a-b198-419f-bad7-a65e2e60725b`
+**78 nós**, `activeVersion 96f84442` (corrente) · Supabase `mxvaufkqijdkapvtkvee` · clínica única
+`7936105a-b198-419f-bad7-a65e2e60725b` (`Clinica Anaruthe`)
 
 ## Regras para agentes (CONTRATO)
 1. **Antes de codar:** leia `docs/DECISIONS.md` (o que já foi rejeitado) e `docs/ARMADILHAS.md`.
@@ -123,5 +131,6 @@ assumir. Multi-clínica por `clinic_id`. Lembretes saem por Edge Function + `pg_
 5. **Honestidade:** "publicado" ≠ "funciona". Só marque ✅ o que você **viu rodando**, e diga
    explicitamente o que não testou.
 6. **Mudanças cirúrgicas:** não refatore o que não foi pedido.
-7. **Teto de ~100 linhas neste arquivo.** Passou? É detalhe demais — mova para um doc e aponte.
-   Histórico vai no commit, não aqui.
+7. **Teto de ~100 linhas FORA a tabela de alerta.** A tabela cresce com o que doeu e não se
+   corta — o resto sim: passou do teto, é detalhe demais, mova para um doc e aponte daqui.
+   Histórico vai no commit, nunca aqui. (Hoje: 135 no total, ~100 fora a tabela.)
