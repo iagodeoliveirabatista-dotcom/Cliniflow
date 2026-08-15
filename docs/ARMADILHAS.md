@@ -1418,3 +1418,50 @@ valor do documento — a permissão existe, o que falta é o documento estar cer
 
 **Relacionado:** §15 (o chunking da tabela de preços não é recuperado) — é problema real, mas
 só passa a importar DEPOIS que os documentos forem verdadeiros. Hoje é o menor dos dois.
+
+## 41. A antecedência do lembrete é configurável; o texto que o paciente recebe, não
+
+**Status: LIMITE CONHECIDO, não corrigido** (depende de template novo na Meta, que o dono
+assumiu). Achado em 15/08/2026 ao liberar a antecedência livre (D-28).
+
+**Sintoma que vai acontecer:** alguém muda a antecedência do lembrete curto de 4h para 2h no
+painel, o card passa a dizer "Lembrete 2 horas antes", o disparo realmente sai 2h antes — e o
+paciente recebe **"Sua consulta é daqui a 4 horas"**.
+
+**Causa:** o corpo aprovado do template é fixo. Conferido direto na Graph API:
+
+```
+confirmao_horas_antes (pt_BR, APPROVED)
+"Olá {{nome}}! Sua consulta é daqui a 4 horas ({{hora}}) com {{medico}}.
+
+Te esperamos! 😊"
+```
+
+As "4 horas" são **texto**, não parâmetro — os params declarados são só `nome`, `hora`,
+`medico`. Fora da janela de 24h a Meta só entrega template aprovado, então não há como o
+Cliniflow reescrever isso em tempo de envio.
+
+**Confusão extra:** `config_automacao.template_mensagem` tem o mesmo texto e É editável na tela,
+com preview. Mas ele alimenta só o histórico do CRM (`disparar-lembretes/index.ts:111`) — o que
+o paciente recebe é o template da Meta. Editar ali conserta a aparência e não conserta o envio.
+
+**Correção quando quiserem antecedência de verdade livre:** aprovar na Meta um template com as
+horas como variável (`daqui a {{horas}} horas`) ou sem citar horas, apontar
+`meta_template_nome`/`meta_template_params` para ele e só então usar valores diferentes de 4.
+
+**Para ler o corpo real de um template sem expor o token** (mesma receita do §31, agora com o
+detalhe de que o `net.http_get` é assíncrono — o `_http_response` não existe no mesmo statement):
+
+```sql
+-- 1) dispara e guarda o id
+with c as (select meta_waba_id w, meta_access_token t from clinics where id = '<clinic>')
+select net.http_get(
+  url := 'https://graph.facebook.com/v20.0/' || c.w || '/message_templates?fields=name,language,status,components',
+  headers := jsonb_build_object('Authorization', 'Bearer ' || c.t)
+) from c;
+-- 2) num segundo statement, lê o corpo
+select status_code, jsonb_pretty(content::jsonb -> 'data') from net._http_response where id = <id>;
+```
+
+**Relacionado:** §39 (a família toda: painel dizendo uma coisa e o WhatsApp fazendo outra) e
+D-28 (a decisão que abriu o campo).

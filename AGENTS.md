@@ -30,6 +30,7 @@ assumir. Multi-clínica por `clinic_id`. Lembretes saem por Edge Function + `pg_
 | **Fora da janela de 24h só passa TEMPLATE** | Texto livre é recusado (131047). Lembrete é sempre fora da janela. §31 |
 | **O idioma do template é o da Meta, não o do texto** | `consulta_amanha` foi aprovado como `en` com corpo em português. §31 |
 | **"Ligado" no painel de lembretes ≠ "envia"** | Sem `meta_template_nome` a config é pulada em silêncio. Confira no banco, não no toggle. §39 |
+| **Antecedência é configurável; o texto do template NÃO** | `confirmao_horas_antes` tem "4 horas" cravado no corpo aprovado. Mudou para 2h? A mensagem mente. §41 |
 | **O RAG é de uma clínica FICTÍCIA** | Preço, convênio, endereço e CRO que o bot cita são inventados. Não ligue divulgação de preço. §40 |
 | **`list_tables` mente sobre contagem de linhas** | Reportou 0 numa tabela com 3. Use `count(*)` antes de concluir que está vazia. §32 |
 | **Nó Supabase que não acha nada mata o ramo** | Execução fica `success` e para no meio. O `If` seguinte nunca roda. `alwaysOutputData`. §25 |
@@ -68,8 +69,14 @@ paciente de verdade não — **ninguém jamais confirmou consulta por WhatsApp a
 consultas futuras no banco, então nada dispara sozinho. O template `consulta_amanha` (`en`,
 lembrete de 24h) nunca teve um envio sequer; o de 4h já provou (1 envio, 14/08).
 
-❓ **CRM: não confirmado se o commitado está servido.** Print do dono mostrava tela antiga
-após as mudanças. Checagem: abrir Automações — 3 cards ou "Envio às 14:00" = cópia atrasada.
+✅ **Antecedência do lembrete virou campo livre** (1–720 horas inteiras, D-28), com save
+bloqueado em valor inválido e o título do card acompanhando ao vivo. Verificado rodando em
+`localhost:3000` (modo demo): 2→6→13 renomeia o card; vazio/0/999 desabilita o Salvar.
+⚠️ **Manter em 4h** enquanto o template ligado for `confirmao_horas_antes` — §41.
+
+❗ **CONFIRMADO: o CRM servido está atrasado.** O print do dono de 15/08 mostra 5 cards e
+"Envio às 14:00" — a versão commitada mostra 2. Não é bug, é cópia velha; peça hard refresh
+(Ctrl+Shift+R) / servidor apontando para o repo antes de investigar qualquer coisa na tela.
 
 ⛔ **Não existe 2ª clínica.** O isolamento multi-tenant está escrito, não testado.
 

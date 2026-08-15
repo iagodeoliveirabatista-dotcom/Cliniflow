@@ -49,6 +49,30 @@ Parecem de outro trabalho. Foram **mantidos** na limpeza de 26/07/2026 por preca
 
 ## 🟢 Tomadas
 
+### D-28 — Antecedência do lembrete é valor livre em horas inteiras, não lista fixa · 15/08/2026
+**Decisão:** o campo "Antecedência" do card de lembrete virou entrada numérica livre (1 a 720
+horas inteiras), no lugar do `select` com 2/4/12/24/48. Pedido do dono: "tem que ser maleável,
+de acordo com o horário que eu definir, e fluido".
+
+**Por que só horas inteiras:** o `pg_cron` chama a `disparar-lembretes` de hora em hora
+(`0 * * * *`) e a janela de busca é `agora + antecedencia_horas` até `+1h`. Uma antecedência de
+2,5h não teria como ser respeitada — o disparo ia arredondar sozinho e a tela mentiria de novo,
+que é a família de erro do §39. A coluna no banco também é `integer`. O teto de 720 (30 dias) é
+só guarda contra estourar o `int4` com o que for digitado.
+
+**O que NÃO foi feito, e é o limite real desta mudança:** o texto entregue ao paciente **não
+acompanha** a antecedência. Ele vem do template aprovado na Meta, e o `confirmao_horas_antes`
+tem **"4 horas" cravado no corpo** (§41). Mudar a antecedência muda *quando* o lembrete sai, não
+*o que* está escrito. O card avisa isso ao lado do campo.
+
+**Quem cuida disso:** o dono assumiu a gestão dos templates da Meta ("eu resolvo questões de
+template"). Enquanto o `confirmao_horas_antes` for o template ligado, **manter a antecedência
+em 4h** — qualquer outro valor faz a mensagem mentir para o paciente.
+
+**Rejeitado:** liberar a antecedência e ajustar o texto local (`template_mensagem`) junto. Não
+resolve — esse campo alimenta só o histórico do CRM; o WhatsApp entrega o template da Meta.
+Ajustar só ele criaria CRM e paciente contando histórias diferentes.
+
 ### D-27 — Consultar o RAG por especificidade da mensagem, não por fase da conversa · 15/08/2026
 **Status: DECIDIDO, NÃO IMPLEMENTADO.** Bloqueado por §40 — só aplicar junto com os documentos
 reais da Anaruthe, **na mesma publicação**.

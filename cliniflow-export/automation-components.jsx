@@ -259,11 +259,23 @@ function LembreteCard({ config, accent, onSave, saving, isConnected }) {
   const horas = draft.antecedencia_horas || config.antecedencia_horas;
   const info = { ...base, titulo: horas ? `Lembrete ${horas} horas antes` : config.tipo_lembrete };
 
+  // Antecedência é livre, mas só em HORAS INTEIRAS: o `pg_cron` chama a
+  // `disparar-lembretes` de hora em hora e a janela é `agora + antecedencia`
+  // até `+1h`. Valor quebrado (2,5) não teria como ser respeitado pelo disparo,
+  // e a coluna no banco é `integer`. O teto de 720h (30 dias) existe só para
+  // não estourar o `int4` com o que for digitado.
+  const horasNum = parseInt(draft.antecedencia_horas, 10);
+  const horasValida = Number.isInteger(horasNum) && horasNum >= 1 && horasNum <= 720;
+
   const handleSave = () => {
+    // Antes o save fazia `parseInt(...) || 24`: campo vazio virava 24 em
+    // silêncio. Com valor livre isso mandaria o lembrete para outra hora sem
+    // ninguém pedir, então agora inválido simplesmente não salva.
+    if (!horasValida) return;
     onSave(config.id, {
       ativo: draft.ativo,
       horario_envio: draft.horario_envio || null,
-      antecedencia_horas: parseInt(draft.antecedencia_horas) || 24,
+      antecedencia_horas: horasNum,
       template_mensagem: draft.template_mensagem,
     });
     setEditando(false);
@@ -341,21 +353,31 @@ function LembreteCard({ config, accent, onSave, saving, isConnected }) {
               <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--supabase-text-muted)', textTransform: 'uppercase', letterSpacing: .7, marginBottom: 6 }}>
                 Antecedência
               </label>
-              <select
-                value={draft.antecedencia_horas}
-                onChange={e => set('antecedencia_horas', e.target.value)}
-                style={{
-                  width: '100%', padding: '8px 10px', borderRadius: 6,
-                  background: 'var(--supabase-bg-input)', border: '1px solid var(--supabase-border)',
-                  color: 'var(--supabase-text-light)', fontSize: 13, outline: 'none', appearance: 'none',
-                }}
-              >
-                <option value={2}>2 horas antes</option>
-                <option value={4}>4 horas antes</option>
-                <option value={12}>12 horas antes</option>
-                <option value={24}>24 horas antes</option>
-                <option value={48}>48 horas antes</option>
-              </select>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                <input
+                  type="number" min={1} max={720} step={1}
+                  value={draft.antecedencia_horas ?? ''}
+                  onChange={e => set('antecedencia_horas', e.target.value)}
+                  style={{
+                    width: 90, padding: '8px 10px', borderRadius: 6,
+                    background: 'var(--supabase-bg-input)',
+                    border: `1px solid ${horasValida ? 'var(--supabase-border)' : '#ef4444'}`,
+                    color: 'var(--supabase-text-light)', fontSize: 13, outline: 'none',
+                  }}
+                />
+                <span style={{ fontSize: 12.5, color: 'var(--supabase-text-muted)' }}>
+                  horas antes da consulta
+                </span>
+              </div>
+              <div style={{ fontSize: 11, color: horasValida ? 'var(--supabase-icon-inactive)' : '#ef4444', marginTop: 6, lineHeight: 1.5 }}>
+                {horasValida
+                  ? 'Horas inteiras, de 1 a 720. O disparo roda de hora em hora, com 1h de tolerância.'
+                  : 'Informe um número inteiro de horas, entre 1 e 720.'}
+                {config.meta_template_nome && (
+                  <> O texto que o paciente recebe vem do template <strong>{config.meta_template_nome}</strong> aprovado na
+                  Meta — mudar a antecedência aqui muda <em>quando</em> sai, não <em>o que</em> está escrito.</>
+                )}
+              </div>
             </div>
           </div>
 
@@ -398,11 +420,11 @@ function LembreteCard({ config, accent, onSave, saving, isConnected }) {
               background: 'var(--supabase-bg-card)', border: '1px solid var(--supabase-border)',
               color: 'var(--supabase-text-muted)', fontSize: 12, fontWeight: 500,
             }}>Cancelar</button>
-            <button onClick={handleSave} disabled={saving} style={{
+            <button onClick={handleSave} disabled={saving || !horasValida} style={{
               padding: '7px 16px', borderRadius: 6,
-              cursor: saving ? 'not-allowed' : 'pointer',
-              background: saving ? 'var(--supabase-bg-hover)' : accent, border: 'none',
-              color: saving ? 'var(--supabase-icon-inactive)' : 'rgba(0,0,0,0.85)',
+              cursor: (saving || !horasValida) ? 'not-allowed' : 'pointer',
+              background: (saving || !horasValida) ? 'var(--supabase-bg-hover)' : accent, border: 'none',
+              color: (saving || !horasValida) ? 'var(--supabase-icon-inactive)' : 'rgba(0,0,0,0.85)',
               fontSize: 12, fontWeight: 600,
             }}>{saving ? 'Salvando…' : 'Salvar configuração'}</button>
           </div>
