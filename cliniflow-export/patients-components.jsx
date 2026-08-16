@@ -493,6 +493,14 @@ function AprovarPedidoModal({ pedido, preferencia, onClose, onSave, accent, prof
 // ─── NEW APPOINTMENT MODAL ───────────────────────────────────────────────────
 
 function NewAppointmentModal({ onClose, onSave, accent, patients, defaultDay, defaultTime, currentMonday, profissionais = [] }) {
+  const [weekMonday, setWeekMonday] = useStateP(() => {
+    if (currentMonday) return new Date(currentMonday);
+    const now = new Date();
+    const m = new Date(now);
+    m.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    m.setHours(0, 0, 0, 0);
+    return m;
+  });
   const [f, setF] = useStateP({
     patientId: '', search: '',
     day: defaultDay ?? 0,
@@ -506,20 +514,22 @@ function NewAppointmentModal({ onClose, onSave, accent, patients, defaultDay, de
   });
   const set = (k,v) => setF(prev => ({ ...prev, [k]: v }));
 
+  const shiftWeek = (deltaDias) => {
+    setWeekMonday(prev => {
+      const next = new Date(prev);
+      next.setDate(prev.getDate() + deltaDias);
+      return next;
+    });
+    set('day', 0); // a semana mudou; o dia selecionado na semana antiga não faz mais sentido
+  };
+
   const getDayOptions = () => {
-    const monday = currentMonday || (() => {
-      const now = new Date();
-      const m = new Date(now);
-      m.setDate(now.getDate() - ((now.getDay() + 6) % 7));
-      m.setHours(0, 0, 0, 0);
-      return m;
-    })();
     const options = [];
-    const days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'];
+    const days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
     const months = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-    for (let i = 0; i < 5; i++) {
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + i);
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(weekMonday);
+      d.setDate(weekMonday.getDate() + i);
       options.push({
         value: i,
         label: `${days[i]}, ${d.getDate()} ${months[d.getMonth()]}`
@@ -539,9 +549,14 @@ function NewAppointmentModal({ onClose, onSave, accent, patients, defaultDay, de
 
   const save = () => {
     if (!ok) return;
+    const data = new Date(weekMonday);
+    data.setDate(weekMonday.getDate() + parseInt(f.day));
+    const [h, m] = f.time.split(':').map(Number);
+    data.setHours(h, m, 0, 0);
+
     onSave({
       id: Date.now(),
-      day: parseInt(f.day),
+      data,
       time: f.time,
       patient: selectedPatient.name,
       initials: selectedPatient.initials,
@@ -604,7 +619,15 @@ function NewAppointmentModal({ onClose, onSave, accent, patients, defaultDay, de
         </Field>
 
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
-          <Field label="Dia">
+          <Field label={
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <span>Dia</span>
+              <div style={{ display:'flex', alignItems:'center', gap:2 }}>
+                <NavBtn onClick={() => shiftWeek(-7)}>‹</NavBtn>
+                <NavBtn onClick={() => shiftWeek(7)}>›</NavBtn>
+              </div>
+            </div>
+          }>
             <Select value={f.day} onChange={v => set('day', v)}
               options={getDayOptions()} />
           </Field>
