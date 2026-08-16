@@ -73,14 +73,14 @@ template for `confirmao_horas_antes` (§41). 🧹 **Legado Evolution apagado** (
 ❗ **CRM servido está atrasado**: print do dono tem 5 cards, o commitado tem 2 — hard refresh
 antes de investigar qualquer coisa na tela.
 
-✅ **CRM: cadastro de profissionais (médicos/dentistas)** — tabela `profissionais` no Supabase
-(`docs/db/10`, RLS fechado para authenticated), gerenciamento em Configurações (adicionar/desativar),
-e seletores de `NewAppointmentModal` e `AprovarPedidoModal` consumindo a lista real com fallback de
-estado vazio (D-30). Testado com Babel standalone e verificação de schema.
-
-✅ **CRM: tema claro com mais contraste e duração da consulta editável** — cores corrigidas,
-status Pendente/Recusado, grade do calendário, destaque de "hoje" e camadas de fundo. Verificado
-rodando em modo demonstração. ⚠️ `node --check` não valida `.jsx` (Babel do browser é o gate, §42).
+✅ **CRM (15/08): profissionais, tema claro e agenda.** Cadastro de profissionais real (tabela
+`profissionais`, `docs/db/10`, RLS fechado, D-30) substituiu a lista fictícia nos seletores. Tema
+claro ganhou contraste (cores, status Pendente/Recusado, grade, destaque de "hoje", camadas de
+fundo) e duração virou editável no card de detalhes. Agenda passou a atender sábado (grade,
+rótulo, bot), Nova Consulta ganhou navegação de semana própria pra escolher data livre,
+Configurações foi reescrita (`Modal` compartilhado, ícones, toggle switch) — specs em
+`docs/superpowers/specs/2026-08-15-*`. Tudo verificado rodando em modo demonstração via Browser
+MCP, não contra o Supabase real. ⚠️ `node --check` não valida `.jsx` (Babel do browser é o gate, §42).
 
 ⛔ **Não existe 2ª clínica.** O isolamento multi-tenant está escrito, não testado.
 
@@ -144,5 +144,5 @@ rodando em modo demonstração. ⚠️ `node --check` não valida `.jsx` (Babel 
 6. **Mudanças cirúrgicas:** não refatore o que não foi pedido.
 7. **Teto de ~100 linhas FORA a tabela de alerta.** A tabela cresce com o que doeu e não se
    corta — o resto sim: passou do teto, é detalhe demais, mova para um doc e aponte daqui.
-   Histórico vai no commit, nunca aqui. (Hoje: 145 no total, ~110 fora a tabela — **acima do
+   Histórico vai no commit, nunca aqui. (Hoje: 148 no total, ~113 fora a tabela — **acima do
    teto**, o próximo que escrever aqui precisa cortar mais do que acrescenta.)
