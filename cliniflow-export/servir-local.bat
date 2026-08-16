@@ -1,9 +1,9 @@
 @echo off
 cd /d "%~dp0"
-echo Iniciando servidor em http://localhost:3000/Cliniflow.html ...
+echo Iniciando servidor em http://localhost:3000/ ...
 start /B python -m http.server 3000
 timeout /t 2 /nobreak >nul
-start http://localhost:3000/Cliniflow.html
+start http://localhost:3000/
 echo.
 echo Servidor rodando. Pressione qualquer tecla para encerrar.
 pause >nul
