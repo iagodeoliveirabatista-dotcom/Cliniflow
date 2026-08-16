@@ -16,8 +16,8 @@
   <script src="supabase-client.js?v=12"></script>
 
   <script type="text/babel" src="tweaks-panel.jsx?v=5"></script>
-  <script type="text/babel" src="cliniflow-components.jsx?v=11"></script>
-  <script type="text/babel" src="patients-components.jsx?v=10"></script>
+  <script type="text/babel" src="cliniflow-components.jsx?v=12"></script>
+  <script type="text/babel" src="patients-components.jsx?v=11"></script>
   <script type="text/babel" src="reports-components.jsx?v=5"></script>
   <script type="text/babel" src="automation-components.jsx?v=6"></script>
 
@@ -846,7 +846,7 @@
       const formatWeekLabel = () => {
         const mon = new Date(currentMonday);
         const fri = new Date(currentMonday);
-        fri.setDate(currentMonday.getDate() + 4);
+        fri.setDate(currentMonday.getDate() + 5);
         const months = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
         
         let label = `Semana de ${mon.getDate()}`;

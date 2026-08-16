@@ -368,7 +368,7 @@ function AppRow({ apt, isSelected, onClick, accent, isLast }) {
 // Drag-and-drop: HTML5 drag lets users move an event to any day/time slot,
 // snapping to 15-minute increments. The detail panel reflects the change live.
 
-const DAY_LABELS = ['Seg','Ter','Qua','Qui','Sex'];
+const DAY_LABELS = ['Seg','Ter','Qua','Qui','Sex','Sáb'];
 const DAY_DATES  = ['1','2','3','4','5'];   // Jun 1–5, 2026 (week of)
 const TODAY_COL  = 0;                        // Monday = today
 const HOUR_START = 7;
@@ -468,12 +468,12 @@ function CalendarView({ appointments, selectedId, onSelect, accent, onMove, curr
     // Check if "now" falls in the week of "mon"
     const currentMon = new Date(mon);
     currentMon.setHours(0,0,0,0);
-    const currentFri = new Date(currentMon);
-    currentFri.setDate(currentMon.getDate() + 4);
-    currentFri.setHours(23,59,59,999);
-    
+    const currentSab = new Date(currentMon);
+    currentSab.setDate(currentMon.getDate() + 5);
+    currentSab.setHours(23,59,59,999);
+
     const nowTime = now.getTime();
-    if (nowTime >= currentMon.getTime() && nowTime <= currentFri.getTime()) {
+    if (nowTime >= currentMon.getTime() && nowTime <= currentSab.getTime()) {
       return (now.getDay() + 6) % 7; // 0=Mon, 1=Tue, etc.
     }
     return -1;

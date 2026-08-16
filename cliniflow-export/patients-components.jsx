@@ -331,12 +331,12 @@ function EditPatientModal({ patient, onClose, onSave, accent }) {
 const fmtData = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-// Sábado e domingo caem para segunda: a clínica atende de segunda a sexta
-// (é o que a agenda mostra — a grade tem 5 colunas).
+// Domingo cai para segunda: a clínica atende de segunda a sábado
+// (é o que a agenda mostra — a grade tem 6 colunas).
 function proximoDiaUtil(base) {
   const d = new Date(base);
   d.setHours(0, 0, 0, 0);
-  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+  while (d.getDay() === 0) d.setDate(d.getDate() + 1);
   return d;
 }
 
