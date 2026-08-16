@@ -398,21 +398,29 @@
         return { success: false, error: (r && r.error) || 'Falha ao enviar' };
       }, [dbConnected]);
 
-      const addAppt = useCallback(async (a) => {
-        if (dbConnected) {
-          // Calculate real datetime from currentMonday
-          const targetDate = new Date(currentMonday);
-          targetDate.setDate(currentMonday.getDate() + parseInt(a.day));
-          const [h, m] = a.time.split(':').map(Number);
-          targetDate.setHours(h, m, 0, 0);
+      // Segunda-feira da semana que contém `date`. Mesma fórmula que já
+      // aparece em getDayOptions/todayCol — não unificada aqui de propósito
+      // (cada arquivo mantém a sua cópia; ver spec §4.4).
+      function mondayOf(date) {
+        const d = new Date(date);
+        d.setHours(0, 0, 0, 0);
+        d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+        return d;
+      }
 
+      const addAppt = useCallback(async (a) => {
+        const targetMonday = mondayOf(a.data);
+        const diaSemHora = new Date(a.data.getFullYear(), a.data.getMonth(), a.data.getDate());
+        const dayIndex = Math.round((diaSemHora - targetMonday) / 86400000); // 0=Seg ... 5=Sáb
+
+        if (dbConnected) {
           // Find patient by name to get ID
           const pat = patients.find(p => p.name === a.patient || p.id === a.patientId);
 
           const statusMap = { confirmed: 'confirmado', pending: 'pendente', rescheduled: 'remarcado', canceled: 'cancelado', solicitado: 'solicitado' };
           const res = await SB.createConsulta({
             patient_id: pat?.id || null,
-            data_hora: targetDate.toISOString(),
+            data_hora: a.data.toISOString(),
             duracao_min: a.dur,
             tipo: a.type,
             medico: a.doctor,
@@ -421,13 +429,16 @@
             preco: a.preco,
           });
           if (res.data) {
-            setAppts(prev => [...prev, SB.consultaToAppointment(res.data, currentMonday)]);
+            setCurrentMonday(targetMonday);
+            setAppts(prev => [...prev, SB.consultaToAppointment(res.data, targetMonday)]);
             return;
           }
         }
-        // Fallback: add locally
-        setAppts(prev => [...prev, a]);
-      }, [dbConnected, patients, currentMonday]);
+        // Fallback: modo demonstração (sem Supabase) — grava local com o
+        // `day` já calculado pra semana certa, e pula a agenda pra lá.
+        setCurrentMonday(targetMonday);
+        setAppts(prev => [...prev, { ...a, day: dayIndex }]);
+      }, [dbConnected, patients]);
 
       const addPatient = useCallback(async (p) => {
         if (dbConnected) {
