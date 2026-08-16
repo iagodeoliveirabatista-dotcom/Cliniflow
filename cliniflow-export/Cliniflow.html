@@ -149,7 +149,7 @@
       { id:'confirmed',   label:'Confirmadas' },
       { id:'pending',     label:'Pendentes'   },
       { id:'solicitado',  label:'Solicitadas' },
-      { id:'rescheduled', label:'Solicitado reagendamento' },
+      { id:'rescheduled', label:'Reagend.' },
       { id:'canceled',    label:'Canceladas'  },
     ];
 
@@ -889,8 +889,8 @@
       };
 
       return (
-        <div style={{ padding:'14px 20px 0', borderBottom:'1px solid #191919', flexShrink:0 }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:13 }}>
+        <div style={{ padding:'18px 20px', borderBottom:'1px solid #191919', flexShrink:0 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
             <div style={{ display:'flex', alignItems:'center', gap:14 }}>
               <h1 style={{ fontSize:15.5, fontWeight:600, color:'var(--supabase-text)', letterSpacing:'-.35px' }}>Agenda</h1>
               <div style={{ display:'flex', alignItems:'center', gap:4 }}>
@@ -900,19 +900,12 @@
                 </span>
                 <NavBtn onClick={onNextWeek}>›</NavBtn>
               </div>
-              <div style={{ display:'flex', gap:6, marginLeft:6 }}>
-                <StatChip value={counts.confirmed} label="Confirm." color="#3ecf8e" />
-                <StatChip value={counts.pending}   label="Pend."    color="#9ca3af" />
-                <StatChip value={counts.solicitado} label="Solicit." color="#a855f7" />
-                <StatChip value={counts.rescheduled} label="Reagend." color="#f59e0b" />
-                <StatChip value={counts.canceled}  label="Cancel."  color="#ef4444" />
-              </div>
             </div>
 
             <div style={{ display:'flex', alignItems:'center', gap:8 }}>
               <div style={{
-                display:'flex', background:'var(--supabase-bg-card)', border:'1px solid var(--supabase-border)',
-                borderRadius:'var(--radius-studio)', padding:2, gap:1,
+                display:'flex', background:'var(--supabase-bg-input)', border:'1px solid var(--supabase-border)',
+                borderRadius:8, padding:3, gap:2,
               }}>
                 {Object.entries(LAYOUT_ICONS).map(([id, icon]) => (
                   <LayoutBtn key={id} active={layout === id}
@@ -926,7 +919,7 @@
                 padding:'6px 13px', borderRadius:'var(--radius-studio)',
                 background: accent, border:'none',
                 color:'var(--supabase-bg-studio)', fontSize:12.5, fontWeight:600,
-                cursor:'pointer', letterSpacing:'-.2px', flexShrink:0,
+                cursor:'pointer', letterSpacing:'-.2px', flexShrink:0, whiteSpace:'nowrap',
                 transition:'var(--transition-studio)'
               }}>
                 <span style={{ fontSize:16, lineHeight:1, marginTop:-1 }}>+</span> Nova consulta
@@ -934,25 +927,24 @@
             </div>
           </div>
 
-          <div style={{ display:'flex', gap:0, marginBottom:'-1px' }}>
+          <div style={{
+            display:'flex', alignItems:'center', gap:2,
+            background:'var(--supabase-bg-card)', border:'1px solid var(--supabase-border)',
+            borderRadius:8, padding:3, width:'fit-content',
+          }}>
             {FILTER_TABS.map(tab => {
               const active = filter === tab.id;
               return (
                 <button key={tab.id} onClick={() => setFilter(tab.id)} style={{
-                  padding:'8px 13px', border:'none', background:'transparent',
-                  borderBottom: active ? `2px solid ${accent}` : '2px solid transparent',
-                  color: active ? accent : '#484848',
-                  fontSize:12.5, fontWeight: active ? 500 : 400,
-                  cursor:'pointer', display:'flex', alignItems:'center', gap:5,
-                  transition:'all .13s', letterSpacing:'-.1px',
+                  padding:'6px 12px', border:'none', borderRadius:'var(--radius-studio)',
+                  background: active ? accent : 'transparent',
+                  color: active ? 'var(--supabase-bg-studio)' : '#8a8a8a',
+                  fontSize:12.5, fontWeight: active ? 600 : 400,
+                  cursor:'pointer', display:'flex', alignItems:'center', gap:6,
+                  transition:'all .13s', whiteSpace:'nowrap',
                 }}>
                   {tab.label}
-                  <span style={{
-                    fontSize:10.5, minWidth:18, textAlign:'center',
-                    padding:'0 5px', borderRadius:8,
-                    background: active ? `${accent}20` : 'var(--supabase-bg-card)',
-                    color: active ? accent : 'var(--supabase-text-muted)',
-                  }}>{counts[tab.id]}</span>
+                  <span style={{ opacity: active ? 0.7 : 0.6 }}>{counts[tab.id]}</span>
                 </button>
               );
             })}
@@ -1027,19 +1019,20 @@
     }
 
     function LayoutBtn({ active, onClick, accent, icon, label }) {
-      const [hov, setHov] = useState(false);
+      const displayLabel = label.charAt(0).toUpperCase() + label.slice(1);
       return (
         <button onClick={onClick}
-          onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-          title={label.charAt(0).toUpperCase() + label.slice(1)}
+          title={displayLabel}
           style={{
-            padding:'5px 9px', borderRadius:4, border:'none',
-            background: active ? '#222' : hov ? '#181818' : 'transparent',
-            color: active ? accent : hov ? '#666' : '#383838',
-            cursor:'pointer', transition:'all .12s',
-            display:'flex', alignItems:'center', justifyContent:'center',
+            padding:'7px 12px', borderRadius:'var(--radius-studio)', border:'none',
+            background: active ? accent : 'transparent',
+            color: active ? 'var(--supabase-bg-studio)' : '#6a6a6a',
+            fontSize:12, fontWeight: active ? 600 : 400,
+            boxShadow: active ? '0 2px 6px rgba(62,207,142,.35), 0 1px 0 rgba(255,255,255,.2) inset' : 'none',
+            cursor:'pointer', transition:'all .12s', whiteSpace:'nowrap',
+            display:'flex', alignItems:'center', gap:6,
           }}>
-          {icon}
+          {icon}{displayLabel}
         </button>
       );
     }
