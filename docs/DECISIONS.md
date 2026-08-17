@@ -63,6 +63,15 @@ exigir um código combinado antes do `signUp`.
 link"). O usuário optou por **desligar "Confirm email"** no painel do Supabase — com isso o
 `signUp` já devolve sessão e a pessoa entra na hora. Custo aceito: e-mail digitado errado passa, e
 aí a recuperação de senha não chega a ninguém.
+⚠️ **Em 17/08 o "Confirm email" ainda estava LIGADO** (medido: o `signUp` de teste voltou sem
+sessão e gravou `confirmation_sent_at`). Enquanto o dono não desligar, quem criar conta precisa
+clicar no link do e-mail antes de entrar — o caminho funciona, só não é o de um passo só.
+
+**Verificado em 17/08/2026** contra o Supabase real, com conta e clínica de teste criadas e
+apagadas depois (banco conferido de volta em 1 clínica / 1 conta): e-mail recusado pelo GoTrue
+(`example.com`) mostra "E-mail inválido" · `signUp` cria o usuário · confirmado na mão, o login
+entra · sessão sem clínica cai no onboarding · criar a clínica monta o CRM. **Não testado:**
+"esqueci minha senha" (não existe tela) e o `signUp` com "Confirm email" desligado.
 
 ### D-30 — Cadastro de profissionais: só nome e status ativo, sem especialidade/cor e sem FK em consultas · 15/08/2026
 **Decisão:** tabela `public.profissionais` criada no Supabase com campos `id`, `clinic_id`, `nome`,

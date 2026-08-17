@@ -1533,7 +1533,8 @@ CLI ou `@babel/parser` com o plugin JSX — nenhum dos dois está instalado nest
 
 ## 43. Conta nova ⇒ clínica NOVA e VAZIA — o onboarding nunca liga alguém à clínica existente ⚠️ ATIVO
 
-**Sintoma (previsto, ainda não observado):** alguém cria uma conta no CRM para a *mesma* clínica
+**Sintoma (OBSERVADO em 17/08/2026, num teste que criou e depois apagou a conta):** alguém cria
+uma conta no CRM para a *mesma* clínica
 que já existe, cai no "Cadastre sua clínica", digita o nome e entra num CRM **vazio** — sem
 paciente, sem consulta, sem conversa. Parece perda de dados. Não é: os dados estão na clínica
 antiga, e a conta nova está numa clínica nova.
@@ -1558,4 +1559,11 @@ from auth.users u where u.email = 'email-da-pessoa@exemplo.com';
 Só então ela entra — `auth_clinic_id()` devolve a clínica certa e o onboarding não aparece.
 
 **Cuidado ao limpar:** se uma clínica duplicada for criada por engano, apagar a linha de `clinics`
-faz CASCADE em `clinic_users` e desloga o usuário de volta pro onboarding (§28).
+faz CASCADE em `clinic_users` e desloga o usuário de volta pro onboarding (§28). Antes de apagar,
+confira se a clínica errada não recebeu dado — a varredura que lista toda tabela com `clinic_id`
+e conta as linhas está no commit deste parágrafo (`query_to_xml` sobre `pg_attribute`).
+
+**O lado bom que apareceu no mesmo teste:** com a sessão da clínica nova, o CRM mostrou 0
+pacientes e 0 consultas enquanto a Anaruthe tinha 2 e 3. É a **primeira prova real** de que o RLS
+isola de verdade a leitura dessas duas tabelas entre clínicas — até então o multi-tenant era só
+escrito, nunca exercitado.

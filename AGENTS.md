@@ -74,23 +74,31 @@ template for `confirmao_horas_antes` (§41). 🧹 **Legado Evolution apagado** (
 ❗ **CRM servido está atrasado**: print do dono tem 5 cards, o commitado tem 2 — hard refresh
 antes de investigar qualquer coisa na tela.
 
-✅ **CRM (15/08): profissionais, tema claro e agenda.** Cadastro de profissionais real (tabela
-`profissionais`, `docs/db/10`, RLS fechado, D-30) substituiu a lista fictícia nos seletores. Tema
-claro ganhou contraste (cores, status Pendente/Recusado, grade, destaque de "hoje", camadas de
-fundo) e duração virou editável no card de detalhes. Agenda passou a atender sábado (grade,
-rótulo, bot), Nova Consulta ganhou navegação de semana própria pra escolher data livre,
-Configurações foi reescrita (`Modal` compartilhado, ícones, toggle switch) — specs em
-`docs/superpowers/specs/2026-08-15-*`. Tudo verificado rodando em modo demonstração via Browser
-MCP, não contra o Supabase real. ⚠️ `node --check` não valida `.jsx` (Babel do browser é o gate, §42).
+⚠️ **§36 REGREDIU e foi corrigido de novo (17/08, `activeVersion ee3828f6`).** Paciente testou
+confirmação por WhatsApp, zero resposta, zero mudança de cor — a correção de 13/08 (`6945f2a8`)
+tinha sido sobrescrita em algum publish posterior (provavelmente o do §37, mesmo dia 15/08).
+Reaplicados: `Consulta Encontrada?` → `={{ !!$json.id }}`, `Busca Consulta` → filtra por
+`id eq {{ $('Get a row').first().json.consulta_id }}` em vez de `patient_id+status` sem
+ordenação (validado contra dado real: paciente tinha 2 consultas `pendente`, o filtro velho
+pegaria a errada). Detalhe em `ARMADILHAS.md` §36. **Pendente:** pontos 3 e 4 da correção
+original (texto do `ENCAMINHAR MENSAGEM` e nó `MSG - NAO ENTENDI`) não foram reaplicados — texto
+novo precisa de revisão antes de ir pro ar. **Ciclo ponta a ponta com paciente real ainda não
+fechado** — as duas mensagens de teste já rodaram pela versão quebrada; falta reenviar ou
+corrigir a consulta pendente (`f111b1e8-2727-46ba-9067-bdb893f67ac5`) direto no banco.
 
-✅ **Autocadastro por e-mail e senha (17/08, D-31).** `LoginScreen` tem alternador Entrar/Criar
-conta e `signUp()` no `supabase-client.js` — fecha a parte (b) da D-6. Cadastro é **público**.
-⚠️ Verificado só o alternador da tela (Browser MCP); **nenhuma conta foi criada de verdade**, e
-depende de "Confirm email" desligado no painel do Supabase. Ao criar a 1ª conta nova, leia o §43
-antes: o onboarding cria clínica **duplicada e vazia**, não vincula à Anaruthe.
+✅ **Autocadastro por e-mail e senha (17/08, D-31), exercitado de ponta a ponta.** `LoginScreen`
+tem alternador Entrar/Criar conta e `signUp()` no `supabase-client.js` — fecha a parte (b) da
+D-6. Cadastro é **público**. Rodado de verdade contra o Supabase real (conta e clínica de teste
+criadas e depois apagadas): criar conta → confirmar → entrar → onboarding → CRM. ⚠️ **"Confirm
+email" está LIGADO** no projeto: o `signUp` volta sem sessão e a tela pede o link do e-mail. O
+dono ficou de desligar em Authentication → Providers → Email. Antes de criar a 1ª conta real,
+leia o §43: o onboarding cria clínica **duplicada e vazia**, não vincula à Anaruthe.
 
-⛔ **Não existe 2ª clínica.** O isolamento multi-tenant está escrito, não testado. Hoje: 1 clínica
-(`Clinica Anaruthe`), 1 conta (`iagodeoliveirabatista@gmail.com`).
+⛔ **Não existe 2ª clínica** — mas o isolamento teve a **1ª prova real** (17/08, durante o teste
+do D-31): logado numa clínica recém-criada, o CRM mostrou 0 pacientes e 0 consultas enquanto a
+Anaruthe tinha 2 e 3. Vale para a leitura de `patients`/`consultas` via CRM; escrita, Realtime,
+conversas e o n8n continuam sem prova. Hoje: 1 clínica (`Clinica Anaruthe`), 1 conta
+(`iagodeoliveirabatista@gmail.com`).
 
 ## 🎯 Próximos passos (comece por aqui)
 
@@ -137,7 +145,7 @@ antes: o onboarding cria clínica **duplicada e vazia**, não vincula à Anaruth
 | Specs e planos | `docs/superpowers/` |
 
 **IDs úteis:** n8n `ZAQ6I2CiBGh8swye` — nome real **"Project Clinica - Migração para Meta"**,
-**78 nós**, `activeVersion 96f84442` (corrente) · Supabase `mxvaufkqijdkapvtkvee` · clínica única
+**78 nós**, `activeVersion ee3828f6` (corrente) · Supabase `mxvaufkqijdkapvtkvee` · clínica única
 `7936105a-b198-419f-bad7-a65e2e60725b` (`Clinica Anaruthe`)
 
 ## Regras para agentes (CONTRATO)
