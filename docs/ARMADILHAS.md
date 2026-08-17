@@ -1233,6 +1233,33 @@ nem que a mensagem existiu.
 coisa. Um ramo que termina num nó sem conexão de saída fecha verde. Ao auditar, olhe
 `lastNodeExecuted` — na 83417 ele era `ENCAMINHAR MENSAGEM`, e isso entregou o caso inteiro.
 
+**REGREDIU e foi corrigido de novo em 17/08/2026.** O usuário testou confirmação por WhatsApp,
+zero resposta, zero mudança de cor na Agenda — sintoma idêntico ao original. Causa: entre
+13/08 (`activeVersion 6945f2a8`, fix aplicado) e 15/08 (`activeVersion 96f84442`, provavelmente
+sobrescrito ao publicar o fix do #37 no mesmo dia), os pontos 1 e 2 da correção voltaram ao
+estado quebrado — `Consulta Encontrada?` de volta a `{{ $json.length > 0 }}`, `Busca Consulta`
+de volta ao filtro `patient_id + status` sem ordenação. Os pontos 3 e 4 (texto do
+`ENCAMINHAR MENSAGEM` e o nó `MSG - NAO ENTENDI`) também desapareceram e **não foram
+reaplicados** — `ENCAMINHAR MENSAGEM` está com o texto mentiroso de novo e agora também
+`disabled: true`; `MSG - NAO ENTENDI` não existe mais no workflow; `REGISTRO OUTLIER1` voltou a
+ser beco sem saída. Confirmado nó a nó via `get_workflow_details`, comparando com o que este
+documento descreve como correção.
+
+Reaplicados agora (`activeVersion ee3828f6`): ponto 1 (`Consulta Encontrada?` →
+`={{ !!$json.id }}`) e ponto 2 (`Busca Consulta` → filtra por
+`id eq {{ $('Get a row').first().json.consulta_id }}`). Validado contra dado real: o paciente de
+teste tinha duas consultas `pendente` (`9c32cf3a…` Botox 09/08, `f111b1e8…` rotina 18/08) — o
+filtro antigo pegaria a errada (Botox); o corrigido usa a da sessão ativa (rotina). **Pontos 3 e
+4 continuam pendentes** — não reaplicados por falta da cópia/wiring exato original no diff;
+precisam de um texto novo revisado com o usuário antes de ir pro ar, não só copiar o que este
+documento resume.
+
+**Lição de método nº2:** este documento registra a correção pela **data em que foi decidida**,
+não pelo que está rodando agora. Publicar um workflow por cima de outro (ex.: fix do #37 em
+cima de uma versão sem o fix do #36) reverte silenciosamente correções anteriores sem deixar
+rastro nenhum no n8n — a única defesa é reconferir nó a nó contra este arquivo antes de confiar
+nele, especialmente depois de qualquer redeploy/import de workflow.
+
 ## 37. "IA Inativa" não silencia a IA — mata o WhatsApp do paciente, confirmação inclusive
 
 **Status: CORRIGIDO e publicado em 15/08/2026** (`activeVersion dea36506`, 78 nós). Achado por
@@ -1503,3 +1530,32 @@ planos de UI) e confira o console, não tente `node --check`.
 **Não faça:** copiar o passo "`node --check <arquivo>.jsx`" de um plano antigo achando que já
 foi provado — nenhum foi. Se quiser um gate de sintaxe fora do navegador, seria preciso Babel
 CLI ou `@babel/parser` com o plugin JSX — nenhum dos dois está instalado neste projeto hoje.
+
+## 43. Conta nova ⇒ clínica NOVA e VAZIA — o onboarding nunca liga alguém à clínica existente ⚠️ ATIVO
+
+**Sintoma (previsto, ainda não observado):** alguém cria uma conta no CRM para a *mesma* clínica
+que já existe, cai no "Cadastre sua clínica", digita o nome e entra num CRM **vazio** — sem
+paciente, sem consulta, sem conversa. Parece perda de dados. Não é: os dados estão na clínica
+antiga, e a conta nova está numa clínica nova.
+
+**Causa:** `registrar_clinica` (D-12) só recusa se `auth.uid()` **já** tiver linha em
+`clinic_users`. Duas contas diferentes pedindo o mesmo nome de clínica geram **duas** linhas em
+`clinics` — o nome não é único, e não existe fluxo de "entrar numa clínica que já existe"
+(convite, código, domínio de e-mail: nada). Com o autocadastro por e-mail e senha (D-31), essa
+porta ficou aberta para qualquer um.
+
+**Agravante:** o `clinic_id` da Anaruthe (`7936105a-b198-419f-bad7-a65e2e60725b`) está **cravado
+no n8n**. Mesmo que a clínica nova pareça funcionar no CRM, o WhatsApp continua gravando tudo na
+antiga.
+
+**Correção:** não passe pelo onboarding. Crie a conta (ou peça para a pessoa criar), e depois
+vincule à clínica que já existe:
+```sql
+insert into clinic_users (user_id, clinic_id)
+select u.id, '7936105a-b198-419f-bad7-a65e2e60725b'
+from auth.users u where u.email = 'email-da-pessoa@exemplo.com';
+```
+Só então ela entra — `auth_clinic_id()` devolve a clínica certa e o onboarding não aparece.
+
+**Cuidado ao limpar:** se uma clínica duplicada for criada por engano, apagar a linha de `clinics`
+faz CASCADE em `clinic_users` e desloga o usuário de volta pro onboarding (§28).

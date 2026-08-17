@@ -1040,10 +1040,13 @@
     // ── Login ──────────────────────────────────────────────────────────────
 
     function LoginScreen() {
+      const [modo, setModo] = useState('entrar'); // 'entrar' | 'criar'
       const [email, setEmail] = useState('');
       const [senha, setSenha] = useState('');
       const [erro, setErro] = useState('');
+      const [aviso, setAviso] = useState('');
       const [enviando, setEnviando] = useState(false);
+      const criando = modo === 'criar';
 
       const inputStyle = {
         width:'100%', padding:'9px 11px', fontSize:14,
@@ -1052,17 +1055,36 @@
         outline:'none',
       };
 
-      async function entrar(e) {
+      function trocarModo(novo) {
+        if (enviando || novo === modo) return;
+        setModo(novo);
+        setErro('');
+        setAviso('');
+      }
+
+      async function enviar(e) {
         e.preventDefault();
         if (enviando) return;
         setErro('');
+        setAviso('');
         setEnviando(true);
-        const res = await SB.signIn(email.trim(), senha);
+        const res = criando
+          ? await SB.signUp(email.trim(), senha)
+          : await SB.signIn(email.trim(), senha);
         if (!res.success) {
           setErro(res.error);
           setEnviando(false);
+          return;
         }
-        // sucesso: o onAuthStateChange no Root troca a tela.
+        // Conta criada sem sessão = "Confirm email" ligado no Supabase: a tela
+        // fica onde está e o acesso só acontece depois do link do e-mail.
+        if (res.precisaConfirmar) {
+          setAviso('Conta criada. Confirme o link que enviamos para ' + email.trim() + ' e depois entre.');
+          setModo('entrar');
+          setSenha('');
+          setEnviando(false);
+        }
+        // sucesso com sessão: o onAuthStateChange no Root troca a tela.
       }
 
       async function entrarComGoogle() {
@@ -1078,7 +1100,7 @@
           height:'100%', display:'flex', alignItems:'center', justifyContent:'center',
           background:'var(--supabase-bg-studio)',
         }}>
-          <form onSubmit={entrar} style={{
+          <form onSubmit={enviar} style={{
             width:360, padding:32, borderRadius:16,
             background:'var(--supabase-bg-card)',
             border:'1px solid var(--supabase-border)',
@@ -1098,24 +1120,47 @@
                   Cliniflow
                 </div>
                 <div style={{ fontSize:12.5, color:'var(--supabase-text-muted)' }}>
-                  Entre para continuar
+                  {criando ? 'Crie a conta da sua clínica' : 'Entre para continuar'}
                 </div>
               </div>
             </div>
 
+            <div style={{
+              display:'flex', gap:4, padding:3, borderRadius:9,
+              background:'#161616', border:'1px solid var(--supabase-border)',
+            }}>
+              {[['entrar','Entrar'], ['criar','Criar conta']].map(([valor, rotulo]) => (
+                <button key={valor} type="button" onClick={() => trocarModo(valor)} style={{
+                  flex:1, padding:'6px 10px', fontSize:13,
+                  fontWeight: modo === valor ? 600 : 400,
+                  background: modo === valor ? 'var(--supabase-bg-card)' : 'transparent',
+                  color: modo === valor ? 'var(--supabase-text)' : 'var(--supabase-text-muted)',
+                  border:'none', borderRadius:7,
+                  cursor: enviando ? 'default' : 'pointer',
+                }}>
+                  {rotulo}
+                </button>
+              ))}
+            </div>
+
             <input
-              type="email" autoComplete="username" placeholder="E-mail" required
+              type="email" autoComplete="username" placeholder="E-mail da clínica" required
               value={email} onChange={e => setEmail(e.target.value)}
               style={inputStyle}
             />
             <input
-              type="password" autoComplete="current-password" placeholder="Senha" required
+              type="password" required minLength={criando ? 6 : undefined}
+              autoComplete={criando ? 'new-password' : 'current-password'}
+              placeholder={criando ? 'Senha (mínimo 6 caracteres)' : 'Senha'}
               value={senha} onChange={e => setSenha(e.target.value)}
               style={inputStyle}
             />
 
             {erro && (
               <div style={{ fontSize:13, color:'#f87171' }}>{erro}</div>
+            )}
+            {aviso && (
+              <div style={{ fontSize:13, color:'var(--supabase-brand)' }}>{aviso}</div>
             )}
 
             <button type="submit" disabled={enviando} style={{
@@ -1126,7 +1171,7 @@
               cursor: enviando ? 'default' : 'pointer',
               opacity: enviando ? 0.6 : 1,
             }}>
-              {enviando ? '...' : 'Entrar'}
+              {enviando ? '...' : (criando ? 'Criar conta' : 'Entrar')}
             </button>
 
             <div style={{ display:'flex', alignItems:'center', gap:10 }}>

@@ -86,6 +86,32 @@
     }
   }
 
+  function traduzErroCadastro(error) {
+    const msg = String((error && error.message) || '');
+    if (/already registered|already exists/i.test(msg)) return 'Já existe uma conta com este e-mail. Use "Entrar".';
+    if (/Password should be at least/i.test(msg)) return 'A senha precisa ter pelo menos 6 caracteres.';
+    if (/invalid.*email|email.*invalid/i.test(msg)) return 'E-mail inválido.';
+    if (/Failed to fetch|NetworkError|network/i.test(msg)) return 'Sem conexão com o servidor. Verifique a internet.';
+    return 'Não foi possível criar a conta. Tente de novo.';
+  }
+
+  // Com "Confirm email" desligado no Supabase, o signUp já devolve sessão e o
+  // onAuthStateChange leva direto ao onboarding da clínica. Com ele ligado,
+  // session vem NULL — daí o precisaConfirmar, que a tela usa para pedir o
+  // clique no link do e-mail.
+  async function signUp(email, senha) {
+    const client = getClient();
+    if (!client) return { success: false, error: 'Supabase não configurado' };
+    try {
+      const { data, error } = await client.auth.signUp({ email, password: senha });
+      if (error) return { success: false, error: traduzErroCadastro(error) };
+      _session = data.session || null;
+      return { success: true, session: _session, precisaConfirmar: !data.session };
+    } catch (err) {
+      return { success: false, error: traduzErroCadastro(err) };
+    }
+  }
+
   async function signOut() {
     const client = getClient();
     if (!client) return { success: false };
@@ -836,6 +862,7 @@
     getCurrentUserId,
     getCurrentUserEmail,
     signIn,
+    signUp,
     signInWithGoogle,
     signOut,
     onAuthStateChange,

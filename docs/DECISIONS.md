@@ -44,6 +44,26 @@ painel não depender do push. **Status:** aguardando o usuário.
 
 ## 🟢 Tomadas
 
+### D-31 — Autocadastro por e-mail e senha na tela de login · 17/08/2026
+**Decisão:** a `LoginScreen` ganhou um alternador **Entrar / Criar conta**, e `supabase-client.js`
+ganhou `signUp(email, senha)`. Qualquer pessoa que chegue na URL do CRM pode criar conta e, em
+seguida, cair no onboarding `registrar_clinica` que já existia (D-12). **Fecha o que restava da
+parte (b) da D-6** — não existe mais "conta criada só à mão no painel".
+
+**Por quê:** o usuário precisa criar a conta da clínica de uma parente e o caminho por Google
+(D-12) **ainda não funciona** — falta o OAuth Client no Google Cloud (próximo passo 3 do
+`AGENTS.md`). O usuário escolheu essa opção sabendo do tradeoff, entre criar a conta à mão no
+painel do Supabase (zero código) e exigir código de convite.
+
+**Consequência assumida:** o cadastro é **público**. Estranho que ache a URL cria conta e clínica
+própria — isoladas por `clinic_id`, mas viram lixo no banco. Se incomodar, o remendo barato é
+exigir um código combinado antes do `signUp`.
+
+**Confirmação de e-mail:** o código trata os dois casos (`data.session` nula ⇒ mostra "confirme o
+link"). O usuário optou por **desligar "Confirm email"** no painel do Supabase — com isso o
+`signUp` já devolve sessão e a pessoa entra na hora. Custo aceito: e-mail digitado errado passa, e
+aí a recuperação de senha não chega a ninguém.
+
 ### D-30 — Cadastro de profissionais: só nome e status ativo, sem especialidade/cor e sem FK em consultas · 15/08/2026
 **Decisão:** tabela `public.profissionais` criada no Supabase com campos `id`, `clinic_id`, `nome`,
 `ativo` e `criado_em`. Gerenciada dentro do modal de **Configurações** (sem aba na sidebar nem

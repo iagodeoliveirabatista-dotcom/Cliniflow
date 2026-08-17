@@ -36,6 +36,7 @@ assumir. Multi-clínica por `clinic_id`. Lembretes saem por Edge Function + `pg_
 | **Nó Supabase que não acha nada mata o ramo** | Execução fica `success` e para no meio. O `If` seguinte nunca roda. `alwaysOutputData`. §25 |
 | **`Busca Paciente` casa só por telefone** | Sem `clinic_id` no filtro, a 2ª clínica pega paciente da 1ª. §26 |
 | **`DROP COLUMN` quebra função em silêncio** | plpgsql só valida na execução. E a sonda com UUID falso diz "funciona". §27 |
+| **Conta nova sempre cria clínica NOVA e vazia** | Não existe "entrar na clínica que já existe". Vincule por SQL, não pelo onboarding. §43 |
 | **Apagar clínica desloga o usuário** | CASCADE em `clinic_users` → CRM cai no onboarding e você cria clínica vazia. §28 |
 | **Tabela nova nasce com RLS ligado e SEM policy** | Event trigger `ensure_rls`. Anon lê `[]` com HTTP 200. §13 |
 | **Não tire o TTL do buffer de debounce** | Sem ele, falha de envio gruda a conversa velha na nova. §12 |
@@ -82,7 +83,14 @@ Configurações foi reescrita (`Modal` compartilhado, ícones, toggle switch) �
 `docs/superpowers/specs/2026-08-15-*`. Tudo verificado rodando em modo demonstração via Browser
 MCP, não contra o Supabase real. ⚠️ `node --check` não valida `.jsx` (Babel do browser é o gate, §42).
 
-⛔ **Não existe 2ª clínica.** O isolamento multi-tenant está escrito, não testado.
+✅ **Autocadastro por e-mail e senha (17/08, D-31).** `LoginScreen` tem alternador Entrar/Criar
+conta e `signUp()` no `supabase-client.js` — fecha a parte (b) da D-6. Cadastro é **público**.
+⚠️ Verificado só o alternador da tela (Browser MCP); **nenhuma conta foi criada de verdade**, e
+depende de "Confirm email" desligado no painel do Supabase. Ao criar a 1ª conta nova, leia o §43
+antes: o onboarding cria clínica **duplicada e vazia**, não vincula à Anaruthe.
+
+⛔ **Não existe 2ª clínica.** O isolamento multi-tenant está escrito, não testado. Hoje: 1 clínica
+(`Clinica Anaruthe`), 1 conta (`iagodeoliveirabatista@gmail.com`).
 
 ## 🎯 Próximos passos (comece por aqui)
 
@@ -144,5 +152,6 @@ MCP, não contra o Supabase real. ⚠️ `node --check` não valida `.jsx` (Babe
 6. **Mudanças cirúrgicas:** não refatore o que não foi pedido.
 7. **Teto de ~100 linhas FORA a tabela de alerta.** A tabela cresce com o que doeu e não se
    corta — o resto sim: passou do teto, é detalhe demais, mova para um doc e aponte daqui.
-   Histórico vai no commit, nunca aqui. (Hoje: 148 no total, ~113 fora a tabela — **acima do
-   teto**, o próximo que escrever aqui precisa cortar mais do que acrescenta.)
+   Histórico vai no commit, nunca aqui. (Hoje: 156 no total, ~124 fora a tabela — **acima do
+   teto e piorou**: a sessão de 17/08 só acrescentou. O próximo que escrever aqui **corta antes
+   de escrever** — comece pelo bloco "CRM (15/08)", que já virou histórico e vive no `git log`.)
