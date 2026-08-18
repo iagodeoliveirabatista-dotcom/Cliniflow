@@ -1567,3 +1567,31 @@ e conta as linhas está no commit deste parágrafo (`query_to_xml` sobre `pg_att
 pacientes e 0 consultas enquanto a Anaruthe tinha 2 e 3. É a **primeira prova real** de que o RLS
 isola de verdade a leitura dessas duas tabelas entre clínicas — até então o multi-tenant era só
 escrito, nunca exercitado.
+
+---
+
+## 44. O autofill do Chrome esconde bug de contraste na tela de login ⚠️ ATIVO
+
+**Sintoma:** o dono abre o site publicado no tema claro, tira print, tudo parece certo — campos
+de e-mail e senha com fundo claro e texto legível. Num navegador **sem senha salva** (o da
+recepção, o do celular da clínica) os mesmos campos aparecem **pretos**, com o texto digitado em
+cinza-escuro por cima. Contraste medido: **2,2:1** (o mínimo legível é 4,5:1).
+
+**Causa:** `LoginScreen` e `OnboardingClinica` cravavam `background:'#161616'` — literal do tema
+escuro — em vez do token `var(--supabase-bg-input)`, que troca para `#eef0f2` no claro. O texto
+usava token (`--supabase-text-light`, que no claro vira `#4b5563`, escuro). Resultado: fundo
+preso no escuro + texto que acompanha o tema = cinza sobre preto.
+
+**Por que o print mentiu:** o Chrome pinta campo autopreenchido com fundo azul-claro próprio,
+que **sobrepõe o inline style**. Quem já logou uma vez naquele navegador nunca vê o bug. Quem
+está criando conta pela primeira vez — exatamente o público da tela — vê sempre.
+
+**Correção:** trocado pelos tokens (`var(--supabase-bg-input)`), 3 ocorrências. Verificado com
+`getComputedStyle` nos dois temas: claro `#eef0f2`/`#4b5563` (≈7,5:1), escuro inalterado.
+
+**Não faça:** validar tema claro só por print do dono. Meça com `getComputedStyle` no navegador,
+ou abra numa janela anônima — sem autofill, sem senha salva, como o usuário real chega.
+
+**Onde mais isso pode estar:** qualquer literal hex em `style={{}}` nos `.jsx`. Procure por
+`grep -n "'#[0-9a-f]\{6\}'" cliniflow-export/*.jsx cliniflow-export/index.html` antes de dar o
+tema claro por pronto.

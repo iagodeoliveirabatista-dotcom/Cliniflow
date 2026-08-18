@@ -36,6 +36,7 @@ assumir. Multi-clínica por `clinic_id`. Lembretes saem por Edge Function + `pg_
 | **Nó Supabase que não acha nada mata o ramo** | Execução fica `success` e para no meio. O `If` seguinte nunca roda. `alwaysOutputData`. §25 |
 | **`Busca Paciente` casa só por telefone** | Sem `clinic_id` no filtro, a 2ª clínica pega paciente da 1ª. §26 |
 | **`DROP COLUMN` quebra função em silêncio** | plpgsql só valida na execução. E a sonda com UUID falso diz "funciona". §27 |
+| **Print do dono no tema claro não prova nada** | Autofill do Chrome pinta o campo e esconde contraste de 2,2:1. Meça, ou abra anônima. §44 |
 | **Conta nova sempre cria clínica NOVA e vazia** | Não existe "entrar na clínica que já existe". Vincule por SQL, não pelo onboarding. §43 |
 | **Apagar clínica desloga o usuário** | CASCADE em `clinic_users` → CRM cai no onboarding e você cria clínica vazia. §28 |
 | **Tabela nova nasce com RLS ligado e SEM policy** | Event trigger `ensure_rls`. Anon lê `[]` com HTTP 200. §13 |
@@ -51,12 +52,11 @@ assumir. Multi-clínica por `clinic_id`. Lembretes saem por Edge Function + `pg_
 
 ## Estado atual (15/08/2026)
 
-✅ **Consertado e publicado nesta data** (detalhe no §/D indicado, não repito aqui):
-confirmação sobrevive à IA inativa (§37) · "ok"/"certo" confirmam consulta (§38) · aprovar
-pedido desliga a IA do paciente (D-23) · lembretes voltaram a existir, estavam TODOS mortos
-(§39) · lembretes viraram multi-tenant, `config_automacao` ganhou `clinic_id` e policy por
-clínica (`docs/db/09`, Edge Function v10) · dia+turno numa pergunta só (D-26).
+✅ **15/08 (detalhe no git log e nos §/D citados):** §37 · §38 · D-23 · lembretes
+ressuscitados e multi-tenant (§39, `docs/db/09`) · D-26 · D-28 · D-29 · CRM ganhou profissionais,
+tema claro e agenda de sábado (D-30, specs em `docs/superpowers/specs/2026-08-15-*`).
 ⚠️ `dea36506` é **piso** do n8n: voltar para antes dele reabre o §37 e quebra o D-23.
+⚠️ `node --check` não valida `.jsx` — o Babel do browser é o gate (§42).
 
 ⛔ **O RAG é de uma clínica FICTÍCIA e está no ar** (§40). O dono ficou de produzir o documento
 real da Anaruthe. Até lá: não ligue divulgação de preço, e trate toda resposta específica do
@@ -65,34 +65,24 @@ bot como potencialmente falsa.
 ⏸️ **Decidido e NÃO implementado:** D-27 (consultar RAG por especificidade, não por fase da
 conversa). Texto pronto lá — aplicar **junto com os documentos reais, na mesma publicação**.
 
-⚠️ **Nada foi exercitado com conversa real.** Prova de lógica sim (22 casos), paciente de
-verdade não — zero consultas futuras no banco. `consulta_amanha` (24h) nunca enviou; o de 4h já
-provou (1 envio, 14/08).
+⚠️ **Paciente real já escreveu (17/08), mas o ciclo nunca fechou.** `consulta_amanha` (24h)
+nunca enviou; o de 4h provou 1 envio (14/08).
 
 ✅ **Lembrete: antecedência virou campo livre** (1–720h, D-28) — ⚠️ **manter em 4h** enquanto o
 template for `confirmao_horas_antes` (§41). 🧹 **Legado Evolution apagado** (D-29, ver commit).
-❗ **CRM servido está atrasado**: print do dono tem 5 cards, o commitado tem 2 — hard refresh
-antes de investigar qualquer coisa na tela.
 
-⚠️ **§36 REGREDIU e foi corrigido de novo (17/08, `activeVersion ee3828f6`).** Paciente testou
-confirmação por WhatsApp, zero resposta, zero mudança de cor — a correção de 13/08 (`6945f2a8`)
-tinha sido sobrescrita em algum publish posterior (provavelmente o do §37, mesmo dia 15/08).
-Reaplicados: `Consulta Encontrada?` → `={{ !!$json.id }}`, `Busca Consulta` → filtra por
-`id eq {{ $('Get a row').first().json.consulta_id }}` em vez de `patient_id+status` sem
-ordenação (validado contra dado real: paciente tinha 2 consultas `pendente`, o filtro velho
-pegaria a errada). Detalhe em `ARMADILHAS.md` §36. **Pendente:** pontos 3 e 4 da correção
-original (texto do `ENCAMINHAR MENSAGEM` e nó `MSG - NAO ENTENDI`) não foram reaplicados — texto
-novo precisa de revisão antes de ir pro ar. **Ciclo ponta a ponta com paciente real ainda não
-fechado** — as duas mensagens de teste já rodaram pela versão quebrada; falta reenviar ou
-corrigir a consulta pendente (`f111b1e8-2727-46ba-9067-bdb893f67ac5`) direto no banco.
+⚠️ **§36 REGREDIU e foi corrigido de novo (17/08, `activeVersion ee3828f6`)** — a correção de
+13/08 tinha sido sobrescrita por um publish posterior. Reaplicados `Consulta Encontrada?` e o
+filtro de `Busca Consulta`; detalhe em `ARMADILHAS.md` §36. **Pendente:** pontos 3 e 4 (texto do
+`ENCAMINHAR MENSAGEM` e do `MSG - NAO ENTENDI`) — texto novo precisa de revisão antes do ar.
+**Ciclo com paciente real ainda não fechou:** as 2 mensagens de teste rodaram pela versão
+quebrada.
 
-✅ **Autocadastro por e-mail e senha (17/08, D-31), exercitado de ponta a ponta.** `LoginScreen`
-tem alternador Entrar/Criar conta e `signUp()` no `supabase-client.js` — fecha a parte (b) da
-D-6. Cadastro é **público**. Rodado de verdade contra o Supabase real (conta e clínica de teste
-criadas e depois apagadas): criar conta → confirmar → entrar → onboarding → CRM. ⚠️ **"Confirm
-email" está LIGADO** no projeto: o `signUp` volta sem sessão e a tela pede o link do e-mail. O
-dono ficou de desligar em Authentication → Providers → Email. Antes de criar a 1ª conta real,
-leia o §43: o onboarding cria clínica **duplicada e vazia**, não vincula à Anaruthe.
+✅ **Autocadastro por e-mail e senha (17/08, D-31), exercitado de ponta a ponta** contra o
+Supabase real (conta e clínica de teste criadas e apagadas). Cadastro é **público**. ⚠️ **"Confirm
+email" está LIGADO** — o `signUp` volta sem sessão e a tela pede o link; o dono ficou de desligar
+em Authentication → Providers → Email. 🐛 Junto veio o conserto do §44 (login ilegível no tema
+claro). Detalhe em `DECISIONS.md` D-31.
 
 ⛔ **Não existe 2ª clínica** — mas o isolamento teve a **1ª prova real** (17/08, durante o teste
 do D-31): logado numa clínica recém-criada, o CRM mostrou 0 pacientes e 0 consultas enquanto a
@@ -100,28 +90,42 @@ Anaruthe tinha 2 e 3. Vale para a leitura de `patients`/`consultas` via CRM; esc
 conversas e o n8n continuam sem prova. Hoje: 1 clínica (`Clinica Anaruthe`), 1 conta
 (`iagodeoliveirabatista@gmail.com`).
 
+### 🏥 Vale para o 1º dia na clínica (revisão de 18/08)
+- **Verificado:** entrar, criar conta, cadastrar clínica, ler agenda/pacientes.
+- **NUNCA exercitado logado:** cadastrar paciente e criar consulta **pela tela** (o conserto do
+  `docs/db/08` só foi testado no papel; os 2 pacientes do banco vieram do bot). Teste isso antes.
+- **Bloqueio:** a conta da recepção não pode passar pelo onboarding (§43) — vincule à Anaruthe
+  por SQL, senão ela cai numa clínica vazia e acha que "sumiu tudo".
+- **Sem "esqueci minha senha"** (não existe tela) e **"Confirm email" ligado** — a 1ª entrada
+  depende do link no e-mail e o destravamento depende do dono.
+- **Bot ativo + RAG fictício** (§40) e **lembretes ligados** (24h e 4h, §31/§41) disparam sozinhos.
+- ⚠️ **`consultas` está VAZIA** (0 linhas em 18/08 03:55 UTC; eram 3 às 20:47 de 17/08). Não fui
+  eu — confirme com quem mexeu antes de concluir que sumiu dado.
+
 ## 🎯 Próximos passos (comece por aqui)
 
-0. 🔥 **Trocar os 7 documentos do RAG pelos dados reais da Anaruthe.** Hoje eles descrevem uma
-   clínica **fictícia** ("Sorriso & Essência"), e o bot responde paciente real com preços,
-   convênios, endereço e um CRO inventados. §40. É o único item desta lista que já causa dano
-   agora, e nenhum agente resolve — depende de conteúdo da clínica (o dono ficou de produzir).
-   **Ao fazer isso, aplique o D-27 na mesma publicação** — o texto já está pronto lá.
-1. **Fechar o ciclo de ponta a ponta, com paciente real.** Aprovar pedido → esperar o lembrete →
+0. 🔥 **Trocar os 7 documentos do RAG pelos dados reais da Anaruthe** (§40). Hoje o bot responde
+   paciente real com preço, convênio, endereço e CRO de uma clínica fictícia — é o único item que
+   **já causa dano**, e nenhum agente resolve: depende de conteúdo que o dono ficou de produzir.
+   **Aplique o D-27 na mesma publicação.**
+1. **Antes de a clínica usar:** criar a conta da recepção, **vincular à Anaruthe por SQL** (§43) e
+   cadastrar um paciente + uma consulta pela tela, logado. É o único caminho que a recepção vai
+   usar amanhã e o único que ninguém exercitou.
+2. **Fechar o ciclo de ponta a ponta, com paciente real.** Aprovar pedido → esperar o lembrete →
    responder "ok" → conferir se `consultas.status` virou `confirmado`. Um teste valida §37, §38,
    §39 e D-23 de uma vez. **É o item mais valioso do projeto agora.**
-2. **Revogar `anon` das RPCs `SECURITY DEFINER` e passar o n8n para `service_role`.**
+3. **Revogar `anon` das RPCs `SECURITY DEFINER` e passar o n8n para `service_role`.**
    `append_whatsapp_buffer` e `criar_pre_agendamento` são chamáveis por qualquer um com a chave
    anon, que é pública (vai no `config.js` servido ao browser). §17
-3. **Terminar a config externa do Google OAuth** (código e banco prontos — D-12). Falta criar o
+4. **Terminar a config externa do Google OAuth** (código e banco prontos — D-12). Falta criar o
    OAuth Client no Google Cloud e colar no Supabase → Providers. Roteiro em `docs/db/05`.
    Testar com `iagodeoliveirabatista@gmail.com` e ler §19 antes.
-4. **Decidir preço no RAG** (§15). A busca não traz a tabela de valores e a IA desvia para
+5. **Decidir preço no RAG** (§15). A busca não traz a tabela de valores e a IA desvia para
    "depende de avaliação". Se é estratégia comercial, feche em `DECISIONS.md`.
-5. **LGPD além do RLS.** Faltam aviso de privacidade na 1ª mensagem, base legal para dado
+6. **LGPD além do RLS.** Faltam aviso de privacidade na 1ª mensagem, base legal para dado
    sensível (art. 11), retenção/expurgo (arts. 15-16) e via de exclusão (art. 18). O bot
    pergunta "o que mais te incomoda" e grava — é dado de saúde. Depende de decisão, não de código.
-6. **Envio travado em `sending`**: mensagem que falha nunca mais é reenviável. §5c
+7. **Envio travado em `sending`**: mensagem que falha nunca mais é reenviável. §5c
 
 ## Como rodar
 - **CRM:** `cliniflow-export/servir-local.bat` (HTML + React via CDN, sem build). Config em
@@ -160,6 +164,6 @@ conversas e o n8n continuam sem prova. Hoje: 1 clínica (`Clinica Anaruthe`), 1 
 6. **Mudanças cirúrgicas:** não refatore o que não foi pedido.
 7. **Teto de ~100 linhas FORA a tabela de alerta.** A tabela cresce com o que doeu e não se
    corta — o resto sim: passou do teto, é detalhe demais, mova para um doc e aponte daqui.
-   Histórico vai no commit, nunca aqui. (Hoje: 156 no total, ~124 fora a tabela — **acima do
-   teto e piorou**: a sessão de 17/08 só acrescentou. O próximo que escrever aqui **corta antes
-   de escrever** — comece pelo bloco "CRM (15/08)", que já virou histórico e vive no `git log`.)
+   Histórico vai no commit, nunca aqui. (Hoje: 169 no total, ~127 fora a tabela — **ainda acima
+   do teto**. Em 18/08 cortei 19 e acrescentei 17: o recital de 15/08 virou 3 linhas e o §36 foi
+   comprimido pro `ARMADILHAS`. Continue cortando — o próximo alvo é "Como rodar".)
