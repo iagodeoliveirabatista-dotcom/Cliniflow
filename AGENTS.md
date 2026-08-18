@@ -52,9 +52,8 @@ assumir. Multi-clínica por `clinic_id`. Lembretes saem por Edge Function + `pg_
 
 ## Estado atual (15/08/2026)
 
-✅ **15/08 (detalhe no git log e nos §/D citados):** §37 · §38 · D-23 · lembretes
-ressuscitados e multi-tenant (§39, `docs/db/09`) · D-26 · D-28 · D-29 · CRM ganhou profissionais,
-tema claro e agenda de sábado (D-30, specs em `docs/superpowers/specs/2026-08-15-*`).
+✅ **15/08:** §37 · §38 · D-23 · D-26 · D-28 · D-29 · D-30 · lembretes ressuscitados e
+multi-tenant (§39). Detalhe no `git log` e nos §/D citados.
 ⚠️ `dea36506` é **piso** do n8n: voltar para antes dele reabre o §37 e quebra o D-23.
 ⚠️ `node --check` não valida `.jsx` — o Babel do browser é o gate (§42).
 
@@ -91,7 +90,13 @@ conversas e o n8n continuam sem prova. Hoje: 1 clínica (`Clinica Anaruthe`), 1 
 (`iagodeoliveirabatista@gmail.com`).
 
 ### 🏥 Vale para o 1º dia na clínica (revisão de 18/08)
-- **Verificado:** entrar, criar conta, cadastrar clínica, ler agenda/pacientes.
+- **Verificado:** entrar, criar conta (com repetição de senha), cadastrar clínica, ler
+  agenda/pacientes. **Tudo isso está publicado** — `origin/main` = `c808488` (18/08).
+- **Cor de status agora é token por tema** (D-33): os 12 pares status×tema passam de 4,5:1.
+  Transparência derivada de cor de status usa `alfa()`/`color-mix` — **nunca** concatene alfa em
+  hex (`${cor}26`) sobre um `var()`: o browser descarta e o elemento fica sem fundo.
+- **`?v=NN` nos `.jsx` é o cache-buster do projeto e ninguém bumpa.** Mexeu num `.jsx`? Bumpe no
+  `index.html`, senão quem já abriu o site continua com o código velho. (Hoje: components `v=13`.)
 - **NUNCA exercitado logado:** cadastrar paciente e criar consulta **pela tela** (o conserto do
   `docs/db/08` só foi testado no papel; os 2 pacientes do banco vieram do bot). Teste isso antes.
 - **Bloqueio:** a conta da recepção não pode passar pelo onboarding (§43) — vincule à Anaruthe
@@ -133,13 +138,10 @@ conversas e o n8n continuam sem prova. Hoje: 1 clínica (`Clinica Anaruthe`), 1 
 
 ## Como rodar
 - **CRM:** `cliniflow-export/servir-local.bat` (HTML + React via CDN, sem build). Config em
-  `cliniflow-export/config.js`.
-- **n8n:** via MCP. `update_workflow` → conferir rascunho → `publish_workflow` → **conferir a
-  `activeVersion`**. Rascunho não é produção (§5d).
-- **Supabase:** MCP. DDL por `apply_migration`, e todo script fica versionado em `docs/db/`.
-  Edge Function por `deploy_edge_function`, preservando `verify_jwt`.
-- Se algo "parou": cheque se o projeto Supabase pausou (§1) antes de qualquer outra hipótese.
-
+  `cliniflow-export/config.js`. Publicado no Vercel a partir do branch **`main`**.
+- **n8n:** via MCP — `update_workflow` escreve no RASCUNHO; sem `publish_workflow` nada muda, e
+  confira a `activeVersion` depois (§5d). **Supabase:** MCP, DDL por `apply_migration`, script
+  versionado em `docs/db/`. Se algo "parou", cheque se o projeto pausou (§1) antes de tudo.
 ## Mapa de arquivos
 
 | Preciso mexer em… | Vá para |
@@ -169,6 +171,7 @@ conversas e o n8n continuam sem prova. Hoje: 1 clínica (`Clinica Anaruthe`), 1 
 6. **Mudanças cirúrgicas:** não refatore o que não foi pedido.
 7. **Teto de ~100 linhas FORA a tabela de alerta.** A tabela cresce com o que doeu e não se
    corta — o resto sim: passou do teto, é detalhe demais, mova para um doc e aponte daqui.
-   Histórico vai no commit, nunca aqui. (Hoje: 169 no total, ~127 fora a tabela — **ainda acima
-   do teto**. Em 18/08 cortei 19 e acrescentei 17: o recital de 15/08 virou 3 linhas e o §36 foi
-   comprimido pro `ARMADILHAS`. Continue cortando — o próximo alvo é "Como rodar".)
+   Histórico vai no commit, nunca aqui. (Hoje: 176 no total, ~134 fora a tabela — **acima do
+   teto**. Em 18/08 duas sessões escreveram aqui no mesmo dia; eu cortei "Como rodar" e o recital
+   de 15/08. Próximo alvo de corte: o bloco "Vale para o 1º dia", que vira histórico assim que a
+   clínica começar a usar.)
