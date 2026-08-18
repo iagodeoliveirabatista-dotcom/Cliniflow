@@ -1666,3 +1666,32 @@ foi exatamente esse o erro. Confira `count(*) where clinic_id is null` nas duas 
 
 **Em aberto:** ninguém decidiu se `SET NULL` é intencional (preservar histórico de paciente se a
 clínica sai do sistema) ou descuido. Enquanto não decidir, a limpeza é manual.
+
+---
+
+## 47. O modo demonstração é meio-mock: abre a conversa, mas nada que você faz nela reflete ⚠️ ATIVO
+
+**Sintoma:** sem Supabase configurado, a aba Atendimentos lista as 3 conversas de exemplo, mas
+clicar em qualquer uma **não abria nada** — o painel ficava em "Selecione um chat". Depois de
+consertar isso, apareceu o segundo andar do problema: o chat abre, você digita, clica em Enviar
+e **a mensagem não aparece**, nem o switch da IA muda. Nenhum erro no console.
+
+**Causa (dois níveis):**
+1. `selectedConversa` procurava em `conversas` (estado real, **vazio** sem Supabase) enquanto a
+   lista renderizava `mockConversas`. O `setSelectedId` gravava um id que a busca nunca achava.
+   Corrigido em 18/08: a busca passou a usar a mesma lista que a tela mostra.
+2. **Continua ativo:** `mockConversas` e `mockMensagens` são `const` dentro do componente, não
+   `useState`. Todo `setConversas`/`setMensagens` escreve no estado real, que o demo não lê. Ou
+   seja: **qualquer escrita testada no modo demonstração é invisível por construção.**
+
+**O que isso significa na prática:** o modo demonstração serve para conferir **layout, tema,
+navegação e contraste** — foi assim que o CRM de 15/08 foi validado, e está correto. Ele **não**
+serve para validar comportamento que depende de escrever estado (pausar IA, enviar mensagem,
+mudar status). Quem tentar vai ver "não acontece nada" e concluir que o código está quebrado
+quando o código pode estar certo.
+
+**Correção se um dia precisar testar escrita sem banco:** transformar os dois mocks em `useState`
+inicializado com o array de exemplo. É pequeno, mas mexe no fluxo de dados da aba inteira —
+**não faça isso às vésperas de uso real** (foi por isso que ficou de fora em 18/08).
+
+**Não faça:** marcar como ✅ um comportamento de escrita "testado no demo". Não foi.

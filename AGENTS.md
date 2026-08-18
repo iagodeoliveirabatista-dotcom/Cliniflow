@@ -36,6 +36,7 @@ assumir. Multi-clínica por `clinic_id`. Lembretes saem por Edge Function + `pg_
 | **Nó Supabase que não acha nada mata o ramo** | Execução fica `success` e para no meio. O `If` seguinte nunca roda. `alwaysOutputData`. §25 |
 | **`Busca Paciente` casa só por telefone** | Sem `clinic_id` no filtro, a 2ª clínica pega paciente da 1ª. §26 |
 | **`DROP COLUMN` quebra função em silêncio** | plpgsql só valida na execução. E a sonda com UUID falso diz "funciona". §27 |
+| **Modo demonstração não prova escrita** | Os mocks são `const`, não estado: pausar IA/enviar msg não reflete. Layout sim, comportamento não. §47 |
 | **Print do dono no tema claro não prova nada** | Autofill do Chrome pinta o campo e esconde contraste de 2,2:1. Meça, ou abra anônima. §44 |
 | **Conta nova sempre cria clínica NOVA e vazia** | Não existe "entrar na clínica que já existe". Vincule por SQL, não pelo onboarding. §43 |
 | **Apagar clínica deixa paciente/consulta órfãos** | FK é `SET NULL`, não CASCADE. Somem da tela e o bot ainda acha por telefone. §46 |
@@ -71,24 +72,19 @@ nunca enviou; o de 4h provou 1 envio (14/08).
 ✅ **Lembrete: antecedência virou campo livre** (1–720h, D-28) — ⚠️ **manter em 4h** enquanto o
 template for `confirmao_horas_antes` (§41). 🧹 **Legado Evolution apagado** (D-29, ver commit).
 
-⚠️ **§36 REGREDIU e foi corrigido de novo (17/08, `activeVersion ee3828f6`)** — a correção de
-13/08 tinha sido sobrescrita por um publish posterior. Reaplicados `Consulta Encontrada?` e o
-filtro de `Busca Consulta`; detalhe em `ARMADILHAS.md` §36. **Pendente:** pontos 3 e 4 (texto do
-`ENCAMINHAR MENSAGEM` e do `MSG - NAO ENTENDI`) — texto novo precisa de revisão antes do ar.
-**Ciclo com paciente real ainda não fechou:** as 2 mensagens de teste rodaram pela versão
-quebrada.
+⚠️ **§36 regrediu em 17/08 e foi corrigido de novo** (`activeVersion ee3828f6`, depois `14b69408`
+com o D-32). **Pendente:** pontos 3 e 4 da correção (textos do `ENCAMINHAR MENSAGEM` e do
+`MSG - NAO ENTENDI`) precisam de revisão antes do ar. Ciclo com paciente real **nunca fechou**.
 
-✅ **Autocadastro por e-mail e senha (17/08, D-31), exercitado de ponta a ponta** contra o
-Supabase real (conta e clínica de teste criadas e apagadas). Cadastro é **público**. ⚠️ **"Confirm
-email" está LIGADO** — o `signUp` volta sem sessão e a tela pede o link; o dono ficou de desligar
-em Authentication → Providers → Email. 🐛 Junto veio o conserto do §44 (login ilegível no tema
-claro). Detalhe em `DECISIONS.md` D-31.
+✅ **Autocadastro por e-mail e senha (D-31)** e **cores de status por tema (D-33)**, os dois
+exercitados. 🐛 Consertados no caminho: §44 (login ilegível no claro) e §47-nível-1 (chat não
+abria no demo). Detalhe nos D citados.
 
 ⛔ **Não existe 2ª clínica** — mas o isolamento teve a **1ª prova real** (17/08, durante o teste
 do D-31): logado numa clínica recém-criada, o CRM mostrou 0 pacientes e 0 consultas enquanto a
 Anaruthe tinha 2 e 3. Vale para a leitura de `patients`/`consultas` via CRM; escrita, Realtime,
-conversas e o n8n continuam sem prova. Hoje: 1 clínica (`Clinica Anaruthe`), 1 conta
-(`iagodeoliveirabatista@gmail.com`).
+conversas e o n8n continuam sem prova. Hoje: 1 clínica (`Clinica Anaruthe`) e **2 contas** — a do
+dono (`admin`) e a da recepção (`recepcao`), ambas ligadas a ela.
 
 ### 🏥 Vale para o 1º dia na clínica (revisão de 18/08)
 - **Verificado:** entrar, criar conta (com repetição de senha), cadastrar clínica, ler
@@ -106,7 +102,15 @@ conversas e o n8n continuam sem prova. Hoje: 1 clínica (`Clinica Anaruthe`), 1 
   por SQL, senão ela cai numa clínica vazia e acha que "sumiu tudo".
 - **Sem "esqueci minha senha"** (não existe tela) e **"Confirm email" ligado** — a 1ª entrada
   depende do link no e-mail e o destravamento depende do dono.
-- **Bot ativo + RAG fictício** (§40) e **lembretes ligados** (24h e 4h, §31/§41) disparam sozinhos.
+- **O número no ar é o de TESTE do dono** (confirmado 18/08). Paciente que escrever para o número
+  real da clínica **não fala com o bot** — fala com quem já atende no app comum. Com o RAG ainda
+  fictício (§40), isso é proteção, não defeito. `bot_ativo` está **false** no banco.
+- **Lembretes continuam ligados** (24h e 4h, §31/§41) e disparam sozinhos de hora em hora.
+- ✅ **A conta da recepção existe e entrou** (`clinica.anaruthe.grangeiro@gmail.com`, papel
+  `recepcao`, vinculada à Anaruthe por SQL — o onboarding **não** faz isso, §43). "Confirm email"
+  foi **desligado** no painel: cadastro público cria conta sem confirmar nada.
+- ⚠️ **D-34 escrito e NÃO exercitado:** responder à mão passou a pausar a IA do paciente. Ninguém
+  viu rodando — o demo não prova (§47). É o 1º teste a fazer com a conversa real.
 - ⚠️ **`consultas` está VAZIA** (0 linhas em 18/08 03:55 UTC; eram 3 às 20:47 de 17/08). Não fui
   eu — confirme com quem mexeu antes de concluir que sumiu dado.
 - ✅ **Kill switch do bot** (D-32, 18/08): toggle "Bot de IA" em Configurações desliga só a
@@ -120,9 +124,9 @@ conversas e o n8n continuam sem prova. Hoje: 1 clínica (`Clinica Anaruthe`), 1 
    paciente real com preço, convênio, endereço e CRO de uma clínica fictícia — é o único item que
    **já causa dano**, e nenhum agente resolve: depende de conteúdo que o dono ficou de produzir.
    **Aplique o D-27 na mesma publicação.**
-1. **Antes de a clínica usar:** criar a conta da recepção, **vincular à Anaruthe por SQL** (§43) e
-   cadastrar um paciente + uma consulta pela tela, logado. É o único caminho que a recepção vai
-   usar amanhã e o único que ninguém exercitou.
+1. **Escolher o texto do lembrete manual (D-OPEN-5).** O botão do card manda uma redação cravada
+   no `.jsx`, diferente das 4 que existem. Mensagem que chega em paciente — decida antes de
+   alguém apertar de novo. Junto: provar o D-34 (responder à mão deve pausar a IA).
 2. **Fechar o ciclo de ponta a ponta, com paciente real.** Aprovar pedido → esperar o lembrete →
    responder "ok" → conferir se `consultas.status` virou `confirmado`. Um teste valida §37, §38,
    §39 e D-23 de uma vez. **É o item mais valioso do projeto agora.**
@@ -174,7 +178,7 @@ conversas e o n8n continuam sem prova. Hoje: 1 clínica (`Clinica Anaruthe`), 1 
 6. **Mudanças cirúrgicas:** não refatore o que não foi pedido.
 7. **Teto de ~100 linhas FORA a tabela de alerta.** A tabela cresce com o que doeu e não se
    corta — o resto sim: passou do teto, é detalhe demais, mova para um doc e aponte daqui.
-   Histórico vai no commit, nunca aqui. (Hoje: 176 no total, ~134 fora a tabela — **acima do
-   teto**. Em 18/08 duas sessões escreveram aqui no mesmo dia; eu cortei "Como rodar" e o recital
-   de 15/08. Próximo alvo de corte: o bloco "Vale para o 1º dia", que vira histórico assim que a
-   clínica começar a usar.)
+   Histórico vai no commit, nunca aqui. (Hoje: 184 no total, ~140 fora a tabela — **acima do
+   teto e subindo**: 18/08 teve 3 sessões escrevendo. A tabela de alerta cresceu 3 linhas (§44,
+   §46, §47) e essa parte não se corta. O próximo que escrever: comece cortando o bloco
+   "Vale para o 1º dia", que vira histórico assim que a clínica rodar uma semana.)

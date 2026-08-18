@@ -7,6 +7,36 @@
 
 ## 🟡 Em aberto
 
+### D-OPEN-5 — O lembrete manual manda um texto que não é o de nenhum lugar · 18/08/2026
+**Contexto:** o dono testou o botão "Enviar lembrete WhatsApp" do card da consulta e reparou que a
+mensagem que chega **não é** a dos envios automáticos. Confirmado no código: o texto do botão está
+**cravado no frontend** (`sendWa`, em `cliniflow-components.jsx`) —
+*"Olá {nome}! 😊 Lembramos da sua consulta ({tipo}) amanhã às {hora} com {medico}. Confirme: ✅
+CONFIRMAR ou ❌ CANCELAR"*. Hoje existem **quatro** redações para a mesma ideia:
+
+| Onde | Texto | Quem vê |
+|---|---|---|
+| Botão manual | cravado no `.jsx` | o paciente, quando a recepção clica |
+| `config_automacao.template_mensagem` | no banco, editável no painel | ninguém — é o que a tela mostra |
+| `consulta_amanha` (Meta, 24h) | congelado na aprovação | o paciente, no lembrete automático |
+| `confirmao_horas_antes` (Meta, 4h) | congelado, diz "4 horas" | o paciente, no lembrete automático |
+
+**Por que não é só copiar e colar:** texto livre só passa dentro da janela de 24h (§31) — por isso
+o automático usa template. Mas os dois templates aprovados **afirmam tempo** ("amanhã", "4 horas"),
+e um envio manual acontece a qualquer hora. Unificar no template faz o botão mentir; unificar no
+texto livre faz o botão falhar fora da janela.
+
+| Opção | Prós | Contras |
+|---|---|---|
+| **A. Template novo, neutro** ("você tem consulta em {data} às {hora}") ⭐ | uma redação só, funciona a qualquer hora | depende de aprovação da Meta |
+| B. Botão lê `template_mensagem` do banco | acaba com o texto cravado, o painel passa a mandar de verdade | continua quebrando fora da janela de 24h |
+| C. Botão manda `consulta_amanha` | zero espera | mente se a consulta não for amanhã |
+
+**Recomendação:** A, e enquanto o template novo não é aprovado, B — que pelo menos tira o texto de
+dentro do código e faz o painel de automações significar alguma coisa.
+**Status:** aguardando o dono. Não implemente sem escolher — é mensagem que chega em paciente.
+
+
 ### D-OPEN-1 — Quando fechar o acesso aos dados de paciente
 **Contexto:** `patients`, `consultas` e `mensagem_logs` estão com RLS `USING (true)`. A chave anon
 é pública (está no `config.js` servido ao browser). Verificado em 26/07/2026: um `GET
@@ -43,6 +73,29 @@ painel não depender do push. **Status:** aguardando o usuário.
 ---
 
 ## 🟢 Tomadas
+
+### D-34 — Humano que escreve no chat assume do bot, e o switch mostra isso · 18/08/2026
+**Decisão:** o primeiro envio manual numa conversa pausa a IA daquele paciente
+(`patients.bot_pausado = true`) e o switch da tela reflete na hora.
+
+**Por quê:** o dono digitou uma resposta manual e reparou que o switch continuou em "IA Ativa" —
+dava para conduzir a conversa inteira à mão com a IA ainda armada para responder por cima. Pior,
+a tela se contradizia: o rótulo do topo dizia "Atendimento Humano" (lê `sessoes_ativas`) e o
+badge dizia "IA Ativa" (lê `patients.bot_pausado`). Dois indicadores, duas fontes, um só usuário
+confuso.
+
+**Consequência assumida:** quem responder uma vez, mesmo que só para dizer "já te retorno",
+desliga a IA daquele paciente **até alguém religar** no mesmo switch. É o comportamento pedido —
+mas é silencioso, e a recepção precisa saber que o botão existe para desfazer.
+
+⚠️ **NÃO exercitado de ponta a ponta.** O modo demonstração não consegue provar (§47) e o caminho
+real exige mandar WhatsApp de verdade pelo CRM. A lógica foi lida e revisada; o comportamento
+não foi visto rodando. **Primeiro teste real:** abrir uma conversa, responder à mão e conferir se
+o switch vira e se `patients.bot_pausado` foi para `true` no banco.
+
+**Fica de fora de propósito:** avisar o **paciente** de que agora é um humano ("você está falando
+com a recepção"). Isso é decisão de produto, não de código — e ninguém pediu.
+
 
 ### D-33 — Cor de status vira token por tema, e transparência vira `color-mix` · 18/08/2026
 **Decisão:** as 6 cores de sinalização da agenda saíram do JS e viraram tokens `--st-*` no

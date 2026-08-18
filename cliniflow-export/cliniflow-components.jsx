@@ -1206,7 +1206,16 @@ function AtendimentosView({ accent }) {
   // Alimenta o rótulo "Humano" e as abas minhas/não atribuídas — "alguém assumiu".
   const currentUserId = (window.SupabaseService && window.SupabaseService.getCurrentUserId()) || null;
 
-  const selectedConversa = conversas.find(c => c.id === selectedId) || null;
+  const mockConversas = [
+    { id: 'c-1', display_id: 1, status: 'open', assignee_id: null, patient: { id: 'p-1', nome: 'Iago de Oliveira', telefone: '88981458633', bot_pausado: false }, last_activity_at: new Date().toISOString() },
+    { id: 'c-2', display_id: 2, status: 'open', assignee_id: currentUserId, patient: { id: 'p-2', nome: 'Ana Silva', telefone: '11999999999', bot_pausado: true }, last_activity_at: new Date(Date.now() - 3600000).toISOString() },
+    { id: 'c-3', display_id: 3, status: 'resolved', assignee_id: null, patient: { id: 'p-3', nome: 'Marcos Souza', telefone: '88988888888', bot_pausado: false }, last_activity_at: new Date(Date.now() - 7200000).toISOString() },
+  ];
+
+  // Procura na MESMA lista que a tela mostra. Antes olhava só `conversas`, que
+  // fica vazia sem Supabase: no modo demonstração dava para clicar na conversa
+  // e nada abria — e é esse modo que serve de bancada de teste do CRM.
+  const selectedConversa = (isConnected ? conversas : mockConversas).find(c => c.id === selectedId) || null;
 
   // Carregar conversas
   const carregarConversas = useCallbackChat(async () => {
@@ -1310,6 +1319,20 @@ function AtendimentosView({ accent }) {
     }
   }, [mensagens]);
 
+  // Humano escreveu = humano assumiu. Antes isto era mudo: dava para digitar a
+  // conversa inteira com o switch parado em "IA Ativa", e a IA continuava
+  // respondendo por cima. Agora o primeiro envio manual pausa a IA daquele
+  // paciente e o switch reflete isso (D-34).
+  const assumirDoBot = async () => {
+    if (selectedConversa?.patient?.bot_pausado) return;   // ja pausada, nada a fazer
+    setConversas(prev => prev.map(c => (
+      c.id === selectedId ? { ...c, patient: { ...c.patient, bot_pausado: true } } : c
+    )));
+    if (isConnected && selectedConversa?.patient?.id) {
+      await window.SupabaseService.updatePaciente(selectedConversa.patient.id, { bot_pausado: true });
+    }
+  };
+
   const handleEnviar = async (e) => {
     e.preventDefault();
     if (!texto.trim() || !selectedConversa || sending) return;
@@ -1328,6 +1351,7 @@ function AtendimentosView({ accent }) {
       );
       if (res.success) {
         setTexto('');
+        await assumirDoBot();
       } else {
         alert('Erro ao enviar mensagem');
       }
@@ -1346,6 +1370,7 @@ function AtendimentosView({ accent }) {
       };
       setMensagens(prev => [...prev, novaMsg]);
       setTexto('');
+      await assumirDoBot();
     }
     setSending(false);
   };
@@ -1412,12 +1437,6 @@ function AtendimentosView({ accent }) {
   };
 
   // Mock dados demo
-  const mockConversas = [
-    { id: 'c-1', display_id: 1, status: 'open', assignee_id: null, patient: { id: 'p-1', nome: 'Iago de Oliveira', telefone: '88981458633', bot_pausado: false }, last_activity_at: new Date().toISOString() },
-    { id: 'c-2', display_id: 2, status: 'open', assignee_id: currentUserId, patient: { id: 'p-2', nome: 'Ana Silva', telefone: '11999999999', bot_pausado: true }, last_activity_at: new Date(Date.now() - 3600000).toISOString() },
-    { id: 'c-3', display_id: 3, status: 'resolved', assignee_id: null, patient: { id: 'p-3', nome: 'Marcos Souza', telefone: '88988888888', bot_pausado: false }, last_activity_at: new Date(Date.now() - 7200000).toISOString() },
-  ];
-
   const mockMensagens = [
     { id: 'm-1', mensagem: 'Olá, gostaria de saber se vocês aceitam convênio Bradesco?', direcao: 'entrada', enviado_em: new Date(Date.now() - 300000).toISOString() },
     { id: 'm-2', mensagem: 'Olá Iago! Sim, nós atendemos consultas no particular e fornecemos a documentação completa para você solicitar reembolso junto ao Bradesco Saúde. 😊', direcao: 'saida', tipo: 'auto', enviado_em: new Date(Date.now() - 240000).toISOString(), sender_id: null }, // IA
