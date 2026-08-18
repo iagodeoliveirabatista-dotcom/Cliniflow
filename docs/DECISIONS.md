@@ -44,6 +44,56 @@ painel não depender do push. **Status:** aguardando o usuário.
 
 ## 🟢 Tomadas
 
+### D-33 — Cor de status vira token por tema, e transparência vira `color-mix` · 18/08/2026
+**Decisão:** as 6 cores de sinalização da agenda saíram do JS e viraram tokens `--st-*` no
+`index.html`, com valores **diferentes por tema**. Toda transparência derivada delas passa por
+`alfa(cor, pct)` → `color-mix(in srgb, … %, transparent)`.
+
+**Por quê:** o dono olhou a agenda no tema claro e disse que o verde "ficou muito transparente".
+Não era impressão: `#3ecf8e` sobre branco dá **1,96:1**. O código assumia que um hex médio serviria
+os dois temas (comentário no `getStatusStyle` afirmava isso) — não serve: o que é legível sobre
+`#0f0f0f` some sobre `#ffffff`.
+
+**A consequência técnica que obriga o `color-mix`:** o padrão antigo era concatenar alfa em hex
+(`${cor}26`, `s.color+'70'`). Isso **quebra silenciosamente** com `var(--x)` — vira
+`var(--st-confirmado)26`, que o browser descarta, e o elemento fica sem fundo. Ao mexer em
+qualquer cor de status daqui pra frente, use `alfa()`; nunca volte a concatenar.
+
+**Medido**, texto do badge sobre o próprio preenchimento (pior caso, não sobre o branco puro),
+com os componentes reais renderizados no browser:
+
+| | claro (antes → depois) | escuro (antes → depois) |
+|---|---|---|
+| Confirmado | 1,86 → **5,57** | 6,94 → **8,73** |
+| Solicitado reagend. | 1,99 → **5,14** | 6,51 → **8,11** |
+| Cancelado | 3,30 → **4,69** | 4,02 → **4,63** |
+| Pendente | 4,32 → **5,48** | 2,71 → **6,86** |
+| Solicitado | 3,50 → **5,06** | 3,79 → **6,59** |
+| Recusado | 6,35 → **7,47** | 1,91 → **6,80** |
+
+Os 12 passam de 4,5:1. **Não clareie um token sem remedir** — o primeiro chute no verde (`#047857`)
+parecia seguro (5,5:1 sobre branco) e dava só 3,97 sobre o preenchimento, que é onde o texto vive.
+
+**Fora de escopo de propósito:** os `#3ecf8e`/`#10b981` soltos da aba Atendimentos (rótulo "IA
+Ativa" etc.) continuam hex fixo. Não são a agenda e ninguém reclamou deles.
+
+
+### D-32 — Kill switch do bot de IA é por clínica e só no caminho automático · 18/08/2026
+**Decisão:** `clinics.bot_ativo` (boolean, default `true`), gate único no n8n em "Bot Ativo?",
+logo antes de "Envia Resposta do Agent" (workflow `Project Clinica - Migração para Meta`,
+`ZAQ6I2CiBGh8swye`). Toggle visível em Configurações no CRM, sem precisar de SQL. Envio manual
+pelo CRM e lembretes automáticos **não** são cobertos por este gate — ficam para depois, se
+precisar.
+
+**Por quê:** véspera do primeiro número de produção real indo ao ar (migração D-13 a D-22). O
+caminho automático e sem supervisão é o de maior risco (loop de resposta, §24) — o usuário
+escolheu esse escopo mínimo em vez de cobrir os três caminhos de saída de uma vez.
+
+**Achado no caminho (não fazia parte do pedido, mas bloqueava o pedido com segurança):** `clinics`
+tinha RLS sem nenhuma policy escondendo GRANT total pra `anon`/`authenticated` em todas as
+colunas, incluindo `meta_access_token`. Fechado antes de abrir a policy do toggle — detalhe em
+`ARMADILHAS.md` §45.
+
 ### D-31 — Autocadastro por e-mail e senha na tela de login · 17/08/2026
 **Decisão:** a `LoginScreen` ganhou um alternador **Entrar / Criar conta**, e `supabase-client.js`
 ganhou `signUp(email, senha)`. Qualquer pessoa que chegue na URL do CRM pode criar conta e, em

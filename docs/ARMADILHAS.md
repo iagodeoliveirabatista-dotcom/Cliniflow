@@ -1595,3 +1595,40 @@ ou abra numa janela anônima — sem autofill, sem senha salva, como o usuário 
 **Onde mais isso pode estar:** qualquer literal hex em `style={{}}` nos `.jsx`. Procure por
 `grep -n "'#[0-9a-f]\{6\}'" cliniflow-export/*.jsx cliniflow-export/index.html` antes de dar o
 tema claro por pronto.
+
+---
+
+## 45. `clinics` "fechada" por RLS sem policy escondia GRANT total, incluindo `meta_access_token` ⚠️ CORRIGIDO EM 18/08/2026
+
+**Sintoma:** ao planejar um toggle simples ("bot ativo") lido/editado pelo CRM, checagem de
+`information_schema.column_privileges` mostrou `anon` e `authenticated` com SELECT/INSERT/UPDATE
+em **todas** as colunas de `clinics` — inclusive `meta_access_token` (o token de acesso da Meta
+Cloud API) — desde a criação da tabela.
+
+**Por que ninguém tinha visto:** `clinics` tem RLS ligado e **zero policies**. Com RLS on e sem
+policy, Postgres nega toda linha por padrão — então nenhum dado vazava até agora, mas por
+acidente de omissão, não por design. É a mesma família do §16/§17 (tabela "fechada" que não está,
+por baixo), só que aqui o gatilho não foi alguém abrir uma view ou esquecer o segundo GRANT — foi
+literalmente nunca ter existido policy nenhuma nessa tabela.
+
+**O risco que isso abriria:** qualquer policy nova em `clinics` — mesmo uma inocente, tipo "deixa
+a própria clínica ler sua linha" — reabriria acesso a **todas** as colunas de uma vez, porque RLS
+só filtra linha, não coluna. Os GRANTs largos por baixo ficariam ativos de novo. Com autocadastro
+público (D-31), isso significa: qualquer pessoa cria conta, e se algum dia uma policy genérica
+"minha própria clínica" for adicionada sem cuidado, ela lê o token do WhatsApp da própria clínica
+pelo `fetch` do browser — não é vazamento cross-tenant, mas ainda é o **token de produção da API
+da Meta** parando num app com autocadastro aberto.
+
+**Correção aplicada (migração `clinics_bot_ativo_kill_switch`):** antes de abrir qualquer policy,
+`REVOKE ALL` de `anon` e `REVOKE` das colunas sensíveis (`cnpj`, `rules_config`,
+`telefone_notificacao`, `meta_access_token`, `meta_phone_number_id`, `meta_waba_id`) de
+`authenticated`. Só depois `GRANT SELECT (id, name, bot_ativo)` e `GRANT UPDATE (bot_ativo)`, e só
+então as duas policies (`clinics_select_own`, `clinics_update_bot_ativo`, ambas
+`id = auth_clinic_id()`).
+
+**Não faça:** adicionar uma policy em `clinics` sem antes checar `information_schema.column_privileges`
+para essa tabela. RLS e GRANT são camadas independentes — fechar uma sem a outra não fecha nada.
+
+**Verificado:** `anon` sem nenhuma linha em `column_privileges` para `clinics`; `authenticated`
+só com SELECT/UPDATE em `bot_ativo` (mais SELECT em `id`/`name`) — as colunas sensíveis mantêm só
+`REFERENCES`, que não é exposto via PostgREST.

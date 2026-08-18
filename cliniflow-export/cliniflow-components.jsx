@@ -35,14 +35,20 @@ const APPOINTMENTS = [
   { id:19, day:4, time:'15:30', patient:'Igor Martins',    initials:'IM', type:'Coleta de exames',     doctor:'Dr. Paulo Ribeiro',   status:'pending',   wa:true,  dur:20, phone:'(11) 92211-0099', age:39, last:'18 abr 2026' },
 ];
 
+// A cor vem do tema (tokens --st-* no index.html): o mesmo hex nao serve claro
+// e escuro. Como sao var(), toda transparencia daqui pra frente usa color-mix,
+// nunca concatenacao de alfa em hex (`${cor}26`) — isso quebra com var().
+const alfa = (cor, pct) => `color-mix(in srgb, ${cor} ${pct}%, transparent)`;
+
 const STATUS_CFG = {
-  confirmed: { label:'Confirmado', color:'#3ecf8e', bg:'rgba(62,207,142,0.10)' },
-  pending:   { label:'Pendente',   color:'#6b7280', bg:'rgba(156,163,175,0.14)' },
-  rescheduled: { label:'Solicitado reagendamento', color:'#f59e0b', bg:'rgba(245,158,11,0.10)' },
-  canceled:  { label:'Cancelado',  color:'#ef4444', bg:'rgba(239,68,68,0.10)'  },
-  solicitado: { label:'Solicitado', color:'#a855f7', bg:'rgba(168, 85, 247, 0.10)' },
-  recusado:  { label:'Recusado',   color:'#4b5563', bg:'rgba(107,114,128,0.14)' },
+  confirmed:   { label:'Confirmado', color:'var(--st-confirmado)' },
+  pending:     { label:'Pendente',   color:'var(--st-pendente)'   },
+  rescheduled: { label:'Solicitado reagendamento', color:'var(--st-remarcado)' },
+  canceled:    { label:'Cancelado',  color:'var(--st-cancelado)'  },
+  solicitado:  { label:'Solicitado', color:'var(--st-solicitado)' },
+  recusado:    { label:'Recusado',   color:'var(--st-recusado)'   },
 };
+Object.values(STATUS_CFG).forEach(s => { s.bg = alfa(s.color, 14); });
 
 // O bot grava a preferência dentro de `notas`, em prosa:
 //   "Pedido pelo bot. Preferência do paciente: segunda de manhã"
@@ -79,21 +85,20 @@ const getStatusStyle = (status) => {
     recusado: 'recusado'
   }[status] || status;
 
-  // Um tom médio + alfa, no mesmo estilo do STATUS_CFG — funciona em fundo
-  // claro e escuro sem precisar de token por tema (ver Global Constraints
-  // sobre o padrão `${cor}NN` usado por Avatar/KanbanView downstream).
+  // Mesmos tokens do STATUS_CFG. A promessa antiga ("funciona nos dois temas
+  // sem token por tema") era falsa: no claro o verde dava 1,96:1 sobre branco.
   const TONS = {
-    confirmado: '#10b981',
-    cancelado:  '#ef4444',
-    remarcado:  '#f59e0b',
-    solicitado: '#a855f7',
-    recusado:   '#6b7280',
-    pendente:   '#9ca3af',
+    confirmado: 'var(--st-confirmado)',
+    cancelado:  'var(--st-cancelado)',
+    remarcado:  'var(--st-remarcado)',
+    solicitado: 'var(--st-solicitado)',
+    recusado:   'var(--st-recusado)',
+    pendente:   'var(--st-pendente)',
   };
   const c = TONS[normalized] || TONS.pendente;
   const isDashed = normalized === 'solicitado';
   return {
-    bg: `${c}1f`,
+    bg: alfa(c, 16),
     border: `${isDashed ? 'dashed 2px' : 'solid 1px'} ${c}`,
     text: c,
   };
@@ -105,7 +110,7 @@ function Avatar({ initials, size=32, color='#3ecf8e' }) {
   return (
     <div style={{
       width:size, height:size, borderRadius:'50%', flexShrink:0,
-      background:`${color}18`, border:`1.5px solid ${color}35`,
+      background:alfa(color, 9), border:`1.5px solid ${alfa(color, 21)}`,
       display:'flex', alignItems:'center', justifyContent:'center',
       fontSize:size*0.34, fontWeight:600, color, letterSpacing:-.5,
       userSelect:'none',
@@ -312,7 +317,7 @@ function ListView({ appointments, selectedId, onSelect, accent }) {
 
 function AppRow({ apt, isSelected, onClick, accent, isLast }) {
   const [hov, setHov] = useState(false);
-  const s = STATUS_CFG[apt.status] || { color: '#9ca3af', bg: 'rgba(156,163,175,0.10)' };
+  const s = STATUS_CFG[apt.status] || { color: 'var(--st-pendente)', bg: alfa('var(--st-pendente)', 14) };
   const dim = apt.status === 'canceled';
   const isSolicitado = apt.status === 'solicitado';
   const st = getStatusStyle(apt.status);
@@ -731,7 +736,7 @@ function CalendarView({ appointments, selectedId, onSelect, accent, onMove, curr
 
 function CalEvent({ apt, dayStart, slotH, selected, dragging, onSelect, onPointerDown }) {
   const [hov, setHov] = useState(false);
-  const s = STATUS_CFG[apt.status] || { color: '#9ca3af', bg: 'rgba(156,163,175,0.10)' };
+  const s = STATUS_CFG[apt.status] || { color: 'var(--st-pendente)', bg: alfa('var(--st-pendente)', 14) };
   const sh = slotH || SLOT_H;
   const top = (apt._start - dayStart) / 60 * sh;
   const height = Math.max(apt.dur / 60 * sh - 2, 22);
@@ -757,17 +762,17 @@ function CalEvent({ apt, dayStart, slotH, selected, dragging, onSelect, onPointe
         height,
         left:  `calc(${leftPct}% + 2px)`,
         width: `calc(${widthPct}% - 4px)`,
-        background: selected || hov ? (isSolicitado ? `${styleVal.text}26` : `${s.color}26`) : (isSolicitado ? styleVal.bg : dim ? 'var(--supabase-bg-hover)' : `${s.color}14`),
+        background: selected || hov ? alfa(isSolicitado ? styleVal.text : s.color, 22) : (isSolicitado ? styleVal.bg : dim ? 'var(--supabase-bg-hover)' : alfa(s.color, 13)),
         border: isSolicitado
           ? (selected ? `solid 2px ${styleVal.text}` : hov ? `dashed 2px ${styleVal.text}` : styleVal.border)
-          : `1px solid ${selected ? s.color+'70' : hov ? s.color+'44' : dim ? 'var(--supabase-border)' : s.color+'2a'}`,
+          : `1px solid ${selected ? alfa(s.color, 44) : hov ? alfa(s.color, 27) : dim ? 'var(--supabase-border)' : alfa(s.color, 22)}`,
         borderLeft: isSolicitado ? undefined : `3px solid ${dim ? 'var(--supabase-border)' : s.color}`,
         borderRadius:5,
         padding: compact ? '2px 6px' : '4px 7px 5px',
         cursor: dragging ? 'grabbing' : 'grab',
         transition: dragging ? 'none' : 'top .25s var(--ease-premium), left .25s var(--ease-premium), background .12s, border-color .12s, box-shadow .12s',
         opacity: dragging ? .35 : dim ? .55 : 1,
-        boxShadow: hov && !dim ? `0 4px 14px -6px ${isSolicitado ? styleVal.text : s.color}55` : 'none',
+        boxShadow: hov && !dim ? `0 4px 14px -6px ${alfa(isSolicitado ? styleVal.text : s.color, 33)}` : 'none',
         overflow:'hidden',
         display:'flex', flexDirection: compact ? 'row' : 'column',
         gap: compact ? 6 : 1,

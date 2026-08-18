@@ -101,6 +101,10 @@ conversas e o n8n continuam sem prova. Hoje: 1 clínica (`Clinica Anaruthe`), 1 
 - **Bot ativo + RAG fictício** (§40) e **lembretes ligados** (24h e 4h, §31/§41) disparam sozinhos.
 - ⚠️ **`consultas` está VAZIA** (0 linhas em 18/08 03:55 UTC; eram 3 às 20:47 de 17/08). Não fui
   eu — confirme com quem mexeu antes de concluir que sumiu dado.
+- ✅ **Kill switch do bot** (D-32, 18/08): toggle "Bot de IA" em Configurações desliga só a
+  resposta automática no WhatsApp — mensagem do paciente continua chegando no CRM. Gate testado
+  no draft do n8n, **não testado com mensagem real ainda**. Usar se o número novo se comportar
+  mal amanhã.
 
 ## 🎯 Próximos passos (comece por aqui)
 
@@ -149,7 +153,8 @@ conversas e o n8n continuam sem prova. Hoje: 1 clínica (`Clinica Anaruthe`), 1 
 | Specs e planos | `docs/superpowers/` |
 
 **IDs úteis:** n8n `ZAQ6I2CiBGh8swye` — nome real **"Project Clinica - Migração para Meta"**,
-**78 nós**, `activeVersion ee3828f6` (corrente) · Supabase `mxvaufkqijdkapvtkvee` · clínica única
+**79 nós**, `activeVersion 14b69408` (corrente, 18/08 — gate "Bot Ativo?", D-32) · Supabase
+`mxvaufkqijdkapvtkvee` · clínica única
 `7936105a-b198-419f-bad7-a65e2e60725b` (`Clinica Anaruthe`)
 
 ## Regras para agentes (CONTRATO)

@@ -27,7 +27,14 @@ CREATE TABLE public.clinics (
     -- direta, não coexistência permanente entre provedores).
     meta_access_token    text,           -- token do usuário de sistema (D-18: compartilhado hoje, guardado por clínica)
     meta_phone_number_id text,           -- ID do NÚMERO (App → WhatsApp → Config. da API). NÃO é o WABA ID — ver ARMADILHAS.md §22
-    meta_waba_id         text            -- ID da WhatsApp Business Account (templates; não entra na URL de envio)
+    meta_waba_id         text,           -- ID da WhatsApp Business Account (templates; não entra na URL de envio)
+    -- Kill switch por clínica (18/08/2026): desliga só a resposta automática
+    -- da IA no WhatsApp. Mensagem do paciente continua logada — handoff pra
+    -- humano, não buraco negro (mesmo raciocínio do D-23). Gate no n8n fica
+    -- em "Bot Ativo?", logo antes de "Envia Resposta do Agent". RLS: só a
+    -- própria clínica lê/edita (auth_clinic_id()), e authenticated só tem
+    -- GRANT em (id, name, bot_ativo) — ver ARMADILHAS.md §44.
+    bot_ativo            boolean NOT NULL DEFAULT true
 );
 
 

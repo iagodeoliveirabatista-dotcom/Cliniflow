@@ -16,7 +16,7 @@
   <script src="supabase-client.js?v=12"></script>
 
   <script type="text/babel" src="tweaks-panel.jsx?v=5"></script>
-  <script type="text/babel" src="cliniflow-components.jsx?v=12"></script>
+  <script type="text/babel" src="cliniflow-components.jsx?v=13"></script>
   <script type="text/babel" src="patients-components.jsx?v=11"></script>
   <script type="text/babel" src="reports-components.jsx?v=5"></script>
   <script type="text/babel" src="automation-components.jsx?v=6"></script>
@@ -51,6 +51,16 @@
       --supabase-bg-input: #161616;
       --supabase-icon-inactive: #3a3a3a;
       --supabase-border-strong: #3d3d3d;
+
+      /* Cores de sinalização da agenda. Existem por tema porque o mesmo hex não
+         serve os dois: #3ecf8e é legível sobre #0f0f0f e some sobre branco
+         (1,96:1). Os tons claros abaixo são os do tema ESCURO. */
+      --st-confirmado: #3ecf8e;
+      --st-pendente:   #9ca3af;
+      --st-remarcado:  #f59e0b;
+      --st-cancelado:  #ef4444;
+      --st-solicitado: #c084fc;
+      --st-recusado:   #94a3b8;
     }
     :root[data-theme="light"] {
       --supabase-bg-main: #f3f4f6;
@@ -69,6 +79,17 @@
       --supabase-bg-input: #eef0f2;
       --supabase-icon-inactive: #aeb4bd;
       --supabase-border-strong: #c8ccd2;
+
+      /* Mesmas famílias de cor, escurecidas até o texto do badge passar de
+         4,5:1 SOBRE O PRÓPRIO PREENCHIMENTO (14% da mesma cor sobre o branco do
+         card) — que é o pior caso da tela, não sobre o branco puro.
+         Não clareie sem remedir: o primeiro chute (#047857) dava só 3,97. */
+      --st-confirmado: #065f46;
+      --st-pendente:   #4b5563;
+      --st-remarcado:  #92400e;
+      --st-cancelado:  #b91c1c;
+      --st-solicitado: #7e22ce;
+      --st-recusado:   #374151;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { height: 100%; overflow: hidden; }
@@ -173,6 +194,7 @@
       const [appts, setAppts] = useState([...APPOINTMENTS]);
       const [patients, setPatients] = useState([...PATIENTS]);
       const [profissionais, setProfissionais] = useState([]);
+      const [botAtivo, setBotAtivo] = useState(true);
       const [selectedId, setSelectedId] = useState(null);
       const [filter, setFilter] = useState('todas');
       const [page, setPage] = useState('agenda');
@@ -227,6 +249,13 @@
         SB.fetchProfissionais().then(res => {
           if (res.data) {
             setProfissionais(res.data);
+          }
+        });
+
+        // Load clinic settings (kill switch do bot de IA)
+        SB.fetchClinicSettings().then(res => {
+          if (res.data) {
+            setBotAtivo(res.data.bot_ativo);
           }
         });
 
@@ -502,6 +531,16 @@
         }
       }, [dbConnected]);
 
+      // Kill switch: desliga só a resposta automática da IA no WhatsApp.
+      // Mensagem do paciente continua chegando e logada no CRM (handoff pra
+      // humano, não buraco negro — mesmo raciocínio do D-23).
+      const toggleBotAtivo = useCallback(async (novoAtivo) => {
+        setBotAtivo(novoAtivo);
+        if (dbConnected) {
+          await SB.updateBotAtivo(novoAtivo);
+        }
+      }, [dbConnected]);
+
       const profissionaisAtivos = useMemo(
         () => profissionais.filter(p => p.ativo),
         [profissionais]
@@ -667,6 +706,8 @@
               profissionais={profissionais}
               onAddProfissional={addProfissional}
               onToggleProfissionalAtivo={toggleProfissionalAtivo}
+              botAtivo={botAtivo}
+              onToggleBotAtivo={toggleBotAtivo}
               onClose={() => setSettingsOpen(false)}
             />
           )}
@@ -736,7 +777,7 @@
 
     // ── Configurações: tema, cor de destaque e profissionais ─────────────
     // Aberto pelo item "Configurações" da sidebar.
-    function SettingsModal({ theme, accentKey, onSetTheme, onSetAccent, accent, onClose, profissionais = [], onAddProfissional, onToggleProfissionalAtivo }) {
+    function SettingsModal({ theme, accentKey, onSetTheme, onSetAccent, accent, onClose, profissionais = [], onAddProfissional, onToggleProfissionalAtivo, botAtivo = true, onToggleBotAtivo }) {
       const [novoNome, setNovoNome] = useState('');
 
       const sectionLabelStyle = {
@@ -790,6 +831,22 @@
                   }} />
                 ))}
               </div>
+            </div>
+
+            <div style={{ borderTop:'1px solid var(--supabase-border)', paddingTop:16 }}>
+              <div style={{ ...sectionLabelStyle, justifyContent:'space-between', marginBottom:6 }}>
+                <span>Bot de IA</span>
+                <ToggleSwitch
+                  checked={botAtivo}
+                  accent={accent}
+                  onChange={v => onToggleBotAtivo && onToggleBotAtivo(v)}
+                />
+              </div>
+              <p style={{ fontSize:11.5, color:'var(--supabase-text-muted)', margin:0, lineHeight:1.4 }}>
+                {botAtivo
+                  ? 'A IA responde automaticamente no WhatsApp.'
+                  : 'IA desligada: mensagens continuam chegando no CRM, mas ninguém responde sozinho.'}
+              </p>
             </div>
 
             <div style={{ borderTop:'1px solid var(--supabase-border)', paddingTop:16 }}>
@@ -1043,6 +1100,7 @@
       const [modo, setModo] = useState('entrar'); // 'entrar' | 'criar'
       const [email, setEmail] = useState('');
       const [senha, setSenha] = useState('');
+      const [confirmarSenha, setConfirmarSenha] = useState('');
       const [erro, setErro] = useState('');
       const [aviso, setAviso] = useState('');
       const [enviando, setEnviando] = useState(false);
@@ -1060,6 +1118,7 @@
         setModo(novo);
         setErro('');
         setAviso('');
+        setConfirmarSenha('');
       }
 
       async function enviar(e) {
@@ -1067,6 +1126,10 @@
         if (enviando) return;
         setErro('');
         setAviso('');
+        if (criando && senha !== confirmarSenha) {
+          setErro('As senhas não coincidem.');
+          return;
+        }
         setEnviando(true);
         const res = criando
           ? await SB.signUp(email.trim(), senha)
@@ -1082,6 +1145,7 @@
           setAviso('Conta criada. Confirme o link que enviamos para ' + email.trim() + ' e depois entre.');
           setModo('entrar');
           setSenha('');
+          setConfirmarSenha('');
           setEnviando(false);
         }
         // sucesso com sessão: o onAuthStateChange no Root troca a tela.
@@ -1155,6 +1219,15 @@
               value={senha} onChange={e => setSenha(e.target.value)}
               style={inputStyle}
             />
+            {criando && (
+              <input
+                type="password" required minLength={6}
+                autoComplete="new-password"
+                placeholder="Confirmar senha"
+                value={confirmarSenha} onChange={e => setConfirmarSenha(e.target.value)}
+                style={inputStyle}
+              />
+            )}
 
             {erro && (
               <div style={{ fontSize:13, color:'#f87171' }}>{erro}</div>

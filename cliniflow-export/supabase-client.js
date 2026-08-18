@@ -470,6 +470,21 @@
     });
   }
 
+  // ── CLÍNICA (kill switch do bot de IA) ──────────────────────────────────────
+
+  async function fetchClinicSettings() {
+    return query(async (sb) => {
+      return sb.from('clinics').select('id, name, bot_ativo').single();
+    });
+  }
+
+  async function updateBotAtivo(ativo) {
+    return query(async (sb) => {
+      const clinicId = await getClinicId();
+      return sb.from('clinics').update({ bot_ativo: ativo }).eq('id', clinicId).select('bot_ativo').single();
+    });
+  }
+
   // ── CONFIGURAÇÃO DE AUTOMAÇÃO ───────────────────────────────────────────────
 
   async function fetchConfigAutomacao() {
@@ -868,6 +883,8 @@
     onAuthStateChange,
     getClinicId,
     registrarClinica,
+    fetchClinicSettings,
+    updateBotAtivo,
 
     // Pacientes
     fetchPacientes,
