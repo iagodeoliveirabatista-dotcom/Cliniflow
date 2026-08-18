@@ -1632,3 +1632,37 @@ para essa tabela. RLS e GRANT são camadas independentes — fechar uma sem a ou
 **Verificado:** `anon` sem nenhuma linha em `column_privileges` para `clinics`; `authenticated`
 só com SELECT/UPDATE em `bot_ativo` (mais SELECT em `id`/`name`) — as colunas sensíveis mantêm só
 `REFERENCES`, que não é exposto via PostgREST.
+
+---
+
+## 46. Apagar clínica NÃO apaga paciente e consulta — vira registro fantasma ⚠️ ATIVO
+
+**Sintoma:** você apaga uma clínica de teste com `delete from clinics where id = …`, confere e o
+banco parece limpo — mas `select count(*) from patients` devolve **mais linhas do que antes do
+teste**. Nenhum erro, nenhuma FK violada. Pela tela do CRM os registros **não aparecem em lugar
+nenhum**, em nenhuma conta.
+
+**Causa:** as FKs de `clinic_id` não são todas iguais (medido em 18/08/2026):
+
+| CASCADE (some junto) | SET NULL (fica órfão) |
+|---|---|
+| `clinic_users` · `config_automacao` · `conversations` · `profissionais` | **`patients`** · **`consultas`** |
+
+Com `clinic_id` NULL, a policy `clinic_id = auth_clinic_id()` nunca casa — o registro fica
+invisível para toda conta, inclusive a sua. Ele não sumiu: só não tem mais dono.
+
+**Por que é pior que sujeira:** `Busca Paciente` no n8n casa **só por telefone**, sem filtrar
+`clinic_id` (§26). Um paciente órfão com telefone real continua sendo encontrável pelo bot — de
+qualquer clínica. Órfão com dado de paciente de verdade é vazamento esperando acontecer.
+
+**Correção (rode SEMPRE depois de apagar qualquer clínica):**
+```sql
+delete from consultas where clinic_id is null;
+delete from patients  where clinic_id is null;
+```
+
+**Não faça:** concluir "limpei" só porque `clinics` e `auth.users` voltaram à contagem certa —
+foi exatamente esse o erro. Confira `count(*) where clinic_id is null` nas duas tabelas.
+
+**Em aberto:** ninguém decidiu se `SET NULL` é intencional (preservar histórico de paciente se a
+clínica sai do sistema) ou descuido. Enquanto não decidir, a limpeza é manual.

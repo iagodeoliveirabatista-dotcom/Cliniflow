@@ -38,6 +38,7 @@ assumir. Multi-clínica por `clinic_id`. Lembretes saem por Edge Function + `pg_
 | **`DROP COLUMN` quebra função em silêncio** | plpgsql só valida na execução. E a sonda com UUID falso diz "funciona". §27 |
 | **Print do dono no tema claro não prova nada** | Autofill do Chrome pinta o campo e esconde contraste de 2,2:1. Meça, ou abra anônima. §44 |
 | **Conta nova sempre cria clínica NOVA e vazia** | Não existe "entrar na clínica que já existe". Vincule por SQL, não pelo onboarding. §43 |
+| **Apagar clínica deixa paciente/consulta órfãos** | FK é `SET NULL`, não CASCADE. Somem da tela e o bot ainda acha por telefone. §46 |
 | **Apagar clínica desloga o usuário** | CASCADE em `clinic_users` → CRM cai no onboarding e você cria clínica vazia. §28 |
 | **Tabela nova nasce com RLS ligado e SEM policy** | Event trigger `ensure_rls`. Anon lê `[]` com HTTP 200. §13 |
 | **Não tire o TTL do buffer de debounce** | Sem ele, falha de envio gruda a conversa velha na nova. §12 |
@@ -97,8 +98,10 @@ conversas e o n8n continuam sem prova. Hoje: 1 clínica (`Clinica Anaruthe`), 1 
   hex (`${cor}26`) sobre um `var()`: o browser descarta e o elemento fica sem fundo.
 - **`?v=NN` nos `.jsx` é o cache-buster do projeto e ninguém bumpa.** Mexeu num `.jsx`? Bumpe no
   `index.html`, senão quem já abriu o site continua com o código velho. (Hoje: components `v=13`.)
-- **NUNCA exercitado logado:** cadastrar paciente e criar consulta **pela tela** (o conserto do
-  `docs/db/08` só foi testado no papel; os 2 pacientes do banco vieram do bot). Teste isso antes.
+- ✅ **Cadastrar paciente e criar consulta pela tela: TESTADO logado** (18/08, conta e clínica
+  descartáveis, apagadas depois). O `clinic_id` DEFAULT do `docs/db/08` preenche e o RLS aceita —
+  os dois inserts caíram na clínica da sessão, zero erro no console. O caminho da recepção
+  funciona. ⚠️ A limpeza revelou o §46: paciente e consulta **não** somem com a clínica.
 - **Bloqueio:** a conta da recepção não pode passar pelo onboarding (§43) — vincule à Anaruthe
   por SQL, senão ela cai numa clínica vazia e acha que "sumiu tudo".
 - **Sem "esqueci minha senha"** (não existe tela) e **"Confirm email" ligado** — a 1ª entrada
