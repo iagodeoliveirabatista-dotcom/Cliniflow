@@ -7,36 +7,6 @@
 
 ## 🟡 Em aberto
 
-### D-OPEN-5 — O lembrete manual manda um texto que não é o de nenhum lugar · 18/08/2026
-**Contexto:** o dono testou o botão "Enviar lembrete WhatsApp" do card da consulta e reparou que a
-mensagem que chega **não é** a dos envios automáticos. Confirmado no código: o texto do botão está
-**cravado no frontend** (`sendWa`, em `cliniflow-components.jsx`) —
-*"Olá {nome}! 😊 Lembramos da sua consulta ({tipo}) amanhã às {hora} com {medico}. Confirme: ✅
-CONFIRMAR ou ❌ CANCELAR"*. Hoje existem **quatro** redações para a mesma ideia:
-
-| Onde | Texto | Quem vê |
-|---|---|---|
-| Botão manual | cravado no `.jsx` | o paciente, quando a recepção clica |
-| `config_automacao.template_mensagem` | no banco, editável no painel | ninguém — é o que a tela mostra |
-| `consulta_amanha` (Meta, 24h) | congelado na aprovação | o paciente, no lembrete automático |
-| `confirmao_horas_antes` (Meta, 4h) | congelado, diz "4 horas" | o paciente, no lembrete automático |
-
-**Por que não é só copiar e colar:** texto livre só passa dentro da janela de 24h (§31) — por isso
-o automático usa template. Mas os dois templates aprovados **afirmam tempo** ("amanhã", "4 horas"),
-e um envio manual acontece a qualquer hora. Unificar no template faz o botão mentir; unificar no
-texto livre faz o botão falhar fora da janela.
-
-| Opção | Prós | Contras |
-|---|---|---|
-| **A. Template novo, neutro** ("você tem consulta em {data} às {hora}") ⭐ | uma redação só, funciona a qualquer hora | depende de aprovação da Meta |
-| B. Botão lê `template_mensagem` do banco | acaba com o texto cravado, o painel passa a mandar de verdade | continua quebrando fora da janela de 24h |
-| C. Botão manda `consulta_amanha` | zero espera | mente se a consulta não for amanhã |
-
-**Recomendação:** A, e enquanto o template novo não é aprovado, B — que pelo menos tira o texto de
-dentro do código e faz o painel de automações significar alguma coisa.
-**Status:** aguardando o dono. Não implemente sem escolher — é mensagem que chega em paciente.
-
-
 ### D-OPEN-1 — Quando fechar o acesso aos dados de paciente
 **Contexto:** `patients`, `consultas` e `mensagem_logs` estão com RLS `USING (true)`. A chave anon
 é pública (está no `config.js` servido ao browser). Verificado em 26/07/2026: um `GET
@@ -73,6 +43,31 @@ painel não depender do push. **Status:** aguardando o usuário.
 ---
 
 ## 🟢 Tomadas
+
+### D-35 — Lembrete manual passa a usar o texto do lembrete de 24h · 18/08/2026
+**Decisão do dono, fechando a D-OPEN-5:** os templates aprovados na Meta **ficam como estão** (não
+mexer no que já passou por aprovação), e o botão "Enviar lembrete WhatsApp" do card passa a mandar
+exatamente a redação do lembrete automático de 24h:
+
+> Oi {nome}! Lembramos que você tem uma consulta amanhã ({data}) às {hora} com {medico}. Por
+> favor, confirme sua presença. 😊
+
+**O que veio junto, e sem isso a mensagem sairia errada:**
+- O texto usa `{data}`, e o `sendWa` passava `data: '—'` — o paciente receberia "consulta amanhã
+  (—)". Agora a data vem de `apt.dataHoraISO`, formatada `D/M/AAAA` **igual à Edge Function**
+  (`disparar-lembretes`), para o CRM e o WhatsApp contarem a mesma história.
+- Médico vazio vira "seu médico", mesmo fallback do automático.
+- `moveAppt` e `aprovarPedido` atualizavam `day`/`time` mas **não** o `dataHoraISO` do card.
+  Arrastar uma consulta e clicar no lembrete anunciaria o **dia velho** ao paciente. Corrigido.
+
+**Limite que continua valendo:** é texto livre, então só passa dentro da janela de 24h (§31). Fora
+dela a Meta recusa (131047) e o botão falha. Quem quiser um manual que funcione a qualquer hora
+precisa de um template novo aprovado — era a opção A da D-OPEN-5, que o dono não escolheu agora.
+
+⚠️ **Verificado até onde dá sem mandar mensagem a paciente:** rodei `consultaToAppointment` com uma
+consulta real e apliquei o template — texto final confere, sem placeholder sobrando, com e sem
+médico. **Não** cliquei no botão (isso manda WhatsApp de verdade).
+
 
 ### D-34 — Humano que escreve no chat assume do bot, e o switch mostra isso · 18/08/2026
 **Decisão:** o primeiro envio manual numa conversa pausa a IA daquele paciente

@@ -109,8 +109,9 @@ dono (`admin`) e a da recepção (`recepcao`), ambas ligadas a ela.
 - ✅ **A conta da recepção existe e entrou** (`clinica.anaruthe.grangeiro@gmail.com`, papel
   `recepcao`, vinculada à Anaruthe por SQL — o onboarding **não** faz isso, §43). "Confirm email"
   foi **desligado** no painel: cadastro público cria conta sem confirmar nada.
-- ⚠️ **D-34 escrito e NÃO exercitado:** responder à mão passou a pausar a IA do paciente. Ninguém
-  viu rodando — o demo não prova (§47). É o 1º teste a fazer com a conversa real.
+- ⚠️ **D-34 e D-35 escritos e NÃO exercitados:** responder à mão passou a pausar a IA (D-34) e o
+  lembrete manual passou a usar o texto do automático de 24h (D-35). O demo não prova escrita
+  (§47) e clicar de verdade manda WhatsApp — são o 1º teste a fazer com a conversa real.
 - ⚠️ **`consultas` está VAZIA** (0 linhas em 18/08 03:55 UTC; eram 3 às 20:47 de 17/08). Não fui
   eu — confirme com quem mexeu antes de concluir que sumiu dado.
 - ✅ **Kill switch do bot** (D-32, 18/08): toggle "Bot de IA" em Configurações desliga só a
@@ -124,9 +125,10 @@ dono (`admin`) e a da recepção (`recepcao`), ambas ligadas a ela.
    paciente real com preço, convênio, endereço e CRO de uma clínica fictícia — é o único item que
    **já causa dano**, e nenhum agente resolve: depende de conteúdo que o dono ficou de produzir.
    **Aplique o D-27 na mesma publicação.**
-1. **Escolher o texto do lembrete manual (D-OPEN-5).** O botão do card manda uma redação cravada
-   no `.jsx`, diferente das 4 que existem. Mensagem que chega em paciente — decida antes de
-   alguém apertar de novo. Junto: provar o D-34 (responder à mão deve pausar a IA).
+1. **Provar D-34 e D-35 com a conversa real** (2 min, ninguém precisa esperar): responder à mão →
+   o switch tem que virar e `patients.bot_pausado` ir para `true`; clicar em "Enviar lembrete
+   WhatsApp" → tem que chegar o texto do lembrete de 24h, com data e hora certas. Os dois estão
+   escritos e revisados, **nenhum foi visto chegando no celular**.
 2. **Fechar o ciclo de ponta a ponta, com paciente real.** Aprovar pedido → esperar o lembrete →
    responder "ok" → conferir se `consultas.status` virou `confirmado`. Um teste valida §37, §38,
    §39 e D-23 de uma vez. **É o item mais valioso do projeto agora.**

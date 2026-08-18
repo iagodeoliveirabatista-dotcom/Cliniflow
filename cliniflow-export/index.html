@@ -13,10 +13,10 @@
   <script src="supabase.js"></script>
 
   <script src="config.js"></script>
-  <script src="supabase-client.js?v=12"></script>
+  <script src="supabase-client.js?v=13"></script>
 
   <script type="text/babel" src="tweaks-panel.jsx?v=5"></script>
-  <script type="text/babel" src="cliniflow-components.jsx?v=14"></script>
+  <script type="text/babel" src="cliniflow-components.jsx?v=15"></script>
   <script type="text/babel" src="patients-components.jsx?v=11"></script>
   <script type="text/babel" src="reports-components.jsx?v=5"></script>
   <script type="text/babel" src="automation-components.jsx?v=6"></script>
@@ -355,15 +355,20 @@
       }, [dbConnected]);
 
       const moveAppt = useCallback(async (id, newDay, newTime) => {
-        setAppts(prev => prev.map(a => a.id === id ? { ...a, day: newDay, time: newTime } : a));
+        // A data nova é calculada ANTES do setAppts porque o card carrega
+        // `dataHoraISO` (usado no texto do lembrete manual). Atualizar só `day` e
+        // `time` deixaria o card com a data velha, e o lembrete anunciaria o
+        // dia errado ao paciente depois de qualquer arrasto.
+        const targetDate = new Date(currentMonday);
+        targetDate.setDate(currentMonday.getDate() + newDay);
+        const [h, m] = newTime.split(':').map(Number);
+        targetDate.setHours(h, m, 0, 0);
+        const novaISO = targetDate.toISOString();
+
+        setAppts(prev => prev.map(a => a.id === id ? { ...a, day: newDay, time: newTime, dataHoraISO: novaISO } : a));
 
         if (dbConnected) {
-          // Calculate new date from currentMonday
-          const targetDate = new Date(currentMonday);
-          targetDate.setDate(currentMonday.getDate() + newDay);
-          const [h, m] = newTime.split(':').map(Number);
-          targetDate.setHours(h, m, 0, 0);
-          await SB.updateConsulta(id, { data_hora: targetDate.toISOString() });
+          await SB.updateConsulta(id, { data_hora: novaISO });
         }
       }, [dbConnected, currentMonday]);
 
@@ -389,7 +394,7 @@
         const time = `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
 
         setAppts(prev => prev.map(a => a.id === id
-          ? { ...a, status: 'pending', day, time, dur: duracao_min, type: tipo, doctor: medico || '' }
+          ? { ...a, status: 'pending', day, time, dataHoraISO: data_hora, dur: duracao_min, type: tipo, doctor: medico || '' }
           : a));
 
         if (patient_id) {

@@ -925,9 +925,15 @@ function DetailPanel({ appointment: apt, onClose, accent, onUpdateStatus, onDele
 
     if (SB && SB.isConnected() && apt.phone) {
       // Real send via n8n webhook
+      // Mesma redação do lembrete automático de 24h (config_automacao.template_mensagem,
+      // escolhida pelo dono em 18/08 — D-35). Data e médico são formatados como a
+      // Edge Function formata (`D/M/AAAA`, "seu médico"), senão o CRM conta uma
+      // história e o paciente recebe outra.
+      const dt = apt.dataHoraISO ? new Date(apt.dataHoraISO) : null;
+      const dataFmt = dt ? `${dt.getDate()}/${dt.getMonth() + 1}/${dt.getFullYear()}` : '';
       const msg = SB.aplicarTemplate(
-        'Olá {nome}! 😊 Lembramos da sua consulta ({tipo}) amanhã às {hora} com {medico}. Confirme: ✅ CONFIRMAR ou ❌ CANCELAR',
-        { nome: apt.patient, data: '—', hora: apt.time, medico: apt.doctor, tipo: apt.type }
+        'Oi {nome}! Lembramos que você tem uma consulta amanhã ({data}) às {hora} com {medico}. Por favor, confirme sua presença. 😊',
+        { nome: apt.patient, data: dataFmt, hora: apt.time, medico: apt.doctor || 'seu médico', tipo: apt.type }
       );
       const cleanPhone = apt.phone.replace(/\D/g, '');
       const result = await SB.enviarWhatsApp(cleanPhone, msg, 'manual', apt._supabaseId || null, apt.patient);
