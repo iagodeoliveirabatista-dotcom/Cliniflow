@@ -1695,3 +1695,41 @@ inicializado com o array de exemplo. É pequeno, mas mexe no fluxo de dados da a
 **não faça isso às vésperas de uso real** (foi por isso que ficou de fora em 18/08).
 
 **Não faça:** marcar como ✅ um comportamento de escrita "testado no demo". Não foi.
+
+---
+
+## 48. Apagar a clínica detona `clinic_users` + `config_automacao` + `conversations` e orfana `patients`/`consultas` — tudo de uma vez
+
+**Status: OCORRIDO em 03/09/2026, recuperado no mesmo dia.** É o §28 e o §46 juntos, em escala,
+mais uma clínica-fantasma no meio.
+
+**Sintoma:** o dono apagou uma clínica (achava que era de teste) e, ao entrar no CRM, caiu em
+"Cadastre sua clínica" — as duas contas (admin e recepção) desvinculadas. Além disso:
+`config_automacao` vazia (lembretes 24h/4h e de-para de template sumidos), `conversations` e
+`profissionais` zerados, 6 pacientes e 2 consultas com `clinic_id NULL` (invisíveis para todos).
+
+**Causa:** as FKs de `clinic_id` não são uniformes —
+
+| ON DELETE CASCADE (some junto) | ON DELETE SET NULL (vira órfão) |
+|---|---|
+| `clinic_users` · `config_automacao` · `conversations` · `profissionais` | `patients` · `consultas` |
+
+Um `DELETE` em `clinics` dispara os dois efeitos de uma vez. `auth_clinic_id()` passa a devolver
+NULL para todo mundo → onboarding → §43 (clínica nova e vazia).
+
+**Agravante encontrado na recuperação:** já existia uma clínica `6b7445d9-…` criada **21/08** por
+uma sessão anterior / outro agente, com `bot_ativo=false` e `meta_phone_number_id` já preenchido —
+mas `meta_waba_id` errado (`202201446305611` no lugar de `1837917480542611`). Nada disso no
+`git log` nem no `AGENTS.md`. Houve trabalho fora de registro entre 18/08 e 03/09.
+
+**Recuperação (03/09):** clínica recriada com o ID original
+`7936105a-b198-419f-bad7-a65e2e60725b` (o que o n8n tem cravado — §43), herdando a config Meta da
+`6b7445d9` com o `meta_waba_id` corrigido; `patients`/`consultas` re-vinculados; as 2 contas
+re-inseridas em `clinic_users` (admin + recepcao); `6b7445d9` apagada. `config_automacao` **NÃO**
+recriada — o `docs/db/06` diz que os templates foram aprovados na WABA da **I2B**, então recriar
+config antes de checar a WABA da Grangeiro001 (`1837917480542611`, receita §41) seria o §39 de
+fábrica.
+
+**Prevenção:** onboarding self-service trancado (`DECISIONS.md` D-36). E antes de qualquer
+`DELETE FROM clinics`: rode a varredura de dependência do §43 e nunca conclua "limpei" sem
+`count(*) where clinic_id is null` em `patients` **e** `consultas`.

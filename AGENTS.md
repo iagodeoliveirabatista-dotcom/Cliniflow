@@ -51,8 +51,17 @@ assumir. Multi-clínica por `clinic_id`. Lembretes saem por Edge Function + `pg_
 | **Lembrete disparado = bot mudo por 16h** | Sessão em `sessoes_ativas` desvia TUDO pro roteiro de confirmação. §36 |
 | **Execução `success` ≠ paciente recebeu algo** | Ramo que morre em nó sem saída fecha verde. Olhe `lastNodeExecuted`. §36 |
 | **A ordem das regras em `Valida contexto` É a lógica** | Regra ancorada (`^...$`) acima de uma `\b...\b` que divide vocabulário torna a de baixo inalcançável. §38 |
+| **`DELETE FROM clinics` detona meio banco** | CASCADE em `clinic_users`/`config_automacao`/`conversations`/`profissionais` + órfã `patients`/`consultas`. Desloga todo mundo. §48 |
 
 ## Estado atual (15/08/2026)
+
+🔧 **03/09 — migração Meta em andamento + recuperação de banco:** o dono apagou a clínica e ela
+foi restaurada com o ID original `7936105a-…` (§48). As 2 contas re-vinculadas. Onboarding
+self-service trancado (D-36). Chip novo `+55 88 98169-8181` (phone_number_id `1279538321913994`,
+WABA `1837917480542611`) adicionado no App da Grangeiro001 mas **ainda "Não registrado"** (erro
+"Falha na inscrição"). `config_automacao` **vazia** — reconstruir só depois de checar os templates
+na WABA da Grangeiro001 (§41; o `docs/db/06` diz que foram aprovados na WABA da I2B). Token no
+`clinics` está **comprometido** (colado num chat) — rotacionar. `bot_ativo=false`.
 
 ✅ **15/08:** §37 · §38 · D-23 · D-26 · D-28 · D-29 · D-30 · lembretes ressuscitados e
 multi-tenant (§39). Detalhe no `git log` e nos §/D citados.
