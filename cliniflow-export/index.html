@@ -1280,41 +1280,18 @@
     }
 
     // ── Onboarding: cria a clínica quando a sessão não tem vínculo ──────────
-    // D-OPEN-4 (decidido em 29/07/2026, reabre a D-6): só aparece para quem
-    // logou e cujo auth_clinic_id() voltou NULL. A RPC registrar_clinica gera
-    // o clinic_id no servidor — o frontend nunca escolhe nem envia um.
-    function OnboardingClinica({ onCriada }) {
-      const [nome, setNome] = useState('');
-      const [erro, setErro] = useState('');
-      const [enviando, setEnviando] = useState(false);
-
-      const inputStyle = {
-        width:'100%', padding:'9px 11px', fontSize:14,
-        background:'var(--supabase-bg-input)', color:'var(--supabase-text-light)',
-        border:'1px solid var(--supabase-border)', borderRadius:8,
-        outline:'none',
-      };
-
-      async function cadastrar(e) {
-        e.preventDefault();
-        if (enviando || !nome.trim()) return;
-        setErro('');
-        setEnviando(true);
-        const res = await SB.registrarClinica(nome.trim());
-        if (!res.success) {
-          setErro(res.error);
-          setEnviando(false);
-          return;
-        }
-        onCriada(res.clinicId);
-      }
-
+    // §43 / D-36: o autocadastro de clínica pela tela criava clínicas vazias
+    // duplicadas — qualquer conta sem vínculo caía aqui e "criava" a clínica que
+    // já existe. Onboarding self-service trancado: conta sem clínica só vê um
+    // aviso. Vincular acesso é feito à mão (SQL) pelo administrador.
+    // A RPC registrar_clinica continua no supabase-client.js, sem chamador.
+    function OnboardingClinica() {
       return (
         <div style={{
           height:'100%', display:'flex', alignItems:'center', justifyContent:'center',
           background:'var(--supabase-bg-studio)',
         }}>
-          <form onSubmit={cadastrar} style={{
+          <div style={{
             width:360, padding:32, borderRadius:16,
             background:'var(--supabase-bg-card)',
             border:'1px solid var(--supabase-border)',
@@ -1323,32 +1300,21 @@
             display:'flex', flexDirection:'column', gap:14,
           }}>
             <div style={{ fontSize:17, fontWeight:600, color:'var(--supabase-text)' }}>
-              Cadastre sua clínica
+              Acesso não vinculado
             </div>
-            <div style={{ fontSize:13, color:'var(--supabase-text-muted)' }}>
-              Sua conta ainda não está vinculada a nenhuma clínica.
+            <div style={{ fontSize:13, color:'var(--supabase-text-muted)', lineHeight:1.5 }}>
+              Sua conta ainda não está vinculada a nenhuma clínica. Peça ao
+              administrador para liberar o seu acesso.
             </div>
 
-            <input
-              type="text" placeholder="Nome da clínica" required
-              value={nome} onChange={e => setNome(e.target.value)}
-              style={inputStyle}
-            />
-
-            {erro && (
-              <div style={{ fontSize:13, color:'#f87171' }}>{erro}</div>
-            )}
-
-            <button type="submit" disabled={enviando} style={{
+            <button type="button" onClick={() => SB.signOut()} style={{
               padding:'9px 11px', fontSize:14, fontWeight:600,
               background:'var(--supabase-brand)', color:'#0f0f0f',
-              border:'none', borderRadius:8,
-              cursor: enviando ? 'default' : 'pointer',
-              opacity: enviando ? 0.6 : 1,
+              border:'none', borderRadius:8, cursor:'pointer',
             }}>
-              {enviando ? '...' : 'Criar clínica'}
+              Sair
             </button>
-          </form>
+          </div>
         </div>
       );
     }
@@ -1407,7 +1373,7 @@
       const modoDemo = !SB || !SB.isConnected();
       if (!modoDemo && !session) return <LoginScreen />;
       if (!modoDemo && session && !clinicId) {
-        return <OnboardingClinica onCriada={setClinicId} />;
+        return <OnboardingClinica />;
       }
 
       // key força o App a remontar quando a conta muda, refazendo as inscrições.

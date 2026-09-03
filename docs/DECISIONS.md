@@ -44,6 +44,22 @@ painel não depender do push. **Status:** aguardando o usuário.
 
 ## 🟢 Tomadas
 
+### D-36 — Onboarding self-service de clínica fica trancado; vínculo é manual · 03/09/2026
+**Decisão:** `OnboardingClinica` (`index.html`) não deixa mais criar clínica pela tela. Conta
+logada sem vínculo em `clinic_users` vê "Acesso não vinculado — peça ao administrador" + botão
+Sair. A RPC `registrar_clinica` continua no banco e no `supabase-client.js`, **sem chamador**.
+
+**Por quê:** o autocadastro (D-31/D-12) criava clínicas vazias duplicadas — qualquer conta sem
+vínculo caía no onboarding e "criava" a clínica que já existe, enquanto o n8n continuava gravando
+na antiga (§43). Custou uma recuperação inteira em 03/09 (`ARMADILHAS.md` §48). Com uma clínica só
+e vínculo por SQL, self-service não paga o risco.
+
+**Consequência:** a 2ª clínica (algum dia) entra por SQL, como o D-6 já previa. Reabrir quando
+existir fluxo de convite/código — a alternativa que o §43 sugeria.
+
+**Reverte:** só a parte de "criar clínica" do D-31 e do D-12. O login por e-mail/senha (D-31) e o
+botão Google (D-12) continuam de pé.
+
 ### D-35 — Lembrete manual passa a usar o texto do lembrete de 24h · 18/08/2026
 **Decisão do dono, fechando a D-OPEN-5:** os templates aprovados na Meta **ficam como estão** (não
 mexer no que já passou por aprovação), e o botão "Enviar lembrete WhatsApp" do card passa a mandar
