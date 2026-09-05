@@ -61,7 +61,9 @@ trancado (D-36). `bot_ativo=false`.
 
 **Meta — o que já está pronto:**
 - Chip `+55 88 98169-8181` — `phone_number_id 1279538321913994`, WABA `1837917480542611` (portfólio
-  Grangeiro001). `code_verification_status: VERIFIED`, `name_status: AVAILABLE_WITHOUT_REVIEW`.
+  Grangeiro001). **REGISTRADO** e `status: CONNECTED`, `platform_type: CLOUD_API`, `quality: GREEN`,
+  tier `TIER_250`. O registro passou pela **API** (`POST /register`, PIN **`152535`**) depois que a
+  UI da Meta falhava com "Falha na inscrição" sem dizer motivo. ⚠️ **PIN `152535` — trocar/anotar.**
 - 3 templates **APPROVED** na WABA `1837917480542611` (pt_BR, UTILITY): `aviso_dia_anterior`
   (nome/data/hora/medico), `aviso_horas_antes` (nome/hora/medico), `resposta_confirmao` (sem params).
   ⚠️ o `aviso_horas_antes` **não** tem "4 horas" cravado no corpo — o §41 não morde mais.
@@ -70,9 +72,9 @@ trancado (D-36). `bot_ativo=false`.
 - `clinics`: `meta_phone_number_id`/`meta_waba_id` certos.
 
 **Meta — o que falta (ordem em Próximos passos):**
-- ⛔ **Chip "Não registrado"** — `platform_type: NOT_APPLICABLE`. Falta o `POST /register` com PIN.
 - ⚠️ Token no `clinics` **comprometido** (colado num chat em 03/09) — rotacionar.
-- Confirmar payment method na WABA `1837917480542611` (não numa das outras 3 WABAs homônimas).
+- Confirmar `Assinar webhooks` ligado na WABA `1837917480542611` e assinando SÓ `messages` (§24).
+- Teste ponta a ponta com o dono de paciente (passo 4).
 - `resposta_confirmao` existe mas **não está ligado** a nada (seria o §36 — resposta ao "ok").
 
 ✅ **15/08:** §37 · §38 · D-23 · D-26 · D-28 · D-29 · D-30 · lembretes ressuscitados e
@@ -148,18 +150,9 @@ dono (`admin`) e a da recepção (`recepcao`), ambas ligadas a ela.
 "Funcionou" = 1 consulta real: paciente recebe o lembrete de 24h sozinho, responde "ok", e
 `consultas.status` vira `confirmado` na agenda — sem tocar no n8n.
 
-1. **Registrar o chip.** No SQL Editor (o token já está no `clinics`; escolha um PIN de 6 díg):
-   ```sql
-   select net.http_post(
-     url := 'https://graph.facebook.com/v21.0/1279538321913994/register',
-     headers := jsonb_build_object(
-       'Authorization','Bearer '||(select meta_access_token from clinics where id='7936105a-b198-419f-bad7-a65e2e60725b'),
-       'Content-Type','application/json'),
-     body := jsonb_build_object('messaging_product','whatsapp','pin','SEU_PIN'));
-   -- depois:  select status_code, content::jsonb from net._http_response order by id desc limit 1;
-   ```
-   Espera `{"success":true}`. Erro → o JSON diz o motivo (2FA da I2B, espera de 7 dias, payment).
-   Confirma: `GET /1279538321913994?fields=platform_type` tem que virar `CLOUD_API`.
+1. ✅ **Chip registrado** (03/09, via API — `status: CONNECTED`, `platform_type: CLOUD_API`,
+   `TIER_250`). PIN de 2 etapas = **`152535`** — trocar em WhatsApp Manager → número → Verificação
+   em duas etapas, ou pelo menos anotar (perder trava migração futura).
 2. **Rotacionar o token** (system user Grangeiro001) → `update clinics set meta_access_token='<novo>'
    where id='7936105a-b198-419f-bad7-a65e2e60725b'`. O atual foi exposto num chat.
 3. **Webhook** — no App, assinar SÓ `messages` (§24). Confirmar `Assinar webhooks` ligado na WABA.
