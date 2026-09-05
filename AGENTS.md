@@ -147,8 +147,12 @@ dono (`admin`) e a da recepção (`recepcao`), ambas ligadas a ela.
 ### 🔜 PILOTO META — ordem pra fechar (03/09)
 
 **Meta:** MVP = recepção humana + lembrete automático + auto-confirmação do paciente. Bot off.
-"Funcionou" = 1 consulta real: paciente recebe o lembrete de 24h sozinho, responde "ok", e
-`consultas.status` vira `confirmado` na agenda — sem tocar no n8n.
+
+✅ **CICLO PROVADO com conversa real (05/09):** lembrete de 24h enviou (via `disparar-lembretes` E
+via botão manual D-35), o dono respondeu "Confirmo sim" pelo WhatsApp → n8n virou
+`consultas.status` para `confirmado` (visível na agenda) → e mandou o template `resposta_confirmao`
+("Consulta confirmada! ✅") de volta, sozinho. **Primeira vez no projeto** — fecha o "sem prova
+real" dos §36/§37/§38. Webhook da Meta está entregando no n8n e o roteiro de confirmação funciona.
 
 1. ✅ **Chip registrado** (03/09, via API — `status: CONNECTED`, `platform_type: CLOUD_API`,
    `TIER_250`). PIN de 2 etapas = **`152535`** — trocar em WhatsApp Manager → número → Verificação
