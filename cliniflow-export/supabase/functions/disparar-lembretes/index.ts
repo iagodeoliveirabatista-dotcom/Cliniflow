@@ -101,7 +101,10 @@ serve(async (req) => {
           // que contar a mesma história, senão o CRM mostra uma coisa e o
           // paciente recebe outra.
           const valores: Record<string, string> = {
-            nome: paciente.nome,
+            // Só o primeiro nome: lembrete soa mais natural ("Oi Maria!" em vez
+            // de "Oi Maria da Silva Santos!"). Vale para o texto do CRM e para
+            // o parâmetro {{nome}} do template — os dois têm que bater.
+            nome: (paciente.nome || '').trim().split(/\s+/)[0] || paciente.nome,
             data: dataFormatada,
             hora: horaFormatada,
             medico: consulta.medico || 'seu médico',

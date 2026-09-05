@@ -933,7 +933,7 @@ function DetailPanel({ appointment: apt, onClose, accent, onUpdateStatus, onDele
       const dataFmt = dt ? `${dt.getDate()}/${dt.getMonth() + 1}/${dt.getFullYear()}` : '';
       const msg = SB.aplicarTemplate(
         'Oi {nome}! Lembramos que você tem uma consulta amanhã ({data}) às {hora} com {medico}. Por favor, confirme sua presença. 😊',
-        { nome: apt.patient, data: dataFmt, hora: apt.time, medico: apt.doctor || 'seu médico', tipo: apt.type }
+        { nome: (apt.patient || '').trim().split(/\s+/)[0] || apt.patient, data: dataFmt, hora: apt.time, medico: apt.doctor || 'seu médico', tipo: apt.type }
       );
       const cleanPhone = apt.phone.replace(/\D/g, '');
       const result = await SB.enviarWhatsApp(cleanPhone, msg, 'manual', apt._supabaseId || null, apt.patient);
