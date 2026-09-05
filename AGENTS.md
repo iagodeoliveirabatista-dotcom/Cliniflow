@@ -55,13 +55,27 @@ assumir. Multi-clínica por `clinic_id`. Lembretes saem por Edge Function + `pg_
 
 ## Estado atual (15/08/2026)
 
-🔧 **03/09 — migração Meta em andamento + recuperação de banco:** o dono apagou a clínica e ela
-foi restaurada com o ID original `7936105a-…` (§48). As 2 contas re-vinculadas. Onboarding
-self-service trancado (D-36). Chip novo `+55 88 98169-8181` (phone_number_id `1279538321913994`,
-WABA `1837917480542611`) adicionado no App da Grangeiro001 mas **ainda "Não registrado"** (erro
-"Falha na inscrição"). `config_automacao` **vazia** — reconstruir só depois de checar os templates
-na WABA da Grangeiro001 (§41; o `docs/db/06` diz que foram aprovados na WABA da I2B). Token no
-`clinics` está **comprometido** (colado num chat) — rotacionar. `bot_ativo=false`.
+🔧 **03/09 — migração Meta em andamento + recuperação de banco.** Clínica apagada pelo dono e
+restaurada com o ID original `7936105a-…` (§48); 2 contas re-vinculadas; onboarding self-service
+trancado (D-36). `bot_ativo=false`.
+
+**Meta — o que já está pronto:**
+- Chip `+55 88 98169-8181` — `phone_number_id 1279538321913994`, WABA `1837917480542611` (portfólio
+  Grangeiro001). **REGISTRADO** e `status: CONNECTED`, `platform_type: CLOUD_API`, `quality: GREEN`,
+  tier `TIER_250`. O registro passou pela **API** (`POST /register`, PIN **`152535`**) depois que a
+  UI da Meta falhava com "Falha na inscrição" sem dizer motivo. ⚠️ **PIN `152535` — trocar/anotar.**
+- 3 templates **APPROVED** na WABA `1837917480542611` (pt_BR, UTILITY): `aviso_dia_anterior`
+  (nome/data/hora/medico), `aviso_horas_antes` (nome/hora/medico), `resposta_confirmao` (sem params).
+  ⚠️ o `aviso_horas_antes` **não** tem "4 horas" cravado no corpo — o §41 não morde mais.
+- `config_automacao` recriada: `lembrete_24h`→`aviso_dia_anterior` (24h), `lembrete_4h`→
+  `aviso_horas_antes` (4h). Ambas `ativo=true`. Cron `disparar-lembretes` (#2) roda de hora em hora.
+- `clinics`: `meta_phone_number_id`/`meta_waba_id` certos.
+
+**Meta — o que falta (ordem em Próximos passos):**
+- ⚠️ Token no `clinics` **comprometido** (colado num chat em 03/09) — rotacionar.
+- Confirmar `Assinar webhooks` ligado na WABA `1837917480542611` e assinando SÓ `messages` (§24).
+- Teste ponta a ponta com o dono de paciente (passo 4).
+- `resposta_confirmao` existe mas **não está ligado** a nada (seria o §36 — resposta ao "ok").
 
 ✅ **15/08:** §37 · §38 · D-23 · D-26 · D-28 · D-29 · D-30 · lembretes ressuscitados e
 multi-tenant (§39). Detalhe no `git log` e nos §/D citados.
@@ -129,6 +143,33 @@ dono (`admin`) e a da recepção (`recepcao`), ambas ligadas a ela.
   mal amanhã.
 
 ## 🎯 Próximos passos (comece por aqui)
+
+### 🔜 PILOTO META — ordem pra fechar (03/09)
+
+**Meta:** MVP = recepção humana + lembrete automático + auto-confirmação do paciente. Bot off.
+
+✅ **CICLO PROVADO com conversa real (05/09):** lembrete de 24h enviou (via `disparar-lembretes` E
+via botão manual D-35), o dono respondeu "Confirmo sim" pelo WhatsApp → n8n virou
+`consultas.status` para `confirmado` (visível na agenda) → e mandou o template `resposta_confirmao`
+("Consulta confirmada! ✅") de volta, sozinho. **Primeira vez no projeto** — fecha o "sem prova
+real" dos §36/§37/§38. Webhook da Meta está entregando no n8n e o roteiro de confirmação funciona.
+
+1. ✅ **Chip registrado** (03/09, via API — `status: CONNECTED`, `platform_type: CLOUD_API`,
+   `TIER_250`). PIN de 2 etapas = **`152535`** — trocar em WhatsApp Manager → número → Verificação
+   em duas etapas, ou pelo menos anotar (perder trava migração futura).
+2. **Rotacionar o token** (system user Grangeiro001) → `update clinics set meta_access_token='<novo>'
+   where id='7936105a-b198-419f-bad7-a65e2e60725b'`. O atual foi exposto num chat.
+3. **Webhook** — no App, assinar SÓ `messages` (§24). Confirmar `Assinar webhooks` ligado na WABA.
+4. **Teste ponta a ponta (você de paciente):** cria paciente de teste com o TEU celular, uma
+   consulta `pendente` pra +24h20 (`whatsapp_ativo=true`), roda `disparar-lembretes` à mão
+   (`select net.http_post(url:='.../functions/v1/disparar-lembretes', ...)`), confere `disparados:1`
+   e a mensagem no teu WhatsApp. Responde "ok" → confere `consultas.status = 'confirmado'`.
+5. Só então: primeiro paciente real. Antes disso, resolver os pontos 3/4 do §36 (beco sem saída
+   do "não entendi") e ter rotina de olhar `logs_erro` (D-OPEN-3).
+
+⚠️ `enviar-whatsapp` usa Graph `v20.0` (linha 31) — velho, mas funciona. Trocar pra `v21`+ depois.
+
+### RAG e resto
 
 0. 🔥 **Trocar os 7 documentos do RAG pelos dados reais da Anaruthe** (§40). Hoje o bot responde
    paciente real com preço, convênio, endereço e CRO de uma clínica fictícia — é o único item que
